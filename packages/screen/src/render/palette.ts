@@ -28,7 +28,7 @@ export const PALETTE = {
   playerArmorLight: 0x5a606c,
   playerShot: 0xfff1a8,
   enemyShot: 0xff2a3a,
-  enemy: 0xc9ccd2,
+  enemy: 0xb4b8c0,
   enemyMid: 0x8d9198,
   enemyDark: 0x2a2c31,
   enemyEye: 0xff2a1a,

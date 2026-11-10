@@ -48,11 +48,11 @@ if (m === 'map') {
 } else {
   // Світло, як на картках концептів: тепле згори, червоний контур ззаду, темна підлога.
   scene.add(new THREE.HemisphereLight(0x9a8a96, 0x3a1410, 1.1));
-  const key = new THREE.DirectionalLight(0xffffff, 2.2);
+  const key = new THREE.DirectionalLight(0xfff4ea, 2.6);
   key.position.set(2, 4, 4);
   key.castShadow = true;
   scene.add(key);
-  const rim = new THREE.PointLight(0xff2a1a, 30, 10, 1.5);
+  const rim = new THREE.PointLight(0xff2a1a, 10, 10, 1.5);
   rim.position.set(-1.5, 2.2, -2);
   scene.add(rim);
   const floor = new THREE.Mesh(

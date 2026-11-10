@@ -54,3 +54,27 @@ export const CYL = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
 export const SPHERE = new THREE.SphereGeometry(0.5, 12, 8);
 export const CONE4 = new THREE.ConeGeometry(0.5, 1, 4);
 export const CONE = new THREE.ConeGeometry(0.5, 1, 8);
+
+const UP = new THREE.Vector3(0, 1, 0);
+
+/** Брусок від точки a до точки b (кінцівки, стріли кранів): товщина w×d, довжина = |b − a|. */
+export function seg(
+  geo: THREE.BufferGeometry,
+  color: number,
+  a: [number, number, number],
+  b: [number, number, number],
+  w: number,
+  d = w,
+): Part {
+  const va = new THREE.Vector3(...a);
+  const vb = new THREE.Vector3(...b);
+  const dir = vb.clone().sub(va);
+  const len = dir.length();
+  const q = new THREE.Quaternion().setFromUnitVectors(UP, dir.normalize());
+  const m = new THREE.Matrix4().compose(
+    va.add(vb).multiplyScalar(0.5),
+    q,
+    new THREE.Vector3(w, len, d),
+  );
+  return { geo, color, m };
+}

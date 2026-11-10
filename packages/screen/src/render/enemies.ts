@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {
   GUNNER,
   GUNNER_PEEK,
+  GUNNER_HIDE,
   GUNNER_OPEN,
   SCOUT,
   SCOUT_WINDUP,
@@ -11,7 +12,7 @@ import {
   type Player,
 } from '@horizon/sim';
 import { PALETTE } from './palette';
-import { BOX, CONE4, SPHERE, merge, part } from './mesh';
+import { BOX, CONE4, SPHERE, merge, part, seg, type Part } from './mesh';
 import { models, type ModelInstance } from './models';
 import { toX, toZ } from './coords';
 
@@ -39,44 +40,86 @@ const VISUAL_SCALE: Record<EnemyType, number> = { scout: 1.35, gunner: 1.45 };
 
 const P = PALETTE;
 
-// Скаут: двоногий, тонкий, з гострою головою й довгими лезами замість рук — біжить і ріже.
-const scoutHull = merge([
-  part(BOX, P.enemyDark, [0.16, 0.28, -0.04], [0.08, 0.5, 0.08], [0.35, 0, 0]),
-  part(BOX, P.enemyDark, [-0.16, 0.28, -0.04], [0.08, 0.5, 0.08], [0.35, 0, 0]),
-  part(BOX, P.enemy, [0.16, 0.5, 0.06], [0.12, 0.12, 0.18]),
-  part(BOX, P.enemy, [-0.16, 0.5, 0.06], [0.12, 0.12, 0.18]),
-  part(BOX, P.enemyMid, [0, 0.66, 0], [0.34, 0.2, 0.28]),
-  part(CONE4, P.enemy, [0, 0.86, 0.05], [0.42, 0.34, 0.42], [0.3, Math.PI / 4, 0]),
-  part(CONE4, P.enemy, [0, 1.12, 0.08], [0.2, 0.36, 0.22], [0.35, Math.PI / 4, 0]),
-  part(BOX, P.enemyDark, [0.24, 0.84, 0.05], [0.07, 0.07, 0.3], [0.6, 0, 0]),
-  part(BOX, P.enemyDark, [-0.24, 0.84, 0.05], [0.07, 0.07, 0.3], [0.6, 0, 0]),
-  // Леза — світлі й довгі: саме їх видно в силуеті.
-  part(BOX, P.enemy, [0.3, 0.62, 0.42], [0.04, 0.06, 0.75], [-0.35, 0.12, 0]),
-  part(BOX, P.enemy, [-0.3, 0.62, 0.42], [0.04, 0.06, 0.75], [-0.35, -0.12, 0]),
-]);
-const scoutGlow = merge([
-  part(BOX, 0xffffff, [0, 1.06, 0.2], [0.12, 0.05, 0.05]),
-  part(BOX, 0xffffff, [0, 0.78, 0.18], [0.08, 0.08, 0.05]),
-]);
+// Скаут (concept enemies.jpg): високий, двоногий, коліна назад, шип на голові,
+// два довгі серпи замість рук — загинаються донизу й уперед.
+function scoutParts(): { hull: THREE.BufferGeometry; glow: THREE.BufferGeometry } {
+  const hull: Part[] = [];
+  const glow: Part[] = [];
+  for (const sx of [1, -1]) {
+    const hip: V3 = [0.13 * sx, 0.74, -0.02];
+    const knee: V3 = [0.16 * sx, 0.48, 0.15];
+    const ankle: V3 = [0.16 * sx, 0.17, -0.12];
+    const toe: V3 = [0.16 * sx, 0.02, 0.1];
+    hull.push(
+      seg(BOX, P.enemy, hip, knee, 0.11, 0.13),
+      seg(BOX, P.enemyDark, knee, ankle, 0.07),
+      seg(BOX, P.enemyMid, ankle, toe, 0.1, 0.06),
+      part(BOX, P.enemyDark, knee, [0.1, 0.1, 0.1]),
+    );
+    const shoulder: V3 = [0.19 * sx, 1.0, 0.02];
+    const elbow: V3 = [0.31 * sx, 0.86, 0.14];
+    const mid: V3 = [0.36 * sx, 0.6, 0.42];
+    const tip: V3 = [0.3 * sx, 0.22, 0.58];
+    hull.push(
+      part(BOX, P.enemyMid, shoulder, [0.12, 0.1, 0.14]),
+      seg(BOX, P.enemyDark, shoulder, elbow, 0.07),
+      // Леза пласкі й світлі: саме їх видно в силуеті згори.
+      seg(BOX, P.enemy, elbow, mid, 0.03, 0.13),
+      seg(BOX, P.enemy, mid, tip, 0.025, 0.08),
+    );
+  }
+  hull.push(
+    part(BOX, P.enemyDark, [0, 0.76, -0.02], [0.3, 0.1, 0.18]),
+    seg(BOX, P.enemyDark, [0, 0.78, -0.02], [0, 0.88, 0.03], 0.1),
+    part(BOX, P.enemy, [0, 0.95, 0.04], [0.3, 0.24, 0.22], [0.25, 0, 0]),
+    part(BOX, P.enemyMid, [0, 0.95, 0.15], [0.16, 0.14, 0.04], [0.25, 0, 0]),
+    part(BOX, P.enemy, [0, 1.14, 0.1], [0.18, 0.13, 0.2]),
+    part(CONE4, P.enemy, [0, 1.36, 0.02], [0.14, 0.34, 0.16], [-0.35, Math.PI / 4, 0]),
+  );
+  glow.push(part(BOX, 0xffffff, [0, 1.14, 0.205], [0.08, 0.035, 0.02]));
+  return { hull: merge(hull), glow: merge(glow) };
+}
 
-// Стрілець: гуманоїд у світлій броні з бластером; присідає за укриттям.
-const gunnerHull = merge([
-  part(BOX, P.enemyDark, [0.14, 0.3, 0], [0.16, 0.6, 0.2]),
-  part(BOX, P.enemyDark, [-0.14, 0.3, 0], [0.16, 0.6, 0.2]),
-  part(BOX, P.enemy, [0.14, 0.42, 0.08], [0.17, 0.2, 0.08]),
-  part(BOX, P.enemy, [-0.14, 0.42, 0.08], [0.17, 0.2, 0.08]),
-  part(BOX, P.enemyMid, [0, 0.66, 0], [0.38, 0.14, 0.24]),
-  part(BOX, P.enemy, [0, 0.92, 0], [0.48, 0.4, 0.3]),
-  part(BOX, P.enemy, [0.32, 1.06, 0], [0.2, 0.16, 0.3]),
-  part(BOX, P.enemy, [-0.32, 1.06, 0], [0.2, 0.16, 0.3]),
-  part(SPHERE, P.enemy, [0, 1.28, 0.02], [0.3, 0.28, 0.3]),
-  part(BOX, P.enemyDark, [0.2, 0.92, 0.36], [0.12, 0.16, 0.7]),
-  part(BOX, P.enemyMid, [0.2, 1.0, 0.2], [0.08, 0.06, 0.3]),
-]);
-const gunnerGlow = merge([
-  part(BOX, 0xffffff, [0, 1.28, 0.16], [0.1, 0.08, 0.04]),
-  part(BOX, 0xffffff, [0.2, 0.92, 0.72], [0.09, 0.09, 0.03]),
-]);
+// Стрілець: гуманоїд у світлій броні, кругла голова з червоним оком, бластер біля плеча.
+function gunnerParts(): { hull: THREE.BufferGeometry; glow: THREE.BufferGeometry } {
+  const hull: Part[] = [];
+  for (const sx of [1, -1]) {
+    hull.push(
+      seg(BOX, P.enemyDark, [0.14 * sx, 0.64, 0], [0.15 * sx, 0.34, 0.06], 0.15),
+      seg(BOX, P.enemy, [0.15 * sx, 0.36, 0.07], [0.15 * sx, 0.06, 0], 0.15, 0.17),
+      part(BOX, P.enemyDark, [0.15 * sx, 0.04, 0.05], [0.16, 0.08, 0.26]),
+      part(BOX, P.enemy, [0.32 * sx, 1.1, 0], [0.2, 0.15, 0.28]),
+    );
+  }
+  hull.push(
+    part(BOX, P.enemyMid, [0, 0.68, 0], [0.36, 0.14, 0.24]),
+    part(BOX, P.enemyDark, [0, 0.84, 0], [0.32, 0.2, 0.22]),
+    part(BOX, P.enemy, [0, 1.02, 0], [0.48, 0.3, 0.3]),
+    part(BOX, P.enemyMid, [0, 1.03, 0.15], [0.3, 0.2, 0.04]),
+    part(SPHERE, P.enemy, [0, 1.3, 0.02], [0.28, 0.27, 0.29]),
+    part(BOX, P.enemyDark, [0, 1.3, 0.13], [0.22, 0.08, 0.06]),
+    // Бластер біля плеча, обидві руки на ньому.
+    part(BOX, P.enemyDark, [0.14, 1.0, 0.36], [0.1, 0.14, 0.72]),
+    part(BOX, P.enemyMid, [0.14, 1.07, 0.3], [0.06, 0.05, 0.3]),
+    seg(BOX, P.enemyDark, [0.32, 1.08, 0], [0.3, 0.9, 0.12], 0.1),
+    seg(BOX, P.enemy, [0.3, 0.9, 0.12], [0.16, 0.95, 0.2], 0.09),
+    seg(BOX, P.enemyDark, [-0.32, 1.08, 0], [-0.2, 0.9, 0.22], 0.1),
+    seg(BOX, P.enemy, [-0.2, 0.9, 0.22], [0.1, 0.97, 0.46], 0.09),
+  );
+  const glow = [
+    part(BOX, 0xffffff, [0, 1.3, 0.165], [0.07, 0.05, 0.02]),
+    part(BOX, 0xffffff, [0.14, 1.0, 0.725], [0.07, 0.07, 0.02]),
+  ];
+  return { hull: merge(hull), glow: merge(glow) };
+}
+
+type V3 = [number, number, number];
+const scoutGeo = scoutParts();
+const gunnerGeo = gunnerParts();
+const scoutHull = scoutGeo.hull;
+const scoutGlow = scoutGeo.glow;
+const gunnerHull = gunnerGeo.hull;
+const gunnerGlow = gunnerGeo.glow;
 
 // Одинична довжина вздовж +Z від початку координат, масштабується на відстань до цілі.
 const laserGeo = new THREE.BoxGeometry(0.09, 0.09, 1).translate(0, 0, 0.5);
@@ -250,7 +293,12 @@ export class EnemyRenderer {
       const windup = e.type === 'scout' && e.ai === SCOUT_WINDUP;
       const prog = windup ? 1 - e.aiT / windupTicks : 0;
       // Замах: присідання, розгорання ока й червоне кільце, що стискається до моменту удару.
-      const crouch = windup ? 1 - prog * 0.3 : 1;
+      // Стрілець за укриттям присідає — ритм «сховався → визирнув» читається без підказок.
+      const crouch = windup
+        ? 1 - prog * 0.3
+        : e.type === 'gunner' && e.ai === GUNNER_HIDE
+          ? 0.8
+          : 1;
       const speed = Math.hypot(e.vx, e.vy);
       const bob = Math.abs(Math.sin(time * 18 + i)) * 0.05 * Math.min(1, speed / 3);
       const bs = VISUAL_SCALE[v.type];
