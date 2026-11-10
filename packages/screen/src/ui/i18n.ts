@@ -37,7 +37,7 @@ const uk = {
     medic: 'Медик',
     tech: 'Технік',
   } as Record<string, string>,
-  controlsHint: 'WASD — рух · Пробіл — ривок · стрільба автоматична',
+  controlsHint: 'WASD — рух · Пробіл — ривок · Shift — здібність · стрільба автоматична',
 };
 
 export type Strings = typeof uk;

@@ -81,4 +81,15 @@ export function botInput(game: Game, slot: number, out: PlayerInput): void {
     out.move.y = ay / l;
   }
   out.dash = danger && p.dashCd === 0;
+
+  // Здібність: коли поруч тиснуть вороги (або, для Медика, хтось поранений).
+  // Ввід — стан кнопки, тож чергуємо true/false, щоб був передній фронт.
+  if (p.abilityCd === 0 && p.abilityT === 0 && p.overheatT === 0 && s.tick % 2 === 0) {
+    let near = 0;
+    for (const e of s.enemies) if (e.alive && (e.x - p.x) ** 2 + (e.y - p.y) ** 2 < 64) near++;
+    const hurt = s.players.some(
+      (o) => !o.down && o.hp < o.maxHp * 0.6 && (o.x - p.x) ** 2 + (o.y - p.y) ** 2 < 16,
+    );
+    out.ability = p.classId === 'medic' ? hurt : near >= 3 || (p.classId === 'engineer' && danger);
+  }
 }

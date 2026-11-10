@@ -5,12 +5,14 @@ import { DEFAULT_CONFIG, type ClassId, type GameConfig } from './config';
 import { createEnemyPool } from './entities/enemy';
 import { createPlayer } from './entities/player';
 import { createPickupPool } from './entities/pickup';
+import { createBarrierPool } from './entities/barrier';
 import { createProjectilePool } from './entities/projectile';
 import { createEventBuffer } from './events';
 import { createRng } from './rng';
 import type { PlayerInput } from './protocol';
 import type { Game, GameState } from './state';
 import { updateAutoaim } from './systems/autoaim';
+import { updateAbilities } from './systems/abilities';
 import { updatePlayerFire, updateProjectiles } from './systems/combat';
 import { updateEnemies } from './systems/enemies';
 import { updatePlayers } from './systems/movement';
@@ -43,6 +45,7 @@ export function createGame(
     enemies: createEnemyPool(ENEMY_CAPACITY),
     projectiles: createProjectilePool(PROJECTILE_CAPACITY),
     pickups: createPickupPool(PICKUP_CAPACITY),
+    barriers: createBarrierPool(4),
     enemiesAlive: 0,
     wave: createWaveState(),
     partsCarry: 0,
@@ -72,6 +75,7 @@ export function step(game: Game, inputs: readonly PlayerInput[]): GameState {
   const s = game.state;
   if (s.phase !== 'playing') return s;
   updatePlayers(game, inputs);
+  updateAbilities(game);
   updateWaves(game);
   updateEnemies(game);
   updateAutoaim(game);
@@ -100,4 +104,6 @@ export { threatOf } from './systems/autoaim';
 export { serializeState, hashState } from './serialize';
 export { SCOUT_WINDUP } from './ai/scout';
 export { botInput } from './ai/playerBot';
+export { abilityReadiness, ABILITY_CLASS_INDEX } from './systems/abilities';
+export type { Barrier } from './entities/barrier';
 export { GUNNER_HIDE, GUNNER_PEEK, GUNNER_SEEK, GUNNER_OPEN, GUNNER_RETURN } from './ai/gunner';

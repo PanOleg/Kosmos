@@ -44,6 +44,7 @@ export function spawnEnemy(game: Game, type: EnemyType, x: number, y: number): n
     e.cover = -1;
     e.stagger = 0;
     e.exposed = false;
+    e.stun = 0;
     s.enemiesAlive++;
     emit(game.events, 'spawn', x, y, 0, 0, i);
     return i;
@@ -137,14 +138,19 @@ export function updateEnemies(game: Game): void {
 
     steer.x = 0;
     steer.y = 0;
-    switch (e.type) {
-      case 'scout':
-        updateScout(game, e, i);
-        break;
-      case 'gunner':
-        updateGunner(game, e, i);
-        break;
-    }
+    // Заглушений ЕМІ: стоїть, не атакує, вразливий (автоприціл бере його охочіше).
+    if (e.stun > 0) {
+      e.stun--;
+      e.exposed = true;
+    } else
+      switch (e.type) {
+        case 'scout':
+          updateScout(game, e, i);
+          break;
+        case 'gunner':
+          updateGunner(game, e, i);
+          break;
+      }
 
     let wx = steer.x * e.speed;
     let wy = steer.y * e.speed;

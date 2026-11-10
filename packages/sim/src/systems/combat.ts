@@ -5,6 +5,71 @@ import { DT, TICKS_PER_SEC } from '../math';
 import { randRange } from '../rng';
 import type { Game } from '../state';
 import { damageEnemy, damagePlayer } from './damage';
+import { ABILITIES, type ArcDef } from '../config/classes';
+import { hasLineOfSight } from '../collision/world';
+import { damageBarrier, segBarrier } from './abilities';
+
+const arcHit = new Int32Array(8);
+
+/**
+ * Електродуга Техніка: миттєво б'є ціль і перескакує на найближчих сусідів (без повторів),
+ * кожен стрибок слабший. Події 'arc' — відрізки для рендеру блискавки.
+ */
+function fireArc(
+  game: Game,
+  slot: number,
+  first: number,
+  damage: number,
+  knock: number,
+  arc: ArcDef,
+): void {
+  const s = game.state;
+  const h = game.hash;
+  const p = s.players[slot]!;
+  let fromX = p.x + p.fx * 0.7;
+  let fromY = p.y + p.fy * 0.7;
+  let cur = first;
+  let dmg = damage;
+  let n = 0;
+  const r2 = arc.jumpRange * arc.jumpRange;
+  for (let jump = 0; jump <= arc.jumps && cur >= 0; jump++) {
+    const e = s.enemies[cur]!;
+    arcHit[n++] = cur;
+    emit(game.events, 'arc', fromX, fromY, e.x, e.y, slot, jump);
+    const dx = e.x - fromX;
+    const dy = e.y - fromY;
+    const l = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ex = e.x;
+    const ey = e.y;
+    damageEnemy(game, e, cur, dmg, dx / l, dy / l, knock, slot);
+    fromX = ex;
+    fromY = ey;
+    dmg *= arc.falloff;
+    // Наступна ціль — найближча неуражена в радіусі стрибка з прямою видимістю.
+    let best = -1;
+    let bestD = r2;
+    const x0 = Math.max(0, Math.floor((ex - arc.jumpRange + h.half) / h.cell));
+    const x1 = Math.min(h.n - 1, Math.floor((ex + arc.jumpRange + h.half) / h.cell));
+    const y0 = Math.max(0, Math.floor((ey - arc.jumpRange + h.half) / h.cell));
+    const y1 = Math.min(h.n - 1, Math.floor((ey + arc.jumpRange + h.half) / h.cell));
+    for (let gy = y0; gy <= y1; gy++)
+      for (let gx = x0; gx <= x1; gx++)
+        for (let j = h.head[gy * h.n + gx]!; j >= 0; j = h.next[j]!) {
+          const o = s.enemies[j]!;
+          if (!o.alive) continue;
+          let seen = false;
+          for (let k = 0; k < n; k++) if (arcHit[k] === j) seen = true;
+          if (seen) continue;
+          const d2 = (o.x - ex) ** 2 + (o.y - ey) ** 2;
+          if (d2 < bestD && hasLineOfSight(game.world, ex, ey, o.x, o.y)) {
+            bestD = d2;
+            best = j;
+          }
+        }
+    cur = best;
+  }
+  emit(game.events, 'shot', p.x + p.fx * 0.7, p.y + p.fy * 0.7, p.fx, p.fy, slot, 1, 1);
+}
 
 export function spawnProjectile(
   game: Game,
@@ -59,8 +124,15 @@ export function updatePlayerFire(game: Game): void {
     dy /= l;
     p.fx = dx;
     p.fy = dy;
-    if (p.fireCd > 0) continue;
-    p.fireCd += TICKS_PER_SEC / w.rate;
+    // Перегрів після перевантаження: ціль тримаємо, але не стріляємо.
+    if (p.fireCd > 0 || p.overheatT > 0) continue;
+    const overload = p.classId === 'assault' && p.abilityT > 0 ? ABILITIES.overload.rateMul : 1;
+    p.fireCd += TICKS_PER_SEC / (w.rate * overload);
+    const arc = game.config.classes[p.classId].arc;
+    if (arc) {
+      fireArc(game, p.slot, p.target, w.damage, w.knockback, arc);
+      continue;
+    }
     const muzzle = 0.7;
     const ox = p.x + dx * muzzle;
     const oy = p.y + dy * muzzle;
@@ -154,6 +226,16 @@ export function updateProjectiles(game: Game): void {
           hitIdx = p.slot;
         }
       }
+      // Бар'єр Інженера зупиняє ворожі кулі раніше за гравця.
+      for (let k = 0; k < s.barriers.length; k++) {
+        const bar = s.barriers[k]!;
+        if (!bar.alive) continue;
+        const t = segBarrier(bar, b.x, b.y, nx, ny);
+        if (t < hitT) {
+          hitT = t;
+          hitIdx = -2 - k;
+        }
+      }
     }
 
     if (hitT < 1) {
@@ -163,7 +245,9 @@ export function updateProjectiles(game: Game): void {
       const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
       const kx = b.vx / sp;
       const ky = b.vy / sp;
-      if (hitIdx >= 0 && b.team === TEAM_PLAYER) {
+      if (hitIdx <= -2) {
+        damageBarrier(game, s.barriers[-2 - hitIdx]!, b.damage, b.x, b.y);
+      } else if (hitIdx >= 0 && b.team === TEAM_PLAYER) {
         damageEnemy(game, s.enemies[hitIdx]!, hitIdx, b.damage, kx, ky, b.knockback, b.owner);
       } else if (hitIdx >= 0 && b.team === TEAM_ENEMY) {
         const p = s.players[hitIdx]!;

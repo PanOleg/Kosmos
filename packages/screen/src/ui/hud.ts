@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TICKS_PER_SEC, type Game } from '@horizon/sim';
+import { TICKS_PER_SEC, abilityReadiness, type Game } from '@horizon/sim';
 import { classColor, hexCss } from '../render/palette';
 import { toX, toZ } from '../render/coords';
 import { t } from './i18n';
@@ -24,6 +24,10 @@ const css = `
 @keyframes hudpop { 0% { transform: scale(1.6); } 100% { transform: scale(1); } }
 .bar { height: 7px; background: rgba(255,255,255,.12); border-radius: 4px; overflow: hidden; margin-top: 6px; }
 .bar > i { display: block; height: 100%; transition: width .12s; }
+.hud-card .ab { height: 3px; margin-top: 4px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; }
+.hud-card .ab > i { display: block; height: 100%; opacity: .55; }
+.hud-card .ab.ready > i { opacity: 1; animation: abpulse 1s ease-in-out infinite; }
+@keyframes abpulse { 50% { opacity: .5; } }
 .over { position: absolute; width: 46px; height: 5px; margin-left: -23px; background: rgba(0,0,0,.55); border-radius: 3px; overflow: hidden; }
 .over > i { display: block; height: 100%; }
 .announce { position: absolute; top: 22%; left: 0; right: 0; text-align: center; font-size: 46px; font-weight: 800; letter-spacing: .12em;
@@ -46,6 +50,8 @@ let styleInstalled = false;
 interface Card {
   el: HTMLDivElement;
   hp: HTMLElement;
+  ab: HTMLElement;
+  abWrap: HTMLElement;
   parts: HTMLElement;
   lastParts: number;
 }
@@ -81,11 +87,13 @@ export class Hud {
       const el = document.createElement('div');
       el.className = 'hud-card';
       Object.assign(el.style, CORNERS[p.slot % 4], { borderColor: color });
-      el.innerHTML = `${portrait(color)}<div class="row"><span class="cls"><span style="opacity:.6">P${p.slot + 1}</span> <span style="color:${color}">${t.className[p.classId]}</span></span><span class="parts">⚙ 0</span></div><div class="bar"><i style="background:${color};width:100%"></i></div>`;
+      el.innerHTML = `${portrait(color)}<div class="row"><span class="cls"><span style="opacity:.6">P${p.slot + 1}</span> <span style="color:${color}">${t.className[p.classId]}</span></span><span class="parts">⚙ 0</span></div><div class="bar"><i style="background:${color};width:100%"></i></div><div class="ab"><i style="background:${color}"></i></div>`;
       this.root.appendChild(el);
       this.cards.push({
         el,
         hp: el.querySelector('.bar > i')!,
+        ab: el.querySelector('.ab > i')!,
+        abWrap: el.querySelector('.ab')!,
         parts: el.querySelector('.parts')!,
         lastParts: 0,
       });
@@ -140,6 +148,10 @@ export class Hud {
     for (const p of s.players) {
       const c = this.cards[p.slot]!;
       c.hp.style.width = `${(p.hp / p.maxHp) * 100}%`;
+      // Готовність здібності: заповнюється під час перезарядки, пульсує, коли можна тиснути.
+      const ready = abilityReadiness(game, p);
+      c.ab.style.width = `${ready * 100}%`;
+      c.abWrap.classList.toggle('ready', ready >= 1);
       const parts = Math.floor(p.parts + 1e-6);
       if (parts !== c.lastParts) {
         c.parts.textContent = `⚙ ${parts}`;

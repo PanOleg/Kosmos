@@ -30,6 +30,7 @@ import { PickupRenderer } from './render/pickups';
 import { FxDirector } from './render/fx';
 import { Sfx } from './audio/sfx';
 import { PostFx } from './render/post';
+import { AbilityRenderer } from './render/abilities';
 import { models } from './render/models';
 import { Hud } from './ui/hud';
 import { showResults } from './ui/results';
@@ -141,7 +142,11 @@ void openRoom();
 class BotSource implements InputSource {
   constructor(private readonly slot: number) {}
   read(out: PlayerInput): void {
-    if (match) botInput(match.game, this.slot, out);
+    if (!match) return;
+    botInput(match.game, this.slot, out);
+    // ?debug: window.forceAbility = true — боти тиснуть здібність, щойно вона готова (огляд ефектів).
+    if (DEBUG && (window as unknown as { forceAbility?: boolean }).forceAbility)
+      out.ability = match.game.state.tick % 2 === 0;
   }
 }
 
@@ -173,6 +178,7 @@ interface Match {
   bulletR: ProjectileRenderer;
   pickupR: PickupRenderer;
   fx: FxDirector;
+  abilityR: AbilityRenderer;
   hud: Hud;
   camPoints: { x: number; z: number }[];
   results: HTMLDivElement | null;
@@ -207,6 +213,7 @@ function startMatch(): void {
     return v;
   });
   const enemyR = new EnemyRenderer(scene, game.state.enemies.length);
+  const fx = new FxDirector(scene, cam, sfx, playerViews, enemyR);
   match = {
     game,
     slots: order,
@@ -216,7 +223,15 @@ function startMatch(): void {
     enemyR,
     bulletR: new ProjectileRenderer(scene, game.state.projectiles.length),
     pickupR: new PickupRenderer(scene, game.state.pickups.length),
-    fx: new FxDirector(scene, cam, sfx, playerViews, enemyR),
+    fx,
+    abilityR: new AbilityRenderer(
+      scene,
+      fx.sparks,
+      sfx,
+      cam,
+      game.state.players.length,
+      game.state.barriers.length,
+    ),
     hud: new Hud(game),
     camPoints: game.state.players.map(() => ({ x: 0, z: 0 })),
     results: null,
@@ -336,6 +351,7 @@ function handleMatchEvents(m: Match): void {
   for (let i = 0; i < ev.count; i++) {
     const e = ev.list[i]!;
     m.fx.handle(e);
+    m.abilityR.handle(e);
     if (e.type === 'playerHit') lobby.hurt(e.a, e.value);
     const def = g.config.waves[e.a];
     if (e.type === 'wavePause' && def) {
@@ -442,6 +458,7 @@ function frameMatch(m: Match, now: number, dt: number): void {
   m.bulletR.update(g.state.projectiles, alpha, m.classes);
   m.pickupR.update(g.state.pickups, alpha, time);
   m.fx.update(g, dt);
+  m.abilityR.update(g, dt, time);
   cam.update(m.camPoints, live, dt, time);
   m.enemyR.updateBars(g.state.enemies, alpha, cam.camera);
   m.hud.update(g, cam.camera, dt);

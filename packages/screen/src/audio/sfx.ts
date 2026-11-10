@@ -138,6 +138,46 @@ export class Sfx {
     this.burst('lowpass', 900, 100, 1, 0.2, 0.4);
   }
 
+  /** Дуга Техніка: короткий електричний тріск. */
+  arc(): void {
+    this.burst('highpass', 6000, 2500, 1, 0.06, 0.16);
+    this.tone('square', 1800, 600, 0.05, 0.05);
+  }
+
+  /** Активація здібності: 0 Штурмовик, 1 Інженер, 2 Медик, 3 Технік. */
+  ability(cls: number): void {
+    switch (cls) {
+      case 0:
+        this.tone('sawtooth', 200, 900, 0.35, 0.18);
+        break;
+      case 1:
+        this.tone('triangle', 300, 600, 0.25, 0.2);
+        this.burst('bandpass', 800, 2400, 2, 0.3, 0.12);
+        break;
+      case 2:
+        [523, 659, 784].forEach((f, i) =>
+          setTimeout(() => this.tone('sine', f, f, 0.25, 0.14), i * 70),
+        );
+        break;
+      case 3:
+        this.tone('sine', 1200, 60, 0.5, 0.35);
+        this.burst('lowpass', 4000, 100, 1, 0.45, 0.35);
+        break;
+    }
+  }
+
+  overheat(): void {
+    this.burst('highpass', 3000, 6000, 0.5, 0.6, 0.12);
+  }
+
+  barrierHit(): void {
+    this.tone('triangle', 700, 500, 0.08, 0.1);
+  }
+
+  barrierBreak(): void {
+    this.burst('bandpass', 3000, 400, 1.5, 0.4, 0.3);
+  }
+
   /** Сигнал станції перед хвилею: дві низькі ноти сирени. */
   stationSignal(): void {
     const ctx = this.ctx;

@@ -25,6 +25,14 @@ export interface Player {
   invuln: number;
   prevDash: boolean;
   prevAbility: boolean;
+  /** Цього тику натиснуто здібність (передній фронт кнопки). */
+  abilityPressed: boolean;
+  /** Тики до готовності здібності. */
+  abilityCd: number;
+  /** Тики дії здібності (перевантаження, поле); 0 — не активна. */
+  abilityT: number;
+  /** Тики перегріву Штурмовика після перевантаження: стріляти не можна. */
+  overheatT: number;
   fireCd: number;
   /** Ід ворога-цілі, -1 якщо немає. */
   target: number;
@@ -66,6 +74,10 @@ export function createPlayer(
     invuln: 0,
     prevDash: false,
     prevAbility: false,
+    abilityPressed: false,
+    abilityCd: 0,
+    abilityT: 0,
+    overheatT: 0,
     fireCd: 0,
     target: -1,
     parts: 0,

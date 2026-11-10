@@ -13,16 +13,42 @@ export interface WeaponDef {
   knockback: number;
 }
 
+/** Електродуга Техніка: миттєве влучання з перескоком на сусідні цілі. */
+export interface ArcDef {
+  /** Скільки додаткових цілей після першої. */
+  jumps: number;
+  /** Множник шкоди за кожен стрибок (−30% → 0.7). */
+  falloff: number;
+  /** Максимальна відстань стрибка, м. */
+  jumpRange: number;
+}
+
 export interface ClassDef {
   hp: number;
   weapon: WeaponDef;
+  arc?: ArcDef;
+  /** Перезарядка здібності, с (BALANCE.md). */
+  abilityCooldown: number;
 }
+
+/** Параметри здібностей з BALANCE.md. */
+export const ABILITIES = {
+  /** Штурмовик: ×2 скорострільність на 5 с, потім 2 с перегріву без стрільби. */
+  overload: { duration: 5, rateMul: 2, overheat: 2 },
+  /** Інженер: стіна 4 м, 300 HP, 10 с; ставиться перед собою, поперек погляду. */
+  barrier: { length: 4, thickness: 0.35, hp: 300, duration: 10, distance: 2 },
+  /** Медик: поле радіусом 4 м навколо себе, +15 HP/с союзникам 5 с. */
+  healField: { radius: 4, perSecond: 15, duration: 5 },
+  /** Технік: ЕМІ радіусом 7 м, глушить ворогів на 3 с. */
+  emp: { radius: 7, stun: 3 },
+};
 
 const deg = Math.PI / 180;
 
 export const CLASSES: Record<ClassId, ClassDef> = {
   assault: {
     hp: 120,
+    abilityCooldown: 15,
     weapon: {
       damage: 12,
       rate: 5,
@@ -35,6 +61,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
   },
   engineer: {
     hp: 150,
+    abilityCooldown: 20,
     weapon: {
       damage: 8,
       rate: 1.2,
@@ -47,6 +74,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
   },
   medic: {
     hp: 100,
+    abilityCooldown: 18,
     weapon: {
       damage: 20,
       rate: 3,
@@ -59,6 +87,8 @@ export const CLASSES: Record<ClassId, ClassDef> = {
   },
   tech: {
     hp: 110,
+    abilityCooldown: 16,
+    arc: { jumps: 2, falloff: 0.7, jumpRange: 4.5 },
     weapon: {
       damage: 15,
       rate: 4,

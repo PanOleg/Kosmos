@@ -34,6 +34,8 @@ export interface Enemy {
   peekY: number;
   /** Тики відкидання після влучання. */
   stagger: number;
+  /** Тики глушіння ЕМІ: не рухається й не атакує, вразливий. */
+  stun: number;
   /** Ворог «відкритий»: у вікні вразливості (визирає, замахується). */
   exposed: boolean;
 }
@@ -68,6 +70,7 @@ export function createEnemyPool(capacity: number): Enemy[] {
       peekX: 0,
       peekY: 0,
       stagger: 0,
+      stun: 0,
       exposed: false,
     });
   }

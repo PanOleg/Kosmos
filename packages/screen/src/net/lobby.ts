@@ -1,4 +1,4 @@
-import type { ClassId, Game, PlayerInput } from '@horizon/sim';
+import { abilityReadiness, type ClassId, type Game, type PlayerInput } from '@horizon/sim';
 import {
   PING_PACKET_SIZE,
   PKT_INPUT,
@@ -286,7 +286,7 @@ export class LobbyHost {
           maxHp: p ? p.maxHp : 0,
           parts: p ? Math.floor(p.parts + 1e-6) : 0,
           down: p ? p.down : false,
-          ability: 1,
+          ability: p && g ? abilityReadiness(g, p) : 1,
           wave: g ? g.state.wave.index : 0,
         });
       }

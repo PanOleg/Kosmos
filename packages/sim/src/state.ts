@@ -2,6 +2,7 @@ import type { GameConfig } from './config';
 import type { CoverPoints } from './collision/cover';
 import type { SpatialHash } from './collision/spatial';
 import type { StaticWorld } from './collision/world';
+import type { Barrier } from './entities/barrier';
 import type { Enemy } from './entities/enemy';
 import type { Player } from './entities/player';
 import type { Pickup } from './entities/pickup';
@@ -22,6 +23,7 @@ export interface GameState {
   enemies: Enemy[];
   projectiles: Projectile[];
   pickups: Pickup[];
+  barriers: Barrier[];
   enemiesAlive: number;
   wave: WaveState;
   /** Дробовий залишок деталей між дропами. */

@@ -17,6 +17,7 @@ export function updatePlayers(game: Game, inputs: readonly PlayerInput[]): void 
     if (p.down || !inp) {
       p.vx = 0;
       p.vy = 0;
+      p.abilityPressed = false;
       if (inp) {
         p.prevDash = inp.dash;
         p.prevAbility = inp.ability;
@@ -55,6 +56,7 @@ export function updatePlayers(game: Game, inputs: readonly PlayerInput[]): void 
       emit(game.events, 'dash', p.x, p.y, dx, dy, p.slot);
     }
     p.prevDash = inp.dash;
+    p.abilityPressed = inp.ability && !p.prevAbility;
     p.prevAbility = inp.ability;
 
     if (p.dashT > 0) {
