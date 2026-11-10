@@ -17,6 +17,8 @@ import { updateAutoaim } from './systems/autoaim';
 import { updateAbilities } from './systems/abilities';
 import { updateUpgrades } from './systems/upgrades';
 import { updateRockets } from './systems/rockets';
+import { allLost, updateRevive } from './systems/revive';
+import { REVIVE } from './config/revive';
 import { updatePlayerFire, updateProjectiles } from './systems/combat';
 import { updateEnemies } from './systems/enemies';
 import { updatePlayers } from './systems/movement';
@@ -66,6 +68,8 @@ export function createGame(
     cover: buildCover(world, 0.6, 0.8),
     perches: buildPerches(world),
   };
+  // Соло-запобіжник: автопідйом раз на матч (DECISIONS.md, п. 12).
+  if (state.players.length === 1) state.players[0]!.autoRevives = REVIVE.soloAuto;
   updateNav(game.nav, state);
   if (config.waves.length > 0) startWave(game, 0);
   else state.wave.phase = 'done';
@@ -82,6 +86,7 @@ export function step(game: Game, inputs: readonly PlayerInput[]): GameState {
   if (s.phase !== 'playing') return s;
   updatePlayers(game, inputs);
   updateUpgrades(game);
+  updateRevive(game);
   updateAbilities(game);
   updateWaves(game);
   updateEnemies(game);
@@ -90,7 +95,7 @@ export function step(game: Game, inputs: readonly PlayerInput[]): GameState {
   updatePlayerFire(game);
   updateProjectiles(game);
   updatePickups(game);
-  if (s.players.every((p) => p.down)) s.phase = 'lost';
+  if (allLost(game)) s.phase = 'lost';
   s.tick++;
   return s;
 }
@@ -125,5 +130,6 @@ export {
 export type { Rocket } from './entities/rocket';
 export { abilityReadiness, ABILITY_CLASS_INDEX } from './systems/abilities';
 export { shopOpen, upgradePrice, wholeParts } from './systems/upgrades';
+export { reviveCost, downedAllyNear } from './systems/revive';
 export type { Barrier } from './entities/barrier';
 export { GUNNER_HIDE, GUNNER_PEEK, GUNNER_SEEK, GUNNER_OPEN, GUNNER_RETURN } from './ai/gunner';

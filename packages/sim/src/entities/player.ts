@@ -40,6 +40,16 @@ export interface Player {
   prevBuy: number;
   /** Аптечку вже куплено в цій паузі. */
   medkitBought: boolean;
+  /** Тики до вибування упалого (поки чекає на підйом). */
+  bleedT: number;
+  /** Вибув до наступної хвилі: не врятували вчасно. */
+  out: boolean;
+  /** Кого піднімає (слот), −1 — нікого; і скільки тиків уже тримає. */
+  reviving: number;
+  reviveT: number;
+  /** Соло: залишок автопідйомів; чи вже куплено додаткове життя. */
+  autoRevives: number;
+  lifeBought: boolean;
   fireCd: number;
   /** Ід ворога-цілі, -1 якщо немає. */
   target: number;
@@ -90,6 +100,12 @@ export function createPlayer(
     buyPressed: 0,
     prevBuy: 0,
     medkitBought: false,
+    bleedT: 0,
+    out: false,
+    reviving: -1,
+    reviveT: 0,
+    autoRevives: 0,
+    lifeBought: false,
     fireCd: 0,
     target: -1,
     parts: 0,

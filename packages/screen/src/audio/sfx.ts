@@ -206,6 +206,16 @@ export class Sfx {
     this.burst('highpass', 5000, 2000, 1, 0.15, 0.3, pan);
   }
 
+  revive(): void {
+    [392, 523, 659, 784].forEach((f, i) =>
+      setTimeout(() => this.tone('triangle', f, f, 0.2, 0.16), i * 80),
+    );
+  }
+
+  reviveStart(): void {
+    this.tone('sine', 300, 600, 0.3, 0.08);
+  }
+
   purchase(ok: boolean): void {
     if (ok)
       [660, 990].forEach((f, i) =>

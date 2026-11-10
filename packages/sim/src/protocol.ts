@@ -16,6 +16,8 @@ export const BUY_WEAPON = 1;
 export const BUY_ARMOR = 2;
 export const BUY_ABILITY = 3;
 export const BUY_MEDKIT = 4;
+/** Соло: додаткове життя (автопідйом). */
+export const BUY_LIFE = 5;
 
 export function emptyInput(): PlayerInput {
   return { move: { x: 0, y: 0 }, ability: false, dash: false, buy: 0 };
@@ -71,9 +73,21 @@ export type ScreenMessage =
       wave: number;
       /** Магазин між хвилями; null — закритий. */
       shop: ShopInfo | null;
+      /** Поруч упалий напарник: кнопка здібності стає «підняти». */
+      revive: ReviveInfo | null;
+      /** Секунди до вибування, якщо впав; −1 — вибув до наступної хвилі. */
+      bleed: number;
     }
   | { t: 'hurt'; amount: number }
   | { t: 'bought'; item: number; ok: boolean };
+
+export interface ReviveInfo {
+  cost: number;
+  /** Деталей вистачає. */
+  affordable: boolean;
+  /** 0..1 — прогрес утримання. */
+  progress: number;
+}
 
 /** Стан магазину для пульта: рівні й ціни наступного рівня (null — максимум). */
 export interface ShopInfo {
@@ -83,6 +97,8 @@ export interface ShopInfo {
   prices: [number | null, number | null, number | null];
   /** Ціна аптечки; null — уже куплена в цій паузі. */
   medkit: number | null;
+  /** Соло: ціна додаткового життя; null — не соло або вже куплено. */
+  life: number | null;
 }
 
 // Бінарні пакети ненадійного каналу.

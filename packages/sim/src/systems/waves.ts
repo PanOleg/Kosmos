@@ -1,6 +1,7 @@
 import { PICKUPS, PLAYER_COUNT_MUL } from '../config/waves';
 import { AIR_TYPES, SWARM } from '../config/enemies';
 import { SWARM_GROUPS } from './enemies';
+import { returnOutPlayers } from './revive';
 import { emit } from '../events';
 import { secToTicks } from '../math';
 import type { Game } from '../state';
@@ -68,8 +69,9 @@ export function startWave(game: Game, index: number): void {
   w.plannedTotal = def.groups.reduce((a, g) => a + unitsOf(game, g.type, g.count), 0);
   w.partsMul = def.partsMul;
   w.speedMul = def.speedMul;
-  // Нова пауза — нова аптечка в магазині.
+  // Нова пауза — нова аптечка в магазині; вибулі повертаються.
   for (const p of game.state.players) p.medkitBought = false;
+  returnOutPlayers(game);
   emit(game.events, 'wavePause', 0, 0, 0, 0, index, 0, def.pause);
 }
 

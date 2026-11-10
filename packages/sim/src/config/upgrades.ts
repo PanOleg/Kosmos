@@ -1,7 +1,7 @@
 /** Покращення з BALANCE.md і DECISIONS.md (п. 26). */
 export type UpgradeId = 'weapon' | 'armor' | 'ability';
 
-export { BUY_WEAPON, BUY_ARMOR, BUY_ABILITY, BUY_MEDKIT } from '../protocol';
+export { BUY_WEAPON, BUY_ARMOR, BUY_ABILITY, BUY_MEDKIT, BUY_LIFE } from '../protocol';
 
 export const UPGRADE_ORDER: UpgradeId[] = ['weapon', 'armor', 'ability'];
 

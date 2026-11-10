@@ -157,6 +157,7 @@ export class PlayerView {
   private readonly visorMat: THREE.MeshStandardMaterial;
   private readonly suitMat: THREE.MeshStandardMaterial;
   private flash = 0;
+  private readonly ringColor: number;
   private muzzleT = 0;
   private recoil = 0;
   private ringPulse = 0;
@@ -170,6 +171,7 @@ export class PlayerView {
     readonly classId: ClassId,
   ) {
     const color = classColor(classId);
+    this.ringColor = color;
     let model = modelCache.get(classId);
     if (!model) {
       model = buildClass(classId);
@@ -293,12 +295,22 @@ export class PlayerView {
       );
       this.model.update(dt);
     }
-    (this.ring.material as THREE.MeshBasicMaterial).opacity = p.dashCd > 0 ? 0.35 : 0.85;
+    const ringMat = this.ring.material as THREE.MeshBasicMaterial;
+    // Упалий: кільце червоне й пульсує — «підійди й підніми».
+    if (p.down) {
+      ringMat.color.setHex(0xff3a2a);
+      ringMat.opacity = 0.5 + 0.4 * Math.sin(time * 8);
+    } else {
+      ringMat.color.setHex(this.ringColor);
+      ringMat.opacity = p.dashCd > 0 ? 0.35 : 0.85;
+    }
     // Підбір деталі: кільце коротко розширюється.
     this.ringPulse = Math.max(0, this.ringPulse - dt * 5);
     const rs = 1 + this.ringPulse * 0.6;
     this.ring.scale.set(rs, 1, rs);
     this.body.rotation.x = p.down ? -1.45 : 0;
+    // Вибулий до наступної хвилі зникає з арени.
+    this.root.visible = !p.out;
     if (this.drone) {
       const a = time * 1.6;
       this.drone.position.set(
@@ -308,7 +320,6 @@ export class PlayerView {
       );
       this.drone.rotation.y = time * 2;
     }
-    this.root.visible = true;
   }
 }
 

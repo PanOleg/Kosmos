@@ -4,6 +4,8 @@ import { TEAM_ENEMY } from '../entities/projectile';
 import type { PlayerInput } from '../protocol';
 import type { Game } from '../state';
 import { shopOpen, upgradePrice, wholeParts } from '../systems/upgrades';
+import { reviveCost } from '../systems/revive';
+import { REVIVE } from '../config/revive';
 import { UPGRADE_ORDER } from '../config/upgrades';
 
 /**
@@ -31,8 +33,10 @@ export function botInput(game: Game, slot: number, out: PlayerInput): void {
     const d2 = dx * dx + dy * dy;
     if (d2 > 36) continue;
     const d = Math.sqrt(d2) || 1;
-    // Відштовхування від ближніх ворогів, сильніше впритул.
-    const k = (6 - d) / 6;
+    // Відштовхування від ближніх ворогів, сильніше впритул. Ремонтник не б'є — від нього
+    // не тікаємо (інакше вічна «рівновага» на межі дальності); від Панцира — лише впритул.
+    const zone = e.type === 'repairer' ? 0 : e.type === 'shell' ? 3 : 6;
+    const k = d < zone ? (zone - d) / zone : 0;
     ax += (dx / d) * k * 2;
     ay += (dy / d) * k * 2;
     if (e.type === 'scout' && e.ai === SCOUT_WINDUP && d < 2.5) danger = true;
@@ -57,7 +61,9 @@ export function botInput(game: Game, slot: number, out: PlayerInput): void {
         ny = e.y;
       }
     }
-    if (nd < Infinity && nd > 100) {
+    // Підходить, доки ворог не опиниться в межах дальності власної зброї (у Інженера — 6 м).
+    // Ціль не взята (далеко або за укриттям) — підходимо, поки її не візьме автоприціл.
+    if (nd < Infinity && nd > 2.5 * 2.5) {
       const d = Math.sqrt(nd);
       ax += ((nx - p.x) / d) * 1.2;
       ay += ((ny - p.y) / d) * 1.2;
@@ -105,12 +111,45 @@ export function botInput(game: Game, slot: number, out: PlayerInput): void {
   ax += Math.cos(t) * 0.3;
   ay += Math.sin(t) * 0.3;
 
+  // Упалий напарник і деталей вистачає — іде піднімати: тягне сильніше за все, крім небезпеки.
+  let rescue = -1;
+  if (wholeParts(p) >= reviveCost(game, p)) {
+    let rd = Infinity;
+    for (const o of s.players) {
+      if (o === p || !o.down || o.out) continue;
+      const d = (o.x - p.x) ** 2 + (o.y - p.y) ** 2;
+      if (d < rd) {
+        rd = d;
+        rescue = o.slot;
+      }
+    }
+    if (rescue >= 0) {
+      const o = s.players[rescue]!;
+      const d = Math.sqrt(rd) || 1;
+      if (d > REVIVE.range * 0.6) {
+        ax = ((o.x - p.x) / d) * 3 + ax * 0.3;
+        ay = ((o.y - p.y) / d) * 3 + ay * 0.3;
+      } else {
+        ax *= 0.1;
+        ay *= 0.1;
+      }
+    }
+  }
+
   const l = Math.sqrt(ax * ax + ay * ay);
   if (l > 0.05) {
     out.move.x = ax / l;
     out.move.y = ay / l;
   }
   out.dash = danger && p.dashCd === 0;
+  // Біля упалого тримає кнопку (підйом), решту логіки здібності пропускає.
+  if (
+    rescue >= 0 &&
+    (s.players[rescue]!.x - p.x) ** 2 + (s.players[rescue]!.y - p.y) ** 2 <= REVIVE.range ** 2
+  ) {
+    out.ability = true;
+    return;
+  }
 
   // Між хвилями — найдешевше доступне покращення (чергуємо натискання, щоб був фронт).
   if (shopOpen(game) && s.tick % 2 === 0) {

@@ -21,6 +21,10 @@ const uk = {
   shopTitle: (s: number) => `Покращення · ${s} с до хвилі`,
   shopHint: 'Телефон — кнопки праворуч · клавіатура — 1–4',
   medkit: 'Аптечка',
+  extraLife: 'Друге дихання',
+  downFor: (s: number) => `ВПАВ · ${s} С`,
+  outUntilWave: 'ВИБУВ ДО ХВИЛІ',
+  revived: (n: number) => `P${n} знову в строю`,
   upgradeName: { weapon: 'Зброя', armor: 'Броня', ability: 'Здібність' } as Record<
     'weapon' | 'armor' | 'ability',
     string

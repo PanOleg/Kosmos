@@ -65,8 +65,9 @@ export function updateRepairer(game: Game, e: Enemy, index: number): void {
     steer.y = 0;
   }
 
-  // Гравець занадто близько — відступає, навіть кидаючи лікування.
-  if (nearD < REPAIRER.keepAway * REPAIRER.keepAway) {
+  // Гравець занадто близько — відступає, навіть кидаючи лікування. Без підопічних тікати
+  // нема заради чого: останній Ремонтник на арені не водить гравця колами вічно.
+  if (a && nearD < REPAIRER.keepAway * REPAIRER.keepAway) {
     const d = Math.sqrt(nearD) || 1;
     steerTo(game, e, e.x + ((e.x - nx) / d) * 4, e.y + ((e.y - ny) / d) * 4);
   }

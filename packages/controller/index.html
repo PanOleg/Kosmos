@@ -431,6 +431,44 @@
       .medkit:disabled {
         opacity: 0.35;
       }
+      /* Режим «підняти напарника»: кнопка здібності зеленіє й показує ціну. */
+      .ability-label {
+        position: absolute;
+        bottom: 18%;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+      }
+      .ability.revive {
+        background: rgba(63, 212, 90, 0.35);
+        color: #b9ffc8;
+        box-shadow: 0 0 40px rgba(63, 212, 90, 0.45);
+      }
+      .ability.revive #ring {
+        stroke: #7dff9a;
+      }
+      .ability.poor {
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.5);
+      }
+      .life {
+        background: rgba(255, 90, 120, 0.25);
+      }
+      #down {
+        font-size: 20px;
+        line-height: 1.5;
+      }
+      #down small {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        opacity: 0.75;
+        letter-spacing: 0.04em;
+        text-transform: none;
+      }
     </style>
   </head>
   <body>
@@ -472,6 +510,7 @@
         <div class="hp"><i id="hp"></i></div>
         <span class="sp"></span>
         <button id="medkit" class="medkit" hidden>✚ <span id="medkit-price">8</span></button>
+        <button id="life" class="medkit life" hidden>♥ <span id="life-price">40</span></button>
         <span>⚙ <span id="parts">0</span></span
         ><span class="sep">|</span><span id="cls"></span>
       </div>
@@ -505,6 +544,7 @@
             />
           </svg>
           <span id="ability-icon">⚡</span>
+          <span id="ability-label" class="ability-label"></span>
         </div>
         <div id="shop" class="shop" hidden>
           <div class="shop-head">Покращення · <span id="shop-time">10</span> с</div>

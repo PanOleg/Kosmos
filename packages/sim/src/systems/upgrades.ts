@@ -1,4 +1,5 @@
 import {
+  BUY_LIFE,
   BUY_MEDKIT,
   MAX_UPGRADE_LEVEL,
   UPGRADES,
@@ -6,6 +7,7 @@ import {
   type UpgradeId,
 } from '../config/upgrades';
 import type { Player } from '../entities/player';
+import { REVIVE } from '../config/revive';
 import { emit } from '../events';
 import { secToTicks } from '../math';
 import type { Game } from '../state';
@@ -46,6 +48,20 @@ export function updateUpgrades(game: Game): void {
   for (const p of game.state.players) {
     const item = p.buyPressed;
     if (item === 0 || !open) continue;
+    if (item === BUY_LIFE) {
+      // Соло: додаткове життя, раз за матч (DECISIONS.md, п. 12).
+      const price = REVIVE.soloLifePrice;
+      if (game.state.players.length !== 1 || p.lifeBought || wholeParts(p) < price) {
+        emit(game.events, 'purchaseFail', p.x, p.y, 0, 0, p.slot, item);
+        continue;
+      }
+      p.parts -= price;
+      p.stats.partsSpent += price;
+      p.lifeBought = true;
+      p.autoRevives++;
+      emit(game.events, 'purchase', p.x, p.y, 0, 0, p.slot, item, 1);
+      continue;
+    }
     if (item === BUY_MEDKIT) {
       const price = UPGRADES.medkit.price;
       if (p.medkitBought || p.down || p.hp >= p.maxHp || wholeParts(p) < price) {

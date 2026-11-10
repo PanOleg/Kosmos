@@ -29,3 +29,4 @@ export * from './enemies';
 export * from './map';
 export * from './waves';
 export * from './upgrades';
+export * from './revive';

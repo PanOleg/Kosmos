@@ -236,6 +236,21 @@ export class FxDirector {
         this.sparks.burst(10, X, 1, Z, X - toX(e.x2), Z - toZ(e.y2), 7, 1.5, 0.25, 0.15, 0xff3020);
         break;
       }
+      case 'revived':
+        this.sfx.revive();
+        this.sparks.burst(30, X, 0.5, Z, 1, 0, 6, Math.PI * 2, 0.7, 0.2, 0x6aff8a);
+        this.players[e.a]?.hitFlash();
+        break;
+      case 'reviveStart':
+        this.sfx.reviveStart();
+        break;
+      case 'bleedOut':
+        this.sfx.playerDown();
+        this.sparks.burst(16, X, 0.6, Z, 1, 0, 3, Math.PI * 2, 0.8, 0.2, 0x5a5a5a);
+        break;
+      case 'playerReturn':
+        this.sparks.burst(24, X, 0.4, Z, 1, 0, 5, Math.PI * 2, 0.6, 0.22, PALETTE.workLight);
+        break;
       case 'playerDown':
         this.sfx.playerDown();
         this.cam.shake(0.6);

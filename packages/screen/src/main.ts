@@ -387,6 +387,8 @@ function handleMatchEvents(m: Match): void {
     if (e.type === 'wavePause' && def) {
       m.hud.announce(def.name, t.stationSignal, 2.5);
       sfx.stationSignal();
+    } else if (e.type === 'revived' && e.b >= 0) {
+      m.hud.announce(t.revived(e.a + 1), '', 1.6);
     } else if (e.type === 'waveCleared' && def && e.b === 0) {
       m.hud.announce(t.waveCleared, '', 2);
     }

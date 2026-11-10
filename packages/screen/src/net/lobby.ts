@@ -4,7 +4,13 @@ import {
   upgradePrice,
   TICKS_PER_SEC,
   UPGRADES,
+  REVIVE,
+  downedAllyNear,
+  reviveCost,
+  wholeParts,
   type ClassId,
+  type Player,
+  type ReviveInfo,
   type Game,
   type PlayerInput,
 } from '@horizon/sim';
@@ -315,8 +321,11 @@ export class LobbyHost {
                     upgradePrice(p, 'ability'),
                   ],
                   medkit: p.medkitBought ? null : UPGRADES.medkit.price,
+                  life: g.state.players.length === 1 && !p.lifeBought ? REVIVE.soloLifePrice : null,
                 }
               : null,
+          revive: p && g && !p.down ? reviveInfo(g, p) : null,
+          bleed: p && p.down ? (p.out ? -1 : Math.ceil(p.bleedT / TICKS_PER_SEC)) : 0,
         });
       }
     }
@@ -329,4 +338,14 @@ export class LobbyHost {
       (s.kind === 'phone' && s.lostAt !== null && this.now() - s.lostAt > BOT_TAKEOVER_MS)
     );
   }
+}
+
+function reviveInfo(g: Game, p: Player): ReviveInfo | null {
+  if (downedAllyNear(g, p) < 0) return null;
+  const cost = reviveCost(g, p);
+  return {
+    cost,
+    affordable: wholeParts(p) >= cost,
+    progress: p.reviveT / (REVIVE.hold * TICKS_PER_SEC),
+  };
 }

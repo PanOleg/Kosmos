@@ -27,7 +27,9 @@ export function updateShell(game: Game, e: Enemy, index: number): void {
   e.fx = Math.cos(a);
   e.fy = Math.sin(a);
 
-  if (d > SHELL.holdRange) steerTo(game, e, p.x, p.y);
+  // Стоїть лише тоді, коли бачить ціль: інакше за контейнерами всі чекали б одне одного.
+  const sees = hasLineOfSight(game.world, e.x, e.y, p.x, p.y);
+  if (d > SHELL.holdRange || !sees) steerTo(game, e, p.x, p.y);
   else {
     steer.x = 0;
     steer.y = 0;

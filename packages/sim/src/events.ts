@@ -33,7 +33,12 @@ export type GameEventType =
   | 'wavePause'
   | 'waveStart'
   | 'waveCleared'
-  | 'playerDown';
+  | 'playerDown'
+  | 'reviveStart'
+  | 'reviveCancel'
+  | 'revived'
+  | 'bleedOut'
+  | 'playerReturn';
 
 export interface GameEvent {
   type: GameEventType;

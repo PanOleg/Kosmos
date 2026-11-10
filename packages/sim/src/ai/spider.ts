@@ -35,7 +35,7 @@ export function updateSpider(game: Game, e: Enemy, index: number): void {
       if (!p || p.down) return;
       // Опора: найближча до цілі в межах стрибка, а серед рівних — ближча до самого павука.
       if (e.cover < 0 || (game.state.tick + index) % 30 === 0)
-        e.cover = pickPerch(game, e, p.x, p.y);
+        e.cover = pickPerch(game, e, index, p.x, p.y);
       if (e.cover < 0) {
         // Жодної опори в межах стрибка (гравець далеко від стін і контейнерів):
         // злазить і полює з землі — підбігає й стрибає звідти. Інакше чекав би вічно.
@@ -67,9 +67,17 @@ export function updateSpider(game: Game, e: Enemy, index: number): void {
         flyTo(e, tx, ty);
         e.alt = Math.min(per.alt[e.cover]!, e.alt + 4 * DT);
       }
-      if (d < 0.3 && e.alt >= per.alt[e.cover]! - 0.05) {
+      if (d < 0.6 && e.alt >= per.alt[e.cover]! - 0.05) {
         e.ai = SPIDER_PERCH;
         e.aiT = 0;
+        e.shots = 0;
+        return;
+      }
+      // Запобіжник: дереться надто довго (штовханина, недосяжна опора) — злазить і полює з землі.
+      if (++e.shots > secToTicks(6)) {
+        e.shots = 0;
+        e.cover = -1;
+        e.alt = Math.min(e.alt, 0.4);
       }
       return;
     }
@@ -149,8 +157,9 @@ export function updateSpider(game: Game, e: Enemy, index: number): void {
   }
 }
 
-function pickPerch(game: Game, e: Enemy, px: number, py: number): number {
+function pickPerch(game: Game, e: Enemy, self: number, px: number, py: number): number {
   const per = game.perches;
+  const en = game.state.enemies;
   let best = -1;
   let bestScore = Infinity;
   const reach = (SPIDER.jumpRange - 1) ** 2;
@@ -158,6 +167,12 @@ function pickPerch(game: Game, e: Enemy, px: number, py: number): number {
     const dp = (per.x[i]! - px) ** 2 + (per.y[i]! - py) ** 2;
     // Лише опори, звідки ціль у межах стрибка, і не ближче 3 м (стрибок, а не крок).
     if (dp < 9 || dp > reach) continue;
+    // Опору іншого павука не займає: двоє штовхались би навколо неї вічно.
+    let taken = false;
+    for (let j = 0; j < en.length; j++)
+      if (j !== self && en[j]!.alive && en[j]!.type === 'spider' && en[j]!.cover === i)
+        taken = true;
+    if (taken) continue;
     const de = Math.sqrt((per.x[i]! - e.x) ** 2 + (per.y[i]! - e.y) ** 2);
     const score = de;
     if (score < bestScore) {

@@ -4,6 +4,7 @@ import type { Player } from '../entities/player';
 import { emit } from '../events';
 import type { Game } from '../state';
 import { dropParts } from './pickups';
+import { onPlayerDown } from './revive';
 
 export function damagePlayer(
   game: Game,
@@ -20,6 +21,7 @@ export function damagePlayer(
     p.hp = 0;
     p.down = true;
     p.target = -1;
+    onPlayerDown(p);
     emit(game.events, 'playerDown', p.x, p.y, 0, 0, p.slot);
   }
 }

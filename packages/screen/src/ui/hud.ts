@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {
   TICKS_PER_SEC,
   UPGRADES,
+  REVIVE,
   abilityReadiness,
   shopOpen,
   upgradePrice,
@@ -51,6 +52,14 @@ const css = `
 .shop .pp i.on { background: currentColor; }
 .shop .pr { font-variant-numeric: tabular-nums; color: #9ff4ff; min-width: 32px; text-align: right; }
 .shop .hint { font-size: 11px; opacity: .5; text-align: center; }
+.hud-card .st { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: #ff6a5a; margin-top: 3px; min-height: 0; }
+.hud-card .st:empty { display: none; }
+.downmark { position: absolute; transform: translate(-50%, -100%); text-align: center; pointer-events: none; }
+.downmark b { display: block; font-size: 16px; font-weight: 800; color: #ff5a4a; text-shadow: 0 0 8px rgba(255,40,20,.8); animation: downpulse .8s ease-in-out infinite; }
+.downmark span { display: block; width: 56px; height: 5px; margin: 3px auto 0; background: rgba(0,0,0,.6); border-radius: 3px; overflow: hidden; }
+.downmark i { display: block; height: 100%; width: 0; background: #6aff8a; }
+.downmark.rescuing b { color: #6aff8a; text-shadow: 0 0 8px rgba(60,255,120,.8); animation: none; }
+@keyframes downpulse { 50% { opacity: .5; } }
 .over { position: absolute; width: 46px; height: 5px; margin-left: -23px; background: rgba(0,0,0,.55); border-radius: 3px; overflow: hidden; }
 .over > i { display: block; height: 100%; }
 .announce { position: absolute; top: 22%; left: 0; right: 0; text-align: center; font-size: 46px; font-weight: 800; letter-spacing: .12em;
@@ -76,6 +85,7 @@ interface Card {
   ab: HTMLElement;
   abWrap: HTMLElement;
   parts: HTMLElement;
+  status: HTMLElement;
   lastParts: number;
 }
 
@@ -87,6 +97,7 @@ export class Hud {
   private readonly hint = document.createElement('div');
   private readonly cards: Card[] = [];
   private readonly overs: { el: HTMLDivElement; fill: HTMLElement }[] = [];
+  private readonly downs: { el: HTMLDivElement; text: HTMLElement; bar: HTMLElement }[] = [];
   private readonly arrows: HTMLDivElement[] = [];
   private announceT = 0;
   private readonly shop = document.createElement('div');
@@ -113,13 +124,14 @@ export class Hud {
       const el = document.createElement('div');
       el.className = 'hud-card';
       Object.assign(el.style, CORNERS[p.slot % 4], { borderColor: color });
-      el.innerHTML = `${portrait(color)}<div class="row"><span class="cls"><span style="opacity:.6">P${p.slot + 1}</span> <span style="color:${color}">${t.className[p.classId]}</span></span><span class="parts">⚙ 0</span></div><div class="bar"><i style="background:${color};width:100%"></i></div><div class="ab"><i style="background:${color}"></i></div>`;
+      el.innerHTML = `${portrait(color)}<div class="row"><span class="cls"><span style="opacity:.6">P${p.slot + 1}</span> <span style="color:${color}">${t.className[p.classId]}</span></span><span class="parts">⚙ 0</span></div><div class="bar"><i style="background:${color};width:100%"></i></div><div class="ab"><i style="background:${color}"></i></div><div class="st"></div>`;
       this.root.appendChild(el);
       this.cards.push({
         el,
         hp: el.querySelector('.bar > i')!,
         ab: el.querySelector('.ab > i')!,
         abWrap: el.querySelector('.ab')!,
+        status: el.querySelector('.st')!,
         parts: el.querySelector('.parts')!,
         lastParts: 0,
       });
@@ -128,6 +140,12 @@ export class Hud {
       over.innerHTML = `<i style="background:${color}"></i>`;
       this.root.appendChild(over);
       this.overs.push({ el: over, fill: over.querySelector('i')! });
+      const down = document.createElement('div');
+      down.className = 'downmark';
+      down.innerHTML = '<b></b><span><i></i></span>';
+      down.style.display = 'none';
+      this.root.appendChild(down);
+      this.downs.push({ el: down, text: down.querySelector('b')!, bar: down.querySelector('i')! });
     }
     for (let i = 0; i < MAX_ARROWS; i++) {
       const a = document.createElement('div');
@@ -179,7 +197,7 @@ export class Hud {
               `<div class="ln"><span>${i + 1} · ${t.upgradeName[id]}</span>${pips(p.upg[id])}<span class="pr">${price(upgradePrice(p, id))}</span></div>`,
           )
           .join('');
-        return `<div class="col" data-slot="${p.slot}" style="border-color:${color}"><div class="nm"><span style="color:${color}">P${p.slot + 1} ${t.className[p.classId]}</span><span class="pr">⚙ ${wholeParts(p)}</span></div>${rows}<div class="ln"><span>4 · ${t.medkit}</span><span></span><span class="pr">${p.medkitBought ? '✓' : price(UPGRADES.medkit.price)}</span></div></div>`;
+        return `<div class="col" data-slot="${p.slot}" style="border-color:${color}"><div class="nm"><span style="color:${color}">P${p.slot + 1} ${t.className[p.classId]}</span><span class="pr">⚙ ${wholeParts(p)}</span></div>${rows}<div class="ln"><span>4 · ${t.medkit}</span><span></span><span class="pr">${p.medkitBought ? '✓' : price(UPGRADES.medkit.price)}</span></div>${s.players.length === 1 ? `<div class="ln"><span>5 · ${t.extraLife}</span><span></span><span class="pr">${p.lifeBought ? '✓' : price(REVIVE.soloLifePrice)}</span></div>` : ''}</div>`;
       })
       .join('');
     const flashing = [...this.shop.querySelectorAll('.col.flash')].map(
@@ -238,13 +256,34 @@ export class Hud {
         c.parts.classList.add('pop');
         c.lastParts = parts;
       }
-      c.el.style.opacity = p.down ? '0.45' : '1';
+      c.el.style.opacity = p.out ? '0.35' : p.down ? '0.6' : '1';
+      // Статус у картці: скільки лишилось до вибування або що вибув.
+      const status = p.out
+        ? t.outUntilWave
+        : p.down
+          ? t.downFor(Math.ceil(p.bleedT / TICKS_PER_SEC))
+          : '';
+      if (c.status.textContent !== status) c.status.textContent = status;
       const o = this.overs[p.slot]!;
       this.v.set(toX(p.x), 2.4, toZ(p.y)).project(camera);
       o.el.style.left = `${((this.v.x + 1) / 2) * W}px`;
       o.el.style.top = `${((1 - this.v.y) / 2) * H}px`;
       o.fill.style.width = `${(p.hp / p.maxHp) * 100}%`;
       o.el.style.display = p.down ? 'none' : 'block';
+      // Над упалим: відлік і прогрес підйому, якщо хтось піднімає.
+      const dn = this.downs[p.slot]!;
+      const showDown = p.down && !p.out;
+      dn.el.style.display = showDown ? 'block' : 'none';
+      if (showDown) {
+        this.v.set(toX(p.x), 1.6, toZ(p.y)).project(camera);
+        dn.el.style.left = `${((this.v.x + 1) / 2) * W}px`;
+        dn.el.style.top = `${((1 - this.v.y) / 2) * H}px`;
+        const rescuer = s.players.find((q) => q.reviving === p.slot);
+        const prog = rescuer ? rescuer.reviveT / (REVIVE.hold * TICKS_PER_SEC) : 0;
+        dn.text.textContent = `✚ ${Math.ceil(p.bleedT / TICKS_PER_SEC)}`;
+        dn.bar.style.width = `${prog * 100}%`;
+        dn.el.classList.toggle('rescuing', !!rescuer);
+      }
     }
 
     // Стрілки на краях екрана до ворогів поза кадром.

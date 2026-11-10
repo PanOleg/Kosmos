@@ -13,6 +13,7 @@ import {
   type ScreenPhase,
   type ShopInfo,
   BUY_MEDKIT,
+  BUY_LIFE,
 } from '@horizon/sim/protocol';
 import { ControllerNet } from './net';
 import { LocalNet } from './localNet';
@@ -95,13 +96,20 @@ function run(room: string): void {
       pressBuy(Number(b.dataset.item), b);
     });
   medkitBtn.addEventListener('pointerdown', () => pressBuy(BUY_MEDKIT, medkitBtn));
+  const lifeBtn = $<HTMLButtonElement>('life');
+  lifeBtn.addEventListener('pointerdown', () => pressBuy(BUY_LIFE, lifeBtn));
 
   const renderShop = (shop: ShopInfo | null, parts: number, fullHp: boolean) => {
     const open = shop !== null;
     shopEl.hidden = !open;
     ability.style.display = open ? 'none' : '';
     medkitBtn.hidden = !open;
+    lifeBtn.hidden = !shop || shop.life === null;
     if (!shop) return;
+    if (shop.life !== null) {
+      lifeBtn.disabled = parts < shop.life;
+      $('life-price').textContent = String(shop.life);
+    }
     $('shop-time').textContent = String(shop.secondsLeft);
     document.querySelectorAll<HTMLButtonElement>('.buy').forEach((b, i) => {
       const lvl = shop.levels[i]!;
@@ -190,8 +198,24 @@ function run(room: string): void {
         $<HTMLElement>('hp').style.width = `${m.maxHp > 0 ? (m.hp / m.maxHp) * 100 : 0}%`;
         $('parts').textContent = String(m.parts);
         $('down').style.display = m.down ? 'block' : 'none';
-        ability.classList.toggle('ready', m.ability >= 1);
-        $('ring').setAttribute('stroke-dasharray', `${Math.round(m.ability * 100)} 100`);
+        if (m.down)
+          $('down').innerHTML =
+            m.bleed < 0
+              ? 'Вибули<small>Повернетесь на початку наступної хвилі</small>'
+              : `Ви впали · ${m.bleed} с<small>Напарник може підняти вас, стоячи поруч</small>`;
+        // Поруч упалий напарник: кнопка здібності — «підняти» з ціною й кільцем утримання.
+        const rv = m.revive;
+        ability.classList.toggle('revive', !!rv && rv.affordable);
+        ability.classList.toggle('poor', !!rv && !rv.affordable);
+        ability.classList.toggle('ready', !rv && m.ability >= 1);
+        $('ability-icon').textContent = rv ? '✚' : m.classId ? CLASS_META[m.classId].icon : '';
+        $('ability-label').textContent = rv
+          ? rv.affordable
+            ? `ПІДНЯТИ · ⚙${rv.cost}`
+            : `ПОТРІБНО ⚙${rv.cost}`
+          : '';
+        const ring = rv ? rv.progress : m.ability;
+        $('ring').setAttribute('stroke-dasharray', `${Math.round(ring * 100)} 100`);
         renderShop(m.shop, m.parts, m.hp >= m.maxHp);
         break;
       }
@@ -202,7 +226,9 @@ function run(room: string): void {
         const btn =
           m.item === BUY_MEDKIT
             ? $('medkit')
-            : document.querySelector<HTMLElement>(`.buy[data-item="${m.item}"]`);
+            : m.item === BUY_LIFE
+              ? $('life')
+              : document.querySelector<HTMLElement>(`.buy[data-item="${m.item}"]`);
         if (m.ok) {
           navigator.vibrate?.(40);
           blip(880, 0.1, 0.12);

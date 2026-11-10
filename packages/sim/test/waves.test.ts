@@ -77,7 +77,9 @@ describe('waves', () => {
     const { g } = playWithBots(2, 5, 60);
     const [a, b] = g.state.players;
     const collected = a!.stats.partsCollected + b!.stats.partsCollected;
-    expect(a!.parts + b!.parts).toBeCloseTo(collected, 5);
+    // Деталі не губляться й не дублюються: на руках + витрачене (покупки, підйоми) = зібране.
+    const spent = a!.stats.partsSpent + b!.stats.partsSpent;
+    expect(a!.parts + b!.parts + spent).toBeCloseTo(collected, 5);
   });
 
   test('bot match is deterministic', () => {
