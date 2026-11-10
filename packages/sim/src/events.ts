@@ -3,7 +3,18 @@
  * пул фіксований, об'єкти перевикористовуються, лічильник обнуляється на початку кожного step.
  */
 export type GameEventType =
-  'dash' | 'shot' | 'hit' | 'kill' | 'playerHit' | 'pickup' | 'playerDown';
+  | 'dash'
+  | 'shot'
+  | 'hit'
+  | 'kill'
+  | 'spawn'
+  | 'enemyWindup'
+  | 'enemyAttack'
+  | 'enemyShot'
+  | 'impact'
+  | 'playerHit'
+  | 'pickup'
+  | 'playerDown';
 
 export interface GameEvent {
   type: GameEventType;

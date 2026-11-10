@@ -1,0 +1,169 @@
+import { clearHash, insertHash } from '../collision/spatial';
+import { hasLineOfSight, resolveCircle } from '../collision/world';
+import { CROWD, ENEMIES, type EnemyType } from '../config/enemies';
+import type { Enemy } from '../entities/enemy';
+import { emit } from '../events';
+import { DT } from '../math';
+import { randRange } from '../rng';
+import type { Game } from '../state';
+import { updateScout } from '../ai/scout';
+import { sampleNav, navDir, updateNav } from './navigation';
+import { updateGunner } from '../ai/gunner';
+
+/** Бажаний напрям руху від AI (одиничний або нуль), множиться на швидкість ворога. */
+export const steer = { x: 0, y: 0 };
+
+const NAV_EVERY = 10;
+
+export function spawnEnemy(game: Game, type: EnemyType, x: number, y: number): number {
+  const s = game.state;
+  for (let i = 0; i < s.enemies.length; i++) {
+    const e = s.enemies[i]!;
+    if (e.alive) continue;
+    const def = ENEMIES[type];
+    const m = game.config.mods;
+    e.alive = true;
+    e.gen++;
+    e.type = type;
+    e.x = e.px = x;
+    e.y = e.py = y;
+    e.vx = e.vy = 0;
+    e.fx = -x;
+    e.fy = -y;
+    const l = Math.sqrt(e.fx * e.fx + e.fy * e.fy) || 1;
+    e.fx /= l;
+    e.fy /= l;
+    e.radius = def.radius;
+    e.hp = e.maxHp = Math.round(def.hp * m.enemyHp);
+    e.speed = def.speed * m.enemySpeed;
+    e.damage = def.damage * m.enemyDamage;
+    e.ai = 0;
+    e.aiT = 0;
+    e.target = -1;
+    e.flank = randRange(s.rng, 0, Math.PI * 2);
+    e.cover = -1;
+    e.stagger = 0;
+    e.exposed = false;
+    s.enemiesAlive++;
+    emit(game.events, 'spawn', x, y, 0, 0, i);
+    return i;
+  }
+  return -1;
+}
+
+/** Рух до точки: напряму, якщо видно, інакше по полю навігації. */
+export function steerTo(game: Game, e: Enemy, tx: number, ty: number): void {
+  if (hasLineOfSight(game.world, e.x, e.y, tx, ty)) {
+    const dx = tx - e.x;
+    const dy = ty - e.y;
+    const l = Math.sqrt(dx * dx + dy * dy) || 1;
+    steer.x = dx / l;
+    steer.y = dy / l;
+    return;
+  }
+  if (sampleNav(game.nav, e.x, e.y)) {
+    steer.x = navDir.x;
+    steer.y = navDir.y;
+  } else {
+    steer.x = 0;
+    steer.y = 0;
+  }
+}
+
+function pickTarget(game: Game, e: Enemy): number {
+  let best = -1;
+  let bestD = Infinity;
+  for (const p of game.state.players) {
+    if (p.down) continue;
+    const d = (p.x - e.x) * (p.x - e.x) + (p.y - e.y) * (p.y - e.y);
+    if (d < bestD) {
+      bestD = d;
+      best = p.slot;
+    }
+  }
+  return best;
+}
+
+export function updateEnemies(game: Game): void {
+  const s = game.state;
+  if (s.tick % NAV_EVERY === 0) updateNav(game.nav, s);
+
+  const h = game.hash;
+  clearHash(h);
+  for (let i = 0; i < s.enemies.length; i++) {
+    const e = s.enemies[i]!;
+    if (e.alive) insertHash(h, i, e.x, e.y);
+  }
+
+  for (let i = 0; i < s.enemies.length; i++) {
+    const e = s.enemies[i]!;
+    if (!e.alive) continue;
+    e.px = e.x;
+    e.py = e.y;
+    // Ціль перевибирається рідко й розкидано за індексом — не всі разом в одному тику.
+    if ((s.tick + i) % 30 === 0 || e.target < 0 || s.players[e.target]?.down)
+      e.target = pickTarget(game, e);
+
+    steer.x = 0;
+    steer.y = 0;
+    switch (e.type) {
+      case 'scout':
+        updateScout(game, e, i);
+        break;
+      case 'gunner':
+        updateGunner(game, e, i);
+        break;
+    }
+
+    let wx = steer.x * e.speed;
+    let wy = steer.y * e.speed;
+    if (wx !== 0 || wy !== 0) {
+      e.fx = steer.x;
+      e.fy = steer.y;
+    }
+
+    // Розштовхування: сусіди з тієї ж і суміжних клітинок.
+    let sx = 0;
+    let sy = 0;
+    const cx = Math.floor((e.x + h.half) / h.cell);
+    const cy = Math.floor((e.y + h.half) / h.cell);
+    for (let oy = -1; oy <= 1; oy++) {
+      const gy = cy + oy;
+      if (gy < 0 || gy >= h.n) continue;
+      for (let ox = -1; ox <= 1; ox++) {
+        const gx = cx + ox;
+        if (gx < 0 || gx >= h.n) continue;
+        for (let j = h.head[gy * h.n + gx]!; j >= 0; j = h.next[j]!) {
+          if (j === i) continue;
+          const o = s.enemies[j]!;
+          const dx = e.x - o.x;
+          const dy = e.y - o.y;
+          const min = (e.radius + o.radius) * CROWD.separation;
+          const d2 = dx * dx + dy * dy;
+          if (d2 >= min * min || d2 < 1e-8) continue;
+          const d = Math.sqrt(d2);
+          const k = (min - d) / min;
+          sx += (dx / d) * k;
+          sy += (dy / d) * k;
+        }
+      }
+    }
+    wx += sx * CROWD.strength;
+    wy += sy * CROWD.strength;
+
+    if (e.stagger > 0) {
+      e.stagger--;
+      // Під час відкидання AI не керує: швидкість лише згасає.
+      e.vx *= 0.85;
+      e.vy *= 0.85;
+    } else {
+      const k = 1 - Math.exp(-DT * 12);
+      e.vx += (wx - e.vx) * k;
+      e.vy += (wy - e.vy) * k;
+    }
+
+    const r = resolveCircle(game.world, e.x + e.vx * DT, e.y + e.vy * DT, e.radius);
+    e.x = r.x;
+    e.y = r.y;
+  }
+}

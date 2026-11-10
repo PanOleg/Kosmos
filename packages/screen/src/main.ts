@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createGame, emptyInput, step, DT, type PlayerInput } from '@horizon/sim';
+import { createGame, emptyInput, step, spawnEnemy, DT, type PlayerInput } from '@horizon/sim';
 import { buildArena } from './render/arena';
 import { GameCamera } from './render/camera';
 import { PlayerView } from './render/players';
@@ -7,6 +7,8 @@ import { PALETTE } from './render/palette';
 import { toX, toZ } from './render/coords';
 import { KeyboardInput, type InputSource } from './input/keyboard';
 import { DebugOverlay } from './debug/overlay';
+import { EnemyRenderer } from './render/enemies';
+import { ProjectileRenderer } from './render/projectiles';
 
 const container = document.getElementById('app')!;
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -32,6 +34,18 @@ const playerViews = game.state.players.map((p) => {
   return v;
 });
 
+const enemyR = new EnemyRenderer(scene, game.state.enemies.length);
+const bulletR = new ProjectileRenderer(scene, game.state.projectiles.length);
+
+// Налагодження до появи хвиль: 1 — група Скаутів з випадкового шлюзу.
+let spawnSeq = 0;
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'Digit1') return;
+  const a = game.config.map.airlocks[spawnSeq++ % 4]!;
+  for (let k = 0; k < 4; k++)
+    spawnEnemy(game, 'scout', a.x * 0.95 + (k % 2), a.y * 0.95 + (k >> 1));
+});
+
 const sources: InputSource[] = [new KeyboardInput()];
 const inputs: PlayerInput[] = game.state.players.map(() => emptyInput());
 const debug = new DebugOverlay();
@@ -54,6 +68,12 @@ function frame(now: number): void {
   while (acc >= DT && steps < 6) {
     for (let i = 0; i < inputs.length; i++) sources[i]?.read(inputs[i]!);
     step(game, inputs);
+    const ev = game.events;
+    for (let i = 0; i < ev.count; i++) {
+      const e = ev.list[i]!;
+      if (e.type === 'hit') enemyR.hit(e.a);
+      else if (e.type === 'playerHit') playerViews[e.a]?.hitFlash();
+    }
     acc -= DT;
     steps++;
   }
@@ -68,6 +88,8 @@ function frame(now: number): void {
     camPoints[i]!.x = toX(p.x);
     camPoints[i]!.z = toZ(p.y);
   }
+  enemyR.update(game.state.enemies, alpha, dt, time);
+  bulletR.update(game.state.projectiles, alpha);
   arena.update(time);
   cam.update(camPoints, dt, time);
   renderer.render(scene, cam.camera);
