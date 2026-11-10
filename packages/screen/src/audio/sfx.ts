@@ -7,6 +7,13 @@ export class Sfx {
   private master!: GainNode;
   private noise!: AudioBuffer;
   private lastShot = new Map<number, number>();
+  /** Тема карти: у пустелі сигнал хвилі — ріг, шлюзи боса — піщані пориви (п. 50). */
+  theme: 'station' | 'desert' = 'station';
+
+  /** Спільний контекст і вихід для музики; null — ще не було жесту користувача. */
+  audio(): { ctx: AudioContext; out: AudioNode } | null {
+    return this.ctx ? { ctx: this.ctx, out: this.master } : null;
+  }
 
   constructor() {
     const unlock = () => this.ensure();
@@ -268,8 +275,12 @@ export class Sfx {
     this.burst('highpass', 4000, 1000, 1, 0.3, 0.3);
   }
 
-  /** Шлюз: тривожна сирена. */
+  /** Шлюз: тривожна сирена (у пустелі — наростаючий свист вітру). */
   airlockWarn(pan: number): void {
+    if (this.theme === 'desert') {
+      this.burst('bandpass', 400, 1800, 3, 1.5, 0.25, pan);
+      return;
+    }
     [0, 300, 600, 900, 1200].forEach((d, i) =>
       setTimeout(
         () => this.tone('square', i % 2 ? 520 : 700, i % 2 ? 520 : 700, 0.22, 0.1, pan),
@@ -280,11 +291,21 @@ export class Sfx {
 
   /** Шлюз відкрито: ревіння повітря, що витікає. */
   airlockOpen(pan: number): void {
+    if (this.theme === 'desert') {
+      // Піщаний порив: низький рев і шурхіт піску.
+      this.burst('lowpass', 500, 180, 0.8, 4, 0.55, pan);
+      this.burst('highpass', 5000, 3000, 0.5, 4, 0.12, pan);
+      return;
+    }
     this.burst('lowpass', 900, 300, 0.6, 4, 0.5, pan);
     this.burst('bandpass', 2400, 800, 1.5, 4, 0.2, pan);
   }
 
   airlockClose(pan: number): void {
+    if (this.theme === 'desert') {
+      this.burst('lowpass', 300, 80, 0.8, 0.6, 0.25, pan);
+      return;
+    }
     this.tone('square', 90, 50, 0.25, 0.4, pan);
   }
 
@@ -300,10 +321,14 @@ export class Sfx {
     );
   }
 
-  /** Сигнал станції перед хвилею: дві низькі ноти сирени. */
+  /** Сигнал станції перед хвилею: дві низькі ноти сирени (у пустелі — довгий ріг). */
   stationSignal(): void {
     const ctx = this.ctx;
     if (!ctx) return;
+    if (this.theme === 'desert') {
+      this.desertHorn(ctx);
+      return;
+    }
     for (let i = 0; i < 2; i++) {
       const t = ctx.currentTime + i * 0.45;
       const o = ctx.createOscillator();
@@ -319,6 +344,39 @@ export class Sfx {
       o.start(t);
       o.stop(t + 0.5);
     }
+  }
+
+  /** Ріг: квінта знизу вгору, пила з вібрато крізь фільтр, що відкривається. */
+  private desertHorn(ctx: AudioContext): void {
+    const t = ctx.currentTime;
+    [
+      [146.83, 0, 0.9],
+      [220, 0.7, 1.3],
+    ].forEach(([f, d, dur]) => {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f! * 0.97, t + d!);
+      o.frequency.linearRampToValueAtTime(f!, t + d! + 0.15);
+      const vib = ctx.createOscillator();
+      vib.frequency.value = 5.5;
+      const vg = ctx.createGain();
+      vg.gain.value = f! * 0.012;
+      vib.connect(vg).connect(o.frequency);
+      const flt = ctx.createBiquadFilter();
+      flt.type = 'lowpass';
+      flt.frequency.setValueAtTime(400, t + d!);
+      flt.frequency.linearRampToValueAtTime(1500, t + d! + 0.4);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t + d!);
+      g.gain.exponentialRampToValueAtTime(0.22, t + d! + 0.15);
+      g.gain.setValueAtTime(0.22, t + d! + dur! - 0.25);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d! + dur!);
+      o.connect(flt).connect(g).connect(this.master);
+      o.start(t + d!);
+      vib.start(t + d!);
+      o.stop(t + d! + dur! + 0.05);
+      vib.stop(t + d! + dur! + 0.05);
+    });
   }
 
   fanfare(won: boolean): void {

@@ -17,6 +17,7 @@ import {
 import { emptyInput } from '@horizon/sim/protocol';
 import { buildArena, type ArenaView } from './render/arena';
 import { buildDesertArena } from './render/desertArena';
+import { Music, type MusicLevel } from './audio/music';
 import { GameCamera } from './render/camera';
 import { PlayerView } from './render/players';
 import { PALETTE } from './render/palette';
@@ -83,6 +84,8 @@ scene.fog = new THREE.FogExp2(0x0a0507, 0.007);
 }
 const cam = new GameCamera(window.innerWidth / window.innerHeight);
 const sfx = new Sfx();
+const music = new Music(() => sfx.audio());
+if (DEBUG) Object.assign(window as unknown as Record<string, unknown>, { sfx, music });
 const debug = new DebugOverlay();
 // ?lowfx — без постобробки, для слабких ноутбуків.
 const LOWFX = params.has('lowfx');
@@ -121,6 +124,9 @@ function makeArena(settings: SessionSettings): ArenaView {
   renderer.toneMappingExposure = a.sky.exposure;
   post.setBloom(...a.sky.bloom);
   envBase = a.sky.env;
+  // Звук за картою (п. 50): пустеля — музика, вітер, ріг; станція — лише звуки подій.
+  sfx.theme = map.id === 'desert' ? 'desert' : 'station';
+  music.setEnabled(map.id === 'desert');
   scene.environmentIntensity = envBase;
   scene.add(a.group);
   return a;
@@ -638,12 +644,23 @@ function debugLine(): string {
   return parts.join('  ');
 }
 
+/** Інтенсивність музики: лобі й пауза між хвилями — спокій, бій, бос (Прораб і Ядро). */
+function musicLevel(): MusicLevel {
+  if (!match) return 'calm';
+  const w = match.game.state.wave;
+  if (w.phase === 'pause' || w.phase === 'done') return 'calm';
+  return match.game.config.waves[w.index]?.boss ? 'boss' : 'fight';
+}
+
 function frame(now: number): void {
   // Обмеження кадру: після вкладки у фоні не наздоганяємо сотні кроків.
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   if (document.visibilityState === 'visible') autoQuality(dt);
   lobby.update();
+  music.tick();
+  music.setLevel(musicLevel());
+  music.setMuffled(!!match && (lobby.pause !== null || lobby.resumeIn() > 0 || !!match.results));
   if (match) frameMatch(match, now, dt);
   else frameLobby(now, dt);
   arena.update(now / 1000);
