@@ -87,16 +87,6 @@ export function buildArena(map: MapDef): ArenaView {
     ring.position.y = 0.01;
     g.add(ring);
   }
-  const hazard = new THREE.Mesh(
-    new THREE.RingGeometry(9.7, 10.3, 96).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({
-      color: PALETTE.emergencyAmber,
-      transparent: true,
-      opacity: 0.1,
-    }),
-  );
-  hazard.position.y = 0.012;
-  g.add(hazard);
 
   // Обшивка станції навколо арени, крім заходу — там ілюмінатор у космос.
   const hull = new THREE.Mesh(
@@ -358,6 +348,18 @@ const darkMetal = new THREE.MeshStandardMaterial({
   roughness: 0.45,
 });
 const trimMat = new THREE.MeshStandardMaterial({ color: 0xd0a020, metalness: 0.4, roughness: 0.5 });
+const rimStripe = (() => {
+  const t = hazardStripe();
+  t.wrapS = THREE.RepeatWrapping;
+  t.repeat.set(0.6, 1);
+  return t;
+})();
+const rimMat = new THREE.MeshStandardMaterial({
+  color: 0x9a9aa0,
+  map: rimStripe,
+  metalness: 0.4,
+  roughness: 0.55,
+});
 const tableTop = new THREE.MeshStandardMaterial({
   color: 0x8a909c,
   metalness: 0.7,
@@ -522,6 +524,12 @@ function makeObstacle(o: Obstacle): THREE.Object3D {
       box(dividerMat, w, o.height, d);
       // Червона світна смуга по верху перегородки — ритм аварійного світла.
       box(dividerLight, w * 0.9, 0.06, d + 0.04, 0, o.height + 0.03, 0);
+      break;
+    }
+    case 'rim': {
+      // Бортик реакторної зали: метал зі смугою небезпеки й червоною кромкою.
+      box(rimMat, w, o.height, d);
+      box(dividerLight, w, 0.05, 0.12, 0, o.height + 0.025, 0);
       break;
     }
     default: {

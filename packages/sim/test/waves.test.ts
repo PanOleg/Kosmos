@@ -9,26 +9,34 @@ function playWithBots(players: number, seed: number, maxSec = 180) {
   );
   const inputs: PlayerInput[] = g.state.players.map(() => emptyInput());
   let ticks = 0;
+  // Скільки деталей лежало на підлозі й було вже зібрано в момент зачистки хвилі.
+  let atClear: { onFloor: number; collected: number } | null = null;
+  const collected = () => g.state.players.reduce((a, p) => a + p.stats.partsCollected, 0);
   while (g.state.phase === 'playing' && ticks < maxSec * 60) {
     for (let i = 0; i < inputs.length; i++) botInput(g, i, inputs[i]!);
     step(g, inputs);
+    for (let i = 0; i < g.events.count; i++)
+      if (g.events.list[i]!.type === 'waveCleared' && !atClear)
+        atClear = {
+          onFloor: g.state.pickups.filter((k) => k.alive).length,
+          collected: collected(),
+        };
     ticks++;
   }
-  return { g, sec: ticks / 60 };
+  return { g, sec: ticks / 60, atClear, collected: collected() };
 }
 
 describe('waves', () => {
   test('solo bot clears the slice wave', () => {
-    const { g, sec } = playWithBots(1, 11);
+    const { g, sec, atClear, collected } = playWithBots(1, 11);
     expect(g.state.phase).toBe('won');
     const p = g.state.players[0]!;
     expect(p.stats.kills).toBe(g.state.wave.spawnedTotal);
-    // Після зачистки «пилосос» збирає все: жодна деталь не губиться.
-    const dropped = g.config.waves[0]!.groups.reduce(
-      (a, gr) => a + gr.count * (gr.type === 'gunner' ? 2 : 1),
-      0,
-    );
-    expect(p.stats.partsCollected).toBe(dropped);
+    // Після зачистки «пилосос» збирає все, що лежало на підлозі: нічого не губиться.
+    // (Деталь, що пролежала 25 с недосяжною для бота, згасає ще під час хвилі — так задумано.)
+    expect(atClear).not.toBeNull();
+    expect(collected).toBe(atClear!.collected + atClear!.onFloor);
+    expect(p.stats.partsCollected).toBeGreaterThan(20);
     // Ціль BALANCE: 45–60 с для новачка; бот грає гірше людини, тож межа ширша.
     expect(sec).toBeGreaterThan(30);
     expect(sec).toBeLessThan(120);

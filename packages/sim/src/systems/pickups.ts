@@ -75,6 +75,12 @@ export function updatePickups(game: Game): void {
       p.vx *= 0.9;
       p.vy *= 0.9;
     }
+    // Під час «пилососа» деталі летять до гравця над перешкодами: інакше застрягли б за бортиком.
+    if (vacuum) {
+      p.x += p.vx * DT;
+      p.y += p.vy * DT;
+      continue;
+    }
     const r = resolveCircle(game.world, p.x + p.vx * DT, p.y + p.vy * DT, 0.2);
     p.x = r.x;
     p.y = r.y;

@@ -25,7 +25,7 @@ export interface CircleObstacle {
 }
 
 export type ObstacleTag =
-  'core' | 'divider' | 'container' | 'table' | 'glass' | 'planter' | 'console';
+  'core' | 'divider' | 'container' | 'table' | 'glass' | 'planter' | 'console' | 'rim';
 
 export type Obstacle = RectObstacle | CircleObstacle;
 
@@ -77,6 +77,29 @@ function buildObstacles(): Obstacle[] {
   for (let i = 0; i < 4; i++) {
     const a = Math.PI / 4 + (i * Math.PI) / 2;
     o.push(rect(Math.cos(a) * 6.5, Math.sin(a) * 6.5, 1.4, 0.7, 'console', { rot: a, height: 1 }));
+  }
+
+  // Бортик реакторної зали (DECISIONS.md, п. 25): тримає тіла, але не кулі й не погляд —
+  // силует зали з макета без закритого бою. Чотири проходи по сторонах світу.
+  const RIM_R = 10.5;
+  const GATE = 2.2 / RIM_R;
+  for (let q = 0; q < 4; q++) {
+    const start = (q * Math.PI) / 2 + GATE;
+    const end = ((q + 1) * Math.PI) / 2 - GATE;
+    const n = 6;
+    for (let k = 0; k < n; k++) {
+      const a0 = start + ((end - start) * k) / n;
+      const a1 = start + ((end - start) * (k + 1)) / n;
+      const am = (a0 + a1) / 2;
+      const len = 2 * RIM_R * Math.sin((a1 - a0) / 2) + 0.12;
+      o.push(
+        rect(Math.cos(am) * RIM_R, Math.sin(am) * RIM_R, len, 0.4, 'rim', {
+          rot: am + Math.PI / 2,
+          height: 0.7,
+          blocksShots: false,
+        }),
+      );
+    }
   }
 
   // Розділювачі секторів по діагоналях з проходами біля центру й біля краю.
