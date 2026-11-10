@@ -5,6 +5,7 @@ import { PlayerView } from './render/players';
 import { buildEnemyVisual } from './render/enemies';
 import { buildArena } from './render/arena';
 import { PostFx } from './render/post';
+import { models } from './render/models';
 
 /**
  * Галерея для доведення вигляду: одна модель крупним планом у ракурсі концептів
@@ -25,6 +26,7 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.32;
 
+await models.load();
 let camera: THREE.Camera;
 if (m === 'map') {
   const arena = buildArena(createGame().config.map);

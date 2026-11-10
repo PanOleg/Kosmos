@@ -29,6 +29,7 @@ import { PickupRenderer } from './render/pickups';
 import { FxDirector } from './render/fx';
 import { Sfx } from './audio/sfx';
 import { PostFx } from './render/post';
+import { models } from './render/models';
 import { Hud } from './ui/hud';
 import { showResults } from './ui/results';
 import { LobbyView } from './ui/lobby';
@@ -308,11 +309,18 @@ window.addEventListener('resize', () => {
   post.setSize(window.innerWidth, window.innerHeight);
 });
 
+// Моделі вантажаться, поки триває лобі; швидкий старт чекає на них.
+const modelsReady = models.load().then((ids) => {
+  if (ids.length) console.info('[models] підставлено:', ids.join(', '));
+});
+
 if (params.has('quick')) {
-  const s = lobby.addLocal('keyboard');
-  if (s) keyboardLayout.set(s, LAYOUT_WASD);
-  for (let i = 0; i < Number(params.get('bots') ?? 0); i++) lobby.addLocal('bot');
-  startMatch();
+  void modelsReady.then(() => {
+    const s = lobby.addLocal('keyboard');
+    if (s) keyboardLayout.set(s, LAYOUT_WASD);
+    for (let i = 0; i < Number(params.get('bots') ?? 0); i++) lobby.addLocal('bot');
+    startMatch();
+  });
 }
 
 // ---------- Кадр ----------
@@ -346,7 +354,7 @@ function frameLobby(now: number, dt: number): void {
       countdown -= dt;
       if (countdown <= 0) {
         countdown = null;
-        startMatch();
+        void modelsReady.then(startMatch);
         return;
       }
     }

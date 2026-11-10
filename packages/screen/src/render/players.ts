@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { ClassId, Player } from '@horizon/sim';
 import { PALETTE, classColor } from './palette';
 import { BOX, CYL, SPHERE, merge, part, type Part } from './mesh';
+import { models, type ModelInstance } from './models';
 import { toX, toZ } from './coords';
 
 /**
@@ -90,6 +91,9 @@ function buildClass(classId: ClassId): {
   return { hull: merge(hull), glow: merge(glow), muzzleZ };
 }
 
+/** Візуально більший за хітбокс (0.5 м): з дивана на телевізорі інакше губиться. */
+const VISUAL_SCALE = 1.35;
+
 const modelCache = new Map<ClassId, ReturnType<typeof buildClass>>();
 
 export class PlayerView {
@@ -103,6 +107,7 @@ export class PlayerView {
   private recoil = 0;
   private ringPulse = 0;
   private readonly muzzle: THREE.Mesh;
+  private readonly model: ModelInstance | null;
 
   constructor(
     readonly slot: number,
@@ -123,12 +128,21 @@ export class PlayerView {
     this.visorMat = new THREE.MeshStandardMaterial({
       color,
       emissive: color,
-      emissiveIntensity: 2.2,
+      // Помірно: з bloom яскравіший візор розпливається в кулю й ховає шолом.
+      emissiveIntensity: 1.2,
     });
-    const hull = new THREE.Mesh(model.hull, this.suitMat);
-    const glow = new THREE.Mesh(model.glow, this.visorMat);
-    hull.castShadow = true;
-    this.body.add(hull, glow);
+    // Готова glTF-модель класу, якщо є (docs/models/README.md); інакше — примітиви.
+    this.model = models.instantiate(classId);
+    if (this.model) {
+      // root масштабується на VISUAL_SCALE нижче, а висота з маніфесту — уже кінцева.
+      this.model.root.scale.setScalar(1 / VISUAL_SCALE);
+      this.body.add(this.model.root);
+    } else {
+      const hull = new THREE.Mesh(model.hull, this.suitMat);
+      const glow = new THREE.Mesh(model.glow, this.visorMat);
+      hull.castShadow = true;
+      this.body.add(hull, glow);
+    }
 
     // Спалах пострілу: два схрещені квадрати, видно з будь-якого кута камери.
     const mGeo = new THREE.PlaneGeometry(0.5, 0.5);
@@ -148,7 +162,7 @@ export class PlayerView {
     this.body.add(this.muzzle);
     this.root.add(this.body);
     // Візуально більший за хітбокс (0.5 м): з дивана на телевізорі інакше губиться.
-    this.root.scale.setScalar(1.35);
+    this.root.scale.setScalar(VISUAL_SCALE);
 
     this.ring = new THREE.Mesh(
       new THREE.RingGeometry(0.62, 0.78, 32).rotateX(-Math.PI / 2),
@@ -202,6 +216,21 @@ export class PlayerView {
     this.body.translateZ(-this.recoil * 0.12);
     this.flash = Math.max(0, this.flash - dt * 6);
     this.suitMat.emissive.setRGB(this.flash, this.flash, this.flash);
+    if (this.model) {
+      this.model.flash(this.flash);
+      this.model.play(
+        p.down
+          ? 'down'
+          : dashing
+            ? 'dash'
+            : speed > 0.5
+              ? 'run'
+              : this.muzzleT > -0.3
+                ? 'shoot'
+                : 'idle',
+      );
+      this.model.update(dt);
+    }
     (this.ring.material as THREE.MeshBasicMaterial).opacity = p.dashCd > 0 ? 0.35 : 0.85;
     // Підбір деталі: кільце коротко розширюється.
     this.ringPulse = Math.max(0, this.ringPulse - dt * 5);

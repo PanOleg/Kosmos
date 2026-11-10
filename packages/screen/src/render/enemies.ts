@@ -12,6 +12,7 @@ import {
 } from '@horizon/sim';
 import { PALETTE } from './palette';
 import { BOX, CONE4, SPHERE, merge, part } from './mesh';
+import { models, type ModelInstance } from './models';
 import { toX, toZ } from './coords';
 
 /**
@@ -29,7 +30,12 @@ export interface EnemyVisual {
   type: EnemyType;
   flash: number;
   spawnT: number;
+  /** Готова glTF-модель замість примітивів, якщо є. */
+  model: ModelInstance | null;
 }
+
+/** Візуально більші за хітбокс, як і гравці: на телевізорі здалеку інакше губляться. */
+const VISUAL_SCALE: Record<EnemyType, number> = { scout: 1.35, gunner: 1.45 };
 
 const P = PALETTE;
 
@@ -89,12 +95,18 @@ export function buildEnemyVisual(type: EnemyType): EnemyVisual {
   const glowMat = new THREE.MeshStandardMaterial({
     color: 0xffb0a0,
     emissive: PALETTE.enemyEye,
-    emissiveIntensity: 2.5,
+    emissiveIntensity: EYE_GLOW,
   });
-  const hull = new THREE.Mesh(type === 'scout' ? scoutHull : gunnerHull, hullMat);
-  const glow = new THREE.Mesh(type === 'scout' ? scoutGlow : gunnerGlow, glowMat);
-  hull.castShadow = true;
-  body.add(hull, glow);
+  const model = models.instantiate(type);
+  if (model) {
+    model.root.scale.setScalar(1 / VISUAL_SCALE[type]);
+    body.add(model.root);
+  } else {
+    const hull = new THREE.Mesh(type === 'scout' ? scoutHull : gunnerHull, hullMat);
+    const glow = new THREE.Mesh(type === 'scout' ? scoutGlow : gunnerGlow, glowMat);
+    hull.castShadow = true;
+    body.add(hull, glow);
+  }
   root.add(body);
   const ring = new THREE.Mesh(
     ringGeo,
@@ -122,11 +134,12 @@ export function buildEnemyVisual(type: EnemyType): EnemyVisual {
   );
   laser.visible = false;
   root.add(laser);
-  // Візуально більші за хітбокс, як і гравці: на телевізорі здалеку інакше губляться.
-  body.scale.setScalar(type === 'scout' ? 1.35 : 1.45);
-  return { root, body, hullMat, glowMat, ring, laser, type, flash: 0, spawnT: 0 };
+  body.scale.setScalar(VISUAL_SCALE[type]);
+  return { root, body, hullMat, glowMat, ring, laser, type, flash: 0, spawnT: 0, model };
 }
 
+/** Око світиться помірно: з bloom сильніше світіння розпливається в кулю й ховає голову. */
+const EYE_GLOW = 1.4;
 const windupTicks = SCOUT.windup * TICKS_PER_SEC;
 const peekTicks = Math.round(GUNNER.peek * TICKS_PER_SEC);
 const aimTicks = Math.round(GUNNER.aim * TICKS_PER_SEC);
@@ -240,10 +253,10 @@ export class EnemyRenderer {
       const crouch = windup ? 1 - prog * 0.3 : 1;
       const speed = Math.hypot(e.vx, e.vy);
       const bob = Math.abs(Math.sin(time * 18 + i)) * 0.05 * Math.min(1, speed / 3);
-      const bs = v.type === 'scout' ? 1.35 : 1.45;
+      const bs = VISUAL_SCALE[v.type];
       v.body.scale.set(bs, bs * crouch * v.spawnT, bs);
       v.body.position.y = bob;
-      v.glowMat.emissiveIntensity = windup ? 4 + prog * 8 : 2.5;
+      v.glowMat.emissiveIntensity = windup ? 2.5 + prog * 5 : EYE_GLOW;
       v.ring.visible = windup;
       if (windup) {
         const s = 2.2 - prog * 0.9;
@@ -269,12 +282,17 @@ export class EnemyRenderer {
         // Пульсація частішає ближче до пострілу.
         (v.laser.material as THREE.MeshBasicMaterial).opacity =
           0.25 + 0.6 * prog * (0.6 + 0.4 * Math.sin(time * (20 + prog * 40)));
-        v.glowMat.emissiveIntensity = 3 + prog * 8;
+        v.glowMat.emissiveIntensity = 2 + prog * 5;
       }
 
       v.flash = Math.max(0, v.flash - dt * 12);
       // Влучання: броня спалахує червоно-білим (на блідій броні білий спалах губиться).
       v.hullMat.emissive.setRGB(0.06 + v.flash * 1.2, 0.04 + v.flash * 0.35, 0.04 + v.flash * 0.25);
+      if (v.model) {
+        v.model.flash(v.flash * 1.2, 1, 0.3, 0.2);
+        v.model.play(windup ? 'attack' : speed > 0.5 ? 'run' : 'idle');
+        v.model.update(dt);
+      }
     }
   }
 }
