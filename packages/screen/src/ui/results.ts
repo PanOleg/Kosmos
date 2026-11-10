@@ -1,45 +1,102 @@
-import type { Game } from '@horizon/sim';
+import type { MatchSummary, PlayerSummary } from '@horizon/sim/protocol';
 import { classColor, hexCss } from '../render/palette';
 import { t } from './i18n';
 
-/** Екран після матчу: підсумок по кожному гравцю. */
-export function showResults(game: Game, won: boolean): HTMLDivElement {
-  const s = game.state;
+/** Екран після матчу (DECISIONS.md, п. 46): картка на гравця, відзнаки, підсумок команди. */
+export interface ResultsView {
+  remove(): void;
+  /** Секунди до автоповернення в лобі. */
+  setCountdown(s: number): void;
+}
+
+const css = `
+.res { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 22px; padding: 24px; background: radial-gradient(ellipse at 50% 30%, rgba(20,24,36,.88), rgba(4,5,9,.94));
+  color: #e8ecf4; font-family: 'Inter', system-ui, sans-serif; opacity: 0; transition: opacity .6s; }
+.res.on { opacity: 1; }
+.res h1 { margin: 0; font-size: 60px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--rc);
+  text-shadow: 0 0 34px color-mix(in srgb, var(--rc) 45%, transparent); }
+.res .sub { display: flex; gap: 26px; font-size: 18px; opacity: .8; letter-spacing: .05em; }
+.res .sub b { color: #fff; font-weight: 700; }
+.res .cards { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+.res .card { width: 250px; background: rgba(16,19,28,.92); border: 1px solid rgba(255,255,255,.08); border-top: 4px solid var(--c);
+  border-radius: 12px; padding: 16px 18px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.4); transform: translateY(16px); opacity: 0;
+  transition: transform .5s, opacity .5s; }
+.res.on .card { transform: none; opacity: 1; }
+.res .who { display: flex; align-items: baseline; gap: 8px; }
+.res .who .n { font-size: 13px; opacity: .55; font-weight: 700; }
+.res .who .cl { font-size: 20px; font-weight: 800; color: var(--c); letter-spacing: .06em; text-transform: uppercase; }
+.res .big { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 8px; }
+.res .big b { font-size: 46px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.res .big span { font-size: 13px; opacity: .6; text-transform: uppercase; letter-spacing: .08em; }
+.res .row { display: flex; justify-content: space-between; font-size: 15px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,.06); }
+.res .row span { opacity: .65; }
+.res .row b { font-variant-numeric: tabular-nums; }
+.res .aw { display: flex; flex-wrap: wrap; gap: 6px; min-height: 26px; margin-top: 10px; }
+.res .aw i { font-style: normal; font-size: 12px; font-weight: 700; letter-spacing: .05em; padding: 4px 9px; border-radius: 99px;
+  background: color-mix(in srgb, var(--c) 22%, transparent); border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); }
+.res .team { display: flex; gap: 30px; font-size: 15px; opacity: .8; letter-spacing: .04em; }
+.res .team b { font-size: 20px; color: #fff; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.res .foot { font-size: 15px; opacity: .65; letter-spacing: .04em; }
+`;
+let styleInstalled = false;
+
+function card(p: PlayerSummary, i: number): string {
+  const c = hexCss(classColor(p.classId));
+  const row = (label: string, v: number) =>
+    `<div class="row"><span>${label}</span><b data-n="${v}">0</b></div>`;
+  const aw = p.awards.map((k) => `<i>${t.award[k] ?? k}</i>`).join('');
+  return `<div class="card" style="--c:${c};transition-delay:${0.15 + i * 0.12}s">
+    <div class="who"><span class="n">P${i + 1}</span><span class="cl">${t.className[p.classId]}</span></div>
+    <div class="big"><b data-n="${p.kills}">0</b><span>${t.colKills}</span></div>
+    ${row(t.colParts, p.parts)}${row(t.colRevives, p.revives)}${row(t.colDowns, p.downs)}
+    ${row(t.colDamage, p.damageDealt)}${row(t.colTaken, p.damageTaken)}
+    <div class="aw">${aw}</div></div>`;
+}
+
+export function showResults(sum: MatchSummary, presetName: string): ResultsView {
+  if (!styleInstalled) {
+    const st = document.createElement('style');
+    st.textContent = css;
+    document.head.appendChild(st);
+    styleInstalled = true;
+  }
   const el = document.createElement('div');
-  Object.assign(el.style, {
-    position: 'fixed',
-    inset: '0',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(5,6,10,.78)',
-    color: '#e8ecf4',
-    fontFamily: "'Inter', system-ui, sans-serif",
-    zIndex: '20',
-    opacity: '0',
-    transition: 'opacity .6s',
-  });
-  const color = won ? '#7dffb0' : '#ff5a3a';
-  const cell = 'padding:8px 16px';
-  const rows = s.players
-    .map((p) => {
-      const c = hexCss(classColor(p.classId));
-      const st = p.stats;
-      return `<tr><td style="${cell};color:${c};font-weight:700">${t.className[p.classId]}</td><td style="${cell}">${st.kills}</td><td style="${cell}">${st.partsCollected}</td><td style="${cell}">${st.revives}</td><td style="${cell}">${Math.round(st.damageDealt)}</td><td style="${cell}">${Math.round(st.damageTaken)}</td></tr>`;
-    })
-    .join('');
-  const th = (s: string) => `<th style="padding:6px 16px">${s}</th>`;
+  el.className = 'res';
+  el.style.setProperty('--rc', sum.won ? '#7dffb0' : '#ff5a3a');
+  const total = (f: (p: PlayerSummary) => number) => sum.players.reduce((a, p) => a + f(p), 0);
+  const mm = `${Math.floor(sum.seconds / 60)}:${String(sum.seconds % 60).padStart(2, '0')}`;
   el.innerHTML = `
-    <div style="font-size:52px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:${color};text-shadow:0 0 30px ${color}55">${won ? t.victory : t.defeat}</div>
-    <div style="opacity:.7;margin:8px 0 26px">${t.time(s.tick / 60)}</div>
-    <table style="border-collapse:collapse;font-size:18px;text-align:center;font-variant-numeric:tabular-nums">
-      <thead><tr style="opacity:.6;font-size:13px;text-transform:uppercase;letter-spacing:.08em">
-        ${th(t.colPlayer)}${th(t.colKills)}${th(t.colParts)}${th(t.colRevives)}${th(t.colDamage)}${th(t.colTaken)}</tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div style="margin-top:30px;opacity:.75;font-size:16px">${t.restartHint}</div>`;
+    <h1>${sum.won ? t.victory : t.defeat}</h1>
+    <div class="sub"><span>${t.resWave} <b>${sum.wave} / ${sum.waves}</b></span><span>${t.resTime} <b>${mm}</b></span><span>${t.resDifficulty} <b>${presetName}</b></span></div>
+    <div class="cards">${sum.players.map(card).join('')}</div>
+    ${
+      sum.players.length > 1
+        ? `<div class="team"><span>${t.teamKills}<b data-n="${total((p) => p.kills)}">0</b></span><span>${t.teamParts}<b data-n="${total((p) => p.parts)}">0</b></span><span>${t.teamRevives}<b data-n="${total((p) => p.revives)}">0</b></span></div>`
+        : ''
+    }
+    <div class="foot"></div>`;
   document.body.appendChild(el);
-  requestAnimationFrame(() => (el.style.opacity = '1'));
-  return el;
+  const foot = el.querySelector<HTMLElement>('.foot')!;
+  // Цифри «набігають» за ~1.2 с — підсумок читається як подія, а не таблиця.
+  const nums = [...el.querySelectorAll<HTMLElement>('[data-n]')];
+  const t0 = performance.now() + 350;
+  let raf = 0;
+  const tick = (now: number) => {
+    const k = Math.min(1, Math.max(0, (now - t0) / 1200));
+    const e = 1 - (1 - k) ** 3;
+    for (const n of nums) n.textContent = String(Math.round(Number(n.dataset.n) * e));
+    if (k < 1) raf = requestAnimationFrame(tick);
+  };
+  raf = requestAnimationFrame(tick);
+  requestAnimationFrame(() => el.classList.add('on'));
+  return {
+    remove() {
+      cancelAnimationFrame(raf);
+      el.remove();
+    },
+    setCountdown(s: number) {
+      foot.textContent = t.resFoot(s);
+    },
+  };
 }

@@ -196,4 +196,26 @@ describe('lobby', () => {
     expect(host.running()).toBe(false);
     expect(host.pause?.waiting.sort()).toEqual([0, 1]);
   });
+
+  test('results reach every controller and «again» works only on the results screen', () => {
+    const { host, a, b, join, tokenB } = inMatch();
+    let again = 0;
+    host.onAgain = () => again++;
+    a.onReliable({ t: 'again' });
+    expect(again).toBe(0);
+    const summary = {
+      won: true,
+      wave: 11,
+      waves: 11,
+      seconds: 600,
+      players: [],
+    };
+    host.endMatch(summary);
+    expect(a.last('results')?.slot).toBe(0);
+    expect(b.last('results')?.slot).toBe(1);
+    // Перепідключився на екрані результатів — теж бачить підсумок.
+    expect(join('b2', tokenB).last('results')?.summary.wave).toBe(11);
+    a.onReliable({ t: 'again' });
+    expect(again).toBe(1);
+  });
 });

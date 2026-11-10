@@ -57,7 +57,9 @@ export type ControllerMessage =
   /** on: true — пауза (пульт утримав кнопку 0.5 с); false — продовжити, відсутніх веде бот. */
   | { t: 'pause'; on: boolean }
   /** Не віддавати відключеного гравця боту, а чекати його на паузі. */
-  | { t: 'wait'; slot: number };
+  | { t: 'wait'; slot: number }
+  /** З екрана результатів — назад у лобі (будь-який пульт). */
+  | { t: 'again' };
 
 /** Екран → пульт. */
 export type ScreenMessage =
@@ -89,7 +91,31 @@ export type ScreenMessage =
       dropped: DroppedInfo[];
     }
   | { t: 'hurt'; amount: number }
+  /** Підсумок матчу для цього гравця — пульт показує власну картку. */
+  | { t: 'results'; summary: MatchSummary; slot: number }
   | { t: 'bought'; item: number; ok: boolean };
+
+/** Підсумок матчу: спільне для екрана й пульта (п. 46). */
+export interface MatchSummary {
+  won: boolean;
+  /** Номер хвилі, до якої дійшли (1-based), і всього хвиль. */
+  wave: number;
+  waves: number;
+  seconds: number;
+  players: PlayerSummary[];
+}
+
+export interface PlayerSummary {
+  classId: ClassId;
+  kills: number;
+  parts: number;
+  revives: number;
+  downs: number;
+  damageDealt: number;
+  damageTaken: number;
+  /** Ключі відзнак (awards.ts): 'kills', 'revives', 'parts', 'tank', 'untouched'. */
+  awards: string[];
+}
 
 export interface PauseInfo {
   /** Хто поставив: слот пульта, −1 — екран (клавіатура), −2 — автоматично (чекаємо гравця). */

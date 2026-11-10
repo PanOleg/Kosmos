@@ -24,6 +24,13 @@ import { blip, hurt, lockPage, onUserGesture, setPlayerColor } from './feedback'
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const SEND_HZ = 30;
+const AWARD: Record<string, string> = {
+  kills: 'Винищувач',
+  revives: 'Рятівник',
+  parts: 'Збирач',
+  tank: 'Щит команди',
+  untouched: 'Без падінь',
+};
 
 lockPage();
 document.addEventListener('pointerdown', () => void onUserGesture(), { capture: true });
@@ -72,6 +79,10 @@ function run(room: string): void {
   const classSelect = new ClassSelect($('classes'), (c) => {
     blip(660, 0.06);
     net.send({ t: 'class', classId: c });
+  });
+  $('again').addEventListener('click', () => {
+    blip(880, 0.08);
+    net.send({ t: 'again' });
   });
   $('ready').addEventListener('click', () => {
     blip(ready ? 440 : 880, 0.08);
@@ -299,6 +310,29 @@ function run(room: string): void {
       case 'hurt':
         hurt(m.amount);
         break;
+      case 'results': {
+        // Власна картка гравця; спільна таблиця — на великому екрані.
+        const sum = m.summary;
+        const me = sum.players[m.slot];
+        $('res-title').textContent = sum.won ? 'Станцію утримано' : 'Екіпаж упав';
+        $('res-sub').textContent =
+          `Хвиля ${sum.wave} / ${sum.waves} · ${Math.floor(sum.seconds / 60)}:${String(sum.seconds % 60).padStart(2, '0')}`;
+        $('res-stats').innerHTML = me
+          ? [
+              ['Вбивства', me.kills],
+              ['Деталі', me.parts],
+              ['Воскресіння', me.revives],
+              ['Падіння', me.downs],
+            ]
+              .map(([l, v]) => `<div><b>${v}</b><span>${l}</span></div>`)
+              .join('')
+          : '';
+        $('res-awards').innerHTML = (me?.awards ?? [])
+          .map((k) => `<i>${AWARD[k] ?? k}</i>`)
+          .join('');
+        navigator.vibrate?.(sum.won ? [60, 60, 120] : 200);
+        break;
+      }
       case 'bought': {
         const btn =
           m.item === BUY_MEDKIT

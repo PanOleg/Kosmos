@@ -26,6 +26,7 @@ import {
   seqNewer,
   type ControllerMessage,
   type DroppedInfo,
+  type MatchSummary,
   type LobbySlotInfo,
   type PauseInfo,
   type ScreenPhase,
@@ -83,6 +84,10 @@ export class LobbyHost {
   private dirty = true;
   /** Викликається при будь-якій зміні лобі (для перемальовки UI). */
   onChange: () => void = () => {};
+  /** Пульт на екрані результатів натиснув «Ще раз». */
+  onAgain: () => void = () => {};
+  /** Підсумок останнього матчу: пульт, що перепідключився на екрані результатів, теж його отримає. */
+  private summary: MatchSummary | null = null;
 
   constructor(
     private readonly now: () => number,
@@ -140,6 +145,8 @@ export class LobbyHost {
       slot.forceBot = false;
       this.unwait(slot.index);
       link.sendReliable({ t: 'welcome', slot: slot.index, token: slot.token });
+      if (this.phase === 'results' && this.summary)
+        link.sendReliable({ t: 'results', summary: this.summary, slot: slot.index });
       this.markDirty();
       return;
     }
@@ -152,6 +159,10 @@ export class LobbyHost {
     }
     if (m.t === 'wait') {
       this.waitFor(m.slot);
+      return;
+    }
+    if (m.t === 'again') {
+      if (this.phase === 'results') this.onAgain();
       return;
     }
     if (this.phase !== 'lobby') return;
@@ -263,7 +274,11 @@ export class LobbyHost {
     this.markDirty();
   }
 
-  endMatch(): void {
+  /** Кінець матчу: кожен пульт отримує підсумок і свій номер у ньому. */
+  endMatch(summary?: MatchSummary): void {
+    this.summary = summary ?? null;
+    if (summary)
+      for (const s of this.slots) s?.link?.sendReliable({ t: 'results', summary, slot: s.index });
     this.phase = 'results';
     this.clearPause();
     this.markDirty();
@@ -271,6 +286,7 @@ export class LobbyHost {
 
   backToLobby(): void {
     this.phase = 'lobby';
+    this.summary = null;
     this.game = null;
     this.clearPause();
     for (const s of this.slots) if (s && s.kind === 'phone') s.ready = false;

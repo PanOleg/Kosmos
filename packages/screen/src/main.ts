@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   createGame,
+  matchSummary,
   buildConfig,
   step,
   spawnEnemy,
@@ -37,7 +38,7 @@ import { PropRenderer, RocketRenderer } from './render/hazards';
 import { BossRenderer } from './render/boss';
 import { models } from './render/models';
 import { Hud } from './ui/hud';
-import { showResults } from './ui/results';
+import { showResults, type ResultsView } from './ui/results';
 import { LobbyView } from './ui/lobby';
 import { t } from './ui/i18n';
 import { LobbyHost, PAUSE_BY_SCREEN, type Slot } from './net/lobby';
@@ -193,12 +194,16 @@ interface Match {
   bossR: BossRenderer;
   hud: Hud;
   camPoints: { x: number; z: number }[];
-  results: HTMLDivElement | null;
+  results: ResultsView | null;
+  /** Коли показали результати, мс: через RESULTS_AUTO_MS — назад у лобі. */
+  resultsAt: number;
   botAnnounced: boolean[];
   classes: ClassId[];
 }
 
 let match: Match | null = null;
+const RESULTS_AUTO_MS = 60000;
+lobby.onAgain = () => endMatch();
 let countdown: number | null = null;
 let seed = Number(params.get('seed') ?? Date.now() % 100000);
 
@@ -250,6 +255,7 @@ function startMatch(): void {
     hud: new Hud(game),
     camPoints: game.state.players.map(() => ({ x: 0, z: 0 })),
     results: null,
+    resultsAt: 0,
     botAnnounced: order.map(() => false),
     classes: game.state.players.map((p) => p.classId),
   };
@@ -509,8 +515,19 @@ function frameMatch(m: Match, now: number, dt: number): void {
   if (g.state.phase !== 'playing' && !m.results) {
     const won = g.state.phase === 'won';
     sfx.fanfare(won);
-    m.results = showResults(g, won);
-    lobby.endMatch();
+    const summary = matchSummary(g);
+    m.results = showResults(summary, t.preset[lobbyView.settings.preset] ?? '');
+    m.resultsAt = now;
+    lobby.endMatch(summary);
+  }
+  // Без клавіатури (лише телефони) повернення в лобі — «Ще раз» на пульті або сам за хвилину.
+  if (m.results) {
+    const left = Math.ceil((m.resultsAt + RESULTS_AUTO_MS - now) / 1000);
+    if (left <= 0) {
+      endMatch();
+      return;
+    }
+    m.results.setCountdown(left);
   }
 
   for (let i = 0; i < m.slots.length; i++) {

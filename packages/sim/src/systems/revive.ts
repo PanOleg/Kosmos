@@ -29,6 +29,7 @@ export function downedAllyNear(game: Game, p: Player): number {
 
 /** Гравець падає: вмикається відлік до вибування, його власний підйом напарника переривається. */
 export function onPlayerDown(p: Player): void {
+  p.stats.downs++;
   p.bleedT = secToTicks(REVIVE.bleedOut);
   p.reviving = -1;
   p.reviveT = 0;

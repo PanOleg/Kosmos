@@ -59,6 +59,8 @@ export interface Player {
     partsCollected: number;
     partsSpent: number;
     revives: number;
+    /** Скільки разів падав. */
+    downs: number;
     damageDealt: number;
     damageTaken: number;
   };
@@ -114,6 +116,7 @@ export function createPlayer(
       partsCollected: 0,
       partsSpent: 0,
       revives: 0,
+      downs: 0,
       damageDealt: 0,
       damageTaken: 0,
     },
