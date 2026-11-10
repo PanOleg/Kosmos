@@ -306,6 +306,12 @@
           display: flex !important;
         }
       }
+      .conn-hint {
+        margin-top: 14px;
+        max-width: 34em;
+        font-size: 14px;
+        line-height: 1.4;
+      }
     </style>
     <style>
       /* Акцент класу (концепт controller.jpg): світлий відтінок кольору класу на насиченому фоні. */
@@ -495,6 +501,10 @@
       <div class="center">
         <h1>Під'єднання…</h1>
         <div id="conn-msg" class="muted"></div>
+        <div id="conn-hint" class="muted conn-hint" hidden>
+          Довго? Перевірте, що телефон і комп'ютер в одній Wi-Fi (не гостьовій), а екран гри
+          відкритий. Мобільний інтернет на телефоні вимкніть.
+        </div>
       </div>
     </div>
     <div id="v-lobby" class="view">

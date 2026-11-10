@@ -43,6 +43,7 @@ export class PeerJsHost implements HostTransport {
   }
 
   private accept(conn: DataConnection): void {
+    exposeLanCandidates(conn.peerConnection);
     let unreliable: RTCDataChannel | null = null;
     let closed = false;
     const link: Link = {
@@ -94,4 +95,38 @@ export class PeerJsHost implements HostTransport {
     this.peer?.destroy();
     this.peer = null;
   }
+}
+
+const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
+
+/** IPv4 цього комп'ютера в домашній мережі: з адреси сторінки або від dev-сервера. */
+function lanIp(): string {
+  if (IPV4.test(location.hostname) && location.hostname !== '127.0.0.1') return location.hostname;
+  return __LAN_IP__;
+}
+
+/**
+ * Браузери ховають локальну адресу за випадковим `*.local` (mDNS). Якщо mDNS у мережі не
+ * працює (роутер ріже multicast, macOS не дав Chrome доступу до локальної мережі), телефон
+ * не може розв'язати це ім'я, а зовнішня адреса з STUN усередині мережі зазвичай не
+ * досяжна (немає NAT hairpin) — ICE висить у checking. Тож до кожного mDNS-кандидата екрана
+ * додаємо копію з реальною LAN-адресою: телефон шле перевірки на неї, а свою адресу екран
+ * дізнається з них самих (peer-reflexive). Пульт нічого не змінює.
+ */
+function exposeLanCandidates(pc: RTCPeerConnection | undefined): void {
+  const ip = lanIp();
+  if (!pc || !ip) return;
+  const send = pc.onicecandidate;
+  if (!send) return;
+  pc.onicecandidate = (evt) => {
+    send.call(pc, evt);
+    const c = evt.candidate;
+    if (!c || !/ [0-9a-f-]+\.local /i.test(c.candidate)) return;
+    const candidate = new RTCIceCandidate({
+      candidate: c.candidate.replace(/ [0-9a-f-]+\.local /i, ` ${ip} `),
+      sdpMid: c.sdpMid,
+      sdpMLineIndex: c.sdpMLineIndex,
+    });
+    send.call(pc, { candidate } as RTCPeerConnectionIceEvent);
+  };
 }

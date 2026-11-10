@@ -158,9 +158,17 @@ function run(room: string): void {
     else show('results');
   };
 
+  // Якщо за 8 с з'єднання немає — підказати типові причини замість вічного «Під'єднання…».
+  const slowHint = window.setTimeout(() => {
+    if (net.state !== 'open') $('conn-hint').hidden = false;
+  }, 8000);
   net.onState = (s) => {
     $('reconnect').classList.toggle('on', s === 'lost');
     if (s === 'connecting') show('connecting');
+    if (s === 'open') {
+      window.clearTimeout(slowHint);
+      $('conn-hint').hidden = true;
+    }
   };
 
   net.onMessage = (m: ScreenMessage) => {

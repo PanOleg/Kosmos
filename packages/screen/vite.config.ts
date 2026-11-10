@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   define: {
+    __LAN_IP__: JSON.stringify(mode === 'production' ? '' : lanAddress()),
     __CONTROLLER_URL__: JSON.stringify(
       process.env.VITE_CONTROLLER_URL ??
         (mode === 'production'
