@@ -10,7 +10,8 @@ export type EnemyType =
   | 'spider'
   | 'repairer'
   | 'foreman'
-  | 'turret';
+  | 'turret'
+  | 'core';
 
 /** Наземні роботи, яких лікує Ремонтник (не дрони й не він сам). */
 export const ROBOT_TYPES: ReadonlySet<EnemyType> = new Set([
@@ -273,7 +274,55 @@ export const TURRET = {
   backMul: 3,
 } satisfies EnemyDef & Record<string, number>;
 
+/** Ядро станції (фінальний бос, DECISIONS.md, п. 41). Нерухоме, стоїть на реакторі. */
+export const CORE = {
+  /** На фазу; фаз три. */
+  hp: 1500,
+  speed: 0,
+  radius: 2.9,
+  damage: 30,
+  parts: 60,
+  /** Нижче за турелі й більшість ворогів: автоприціл спершу чистить загрози. */
+  threat: 8,
+  /** Невразливість між фазами, с. */
+  transition: 2.5,
+  // Фаза 1: темрява, турелі зі стін, лазерна сітка.
+  darkRadius: 8,
+  wallTurrets: 6,
+  wallTurretR: 25,
+  gridEvery: 6,
+  gridWarn: 1.5,
+  gridFire: 0.25,
+  /** Відстань між променями й половина ширини променя. */
+  gridSpacing: 4.5,
+  gridHalfWidth: 0.55,
+  gridDamage: 25,
+  // Фаза 2: шлюзи.
+  airlockEvery: 10,
+  airlockOpen: 4,
+  /** Попередження перед відкриттям шлюзу (сирена, мигання). */
+  airlockWarn: 1.5,
+  pull: 3,
+  /** Ближче за це до відкритого шлюзу — затягнуло. */
+  suckRadius: 1.6,
+  rocketEvery: 3.5,
+  scoutEvery: 9,
+  scoutCount: 3,
+  // Фаза 3: робот, атаки по черзі з паузою.
+  attackPause: 2,
+  volley: 3,
+  laserAim: 1.5,
+  laserSpeed: 45,
+  laserDamage: 35,
+  craneRadius: 3.5,
+  craneWarn: 1.2,
+  craneDamage: 35,
+  /** Не кличе Рій, якщо дрібних дронів уже стільки. */
+  swarmCap: 24,
+} satisfies EnemyDef & Record<string, number>;
+
 export const ENEMIES: Record<EnemyType, EnemyDef> = {
+  core: CORE,
   foreman: FOREMAN,
   turret: TURRET,
   shell: SHELL,

@@ -241,6 +241,18 @@ export function updateProjectiles(game: Game): void {
               hitIdx = j;
             }
           }
+      // Ядро завбільшки з кілька клітинок сітки: центр далеко від кулі — перевіряємо окремо.
+      const bi = s.boss.index;
+      if (bi >= 0 && !b.air) {
+        const c = s.enemies[bi]!;
+        if (c.alive) {
+          const t = segCircle(b.x, b.y, nx, ny, c.x, c.y, c.radius + b.radius);
+          if (t < hitT) {
+            hitT = t;
+            hitIdx = bi;
+          }
+        }
+      }
     } else {
       for (const p of s.players) {
         if (p.down) continue;

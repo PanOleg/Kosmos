@@ -25,7 +25,7 @@ export interface WaveDef {
   partsMul: number;
   pressureBelow: number;
   /** Хвиля з босом: смуга здоров'я на екрані й скасування підкріплень з його смертю. */
-  boss?: 'foreman';
+  boss?: 'foreman' | 'core';
 }
 
 /** BALANCE.md: 1 → ×1, 2 → ×1.6, 3 → ×2.3, 4 → ×3. */
@@ -197,6 +197,17 @@ export const FOREMAN_WAVE: WaveDef = {
   boss: 'foreman',
 };
 
+/** Фінал: Ядро станції в реакторній залі (BALANCE.md). */
+export const CORE_WAVE: WaveDef = {
+  name: 'Ядро станції',
+  pause: 15,
+  speedMul: 1,
+  partsMul: 1,
+  pressureBelow: 0,
+  groups: [g('core', 1, 0, 'center')],
+  boss: 'core',
+};
+
 /**
  * Таблиця під повзунок «кількість хвиль» (DECISIONS.md, п. 38): менше 9 — рівномірна вибірка
  * зі збереженням порядку й останньої; більше — повтор трьох останніх із +15% ворогів за коло.
@@ -228,6 +239,7 @@ export function buildWaves(count = 9): WaveDef[] {
   const out: WaveDef[] = picked.map((w, i) => ({ ...w, name: `Хвиля ${i + 1}` }));
   const after = Math.min(out.length, Math.ceil(0.55 * out.length));
   out.splice(after, 0, { ...FOREMAN_WAVE });
+  out.push({ ...CORE_WAVE });
   return out;
 }
 

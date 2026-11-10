@@ -5,6 +5,7 @@ import type { StaticWorld } from './collision/world';
 import type { Barrier } from './entities/barrier';
 import type { Rocket } from './entities/rocket';
 import type { Prop } from './entities/prop';
+import type { BossState } from './entities/boss';
 import type { Perches } from './collision/perches';
 import type { Enemy } from './entities/enemy';
 import type { Player } from './entities/player';
@@ -34,6 +35,8 @@ export interface GameState {
   wave: WaveState;
   /** Дробовий залишок деталей між дропами. */
   partsCarry: number;
+  /** Фінальний бос — Ядро станції. */
+  boss: BossState;
 }
 
 /**

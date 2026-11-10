@@ -1,3 +1,5 @@
+import { gridDistance } from './core';
+import { CORE } from '../config/enemies';
 import { SCOUT_WINDUP } from './scout';
 import { KAMI_DIVE, KAMI_WINDUP } from './kamikaze';
 import { TEAM_ENEMY } from '../entities/projectile';
@@ -66,6 +68,26 @@ export function botInput(game: Game, slot: number, out: PlayerInput): void {
       ay += e.fx * 2;
     }
   }
+  // Бос: від відкритого шлюзу — геть (до центру), з променя сітки — убік, у проміжок.
+  const boss = s.boss;
+  if (boss.airlockState > 0 && boss.airlock >= 0) {
+    const al = game.config.map.airlocks[boss.airlock]!;
+    const d = Math.hypot(al.x - p.x, al.y - p.y);
+    if (d < 16) {
+      const l = Math.hypot(p.x, p.y) || 1;
+      ax += (-p.x / l) * 3;
+      ay += (-p.y / l) * 3;
+      if (d < 4) danger = true;
+    }
+  }
+  if (boss.grid === 1 && gridDistance(boss, p.x, p.y) < CORE.gridHalfWidth + 0.6) {
+    const nx = Math.cos(boss.gridAngle);
+    const ny = Math.sin(boss.gridAngle);
+    const side =
+      gridDistance(boss, p.x + nx * 0.1, p.y + ny * 0.1) > gridDistance(boss, p.x, p.y) ? 1 : -1;
+    ax += nx * side * 3;
+    ay += ny * side * 3;
+  }
   // Нікого в прицілі — підходимо до найближчого ворога (снайпер висить поза дальністю).
   if (p.target < 0) {
     let nd = Infinity;
@@ -73,11 +95,16 @@ export function botInput(game: Game, slot: number, out: PlayerInput): void {
     let ny = 0;
     for (const e of s.enemies) {
       if (!e.alive) continue;
-      const d2 = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;
+      // Велике тіло (Ядро на реакторі) — ідемо до його краю зі свого боку, а не в центр.
+      const ed = Math.hypot(p.x - e.x, p.y - e.y) || 1;
+      const off = e.radius > 1.5 ? e.radius + 1 : 0;
+      const tx = e.x + ((p.x - e.x) / ed) * off;
+      const ty = e.y + ((p.y - e.y) / ed) * off;
+      const d2 = (tx - p.x) ** 2 + (ty - p.y) ** 2;
       if (d2 < nd) {
         nd = d2;
-        nx = e.x;
-        ny = e.y;
+        nx = tx;
+        ny = ty;
       }
     }
     // Підходить, доки ворог не опиниться в межах дальності власної зброї (у Інженера — 6 м).

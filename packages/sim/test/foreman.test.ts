@@ -106,7 +106,8 @@ describe('foreman & turret', () => {
 describe('wave table', () => {
   test('9 waves match BALANCE, foreman after the 5th, breather has double parts', () => {
     const w = buildWaves(9);
-    expect(w.length).toBe(10);
+    expect(w.length).toBe(11);
+    expect(w[10]!.boss).toBe('core');
     expect(w[5]!.boss).toBe('foreman');
     const count = (i: number, type: string) =>
       w[i]!.groups.filter((g) => g.type === type).reduce((a, g) => a + g.count, 0);
@@ -153,7 +154,9 @@ describe('wave table', () => {
     expect(fifteen.filter((w) => !w.boss).length).toBe(15);
     expect(fifteen.findIndex((w) => w.boss)).toBe(Math.ceil(0.55 * 15));
     const total = (w: (typeof fifteen)[number]) => w.groups.reduce((a, g) => a + g.count, 0);
-    expect(total(fifteen[fifteen.length - 1]!)).toBeGreaterThan(total(buildWaves(9)[9]!));
+    const reg15 = fifteen.filter((w) => !w.boss);
+    const reg9 = buildWaves(9).filter((w) => !w.boss);
+    expect(total(reg15[reg15.length - 1]!)).toBeGreaterThan(total(reg9[reg9.length - 1]!));
   });
 });
 

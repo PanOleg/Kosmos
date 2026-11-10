@@ -35,6 +35,12 @@ function kamikazeHittable(e: Enemy, px: number, py: number): boolean {
 
 /** Пряма видимість з урахуванням висоти: до дрона в повітрі низькі перешкоди не заважають. */
 function canSee(game: Game, px: number, py: number, e: Enemy): boolean {
+  // Ядро стоїть на реакторі, що сам блокує постріли: цілимося в край тіла з боку гравця.
+  if (e.type === 'core') {
+    const d = Math.hypot(px - e.x, py - e.y) || 1;
+    const k = (e.radius + 0.1) / d;
+    return hasLineOfSight(game.world, px, py, e.x + (px - e.x) * k, e.y + (py - e.y) * k);
+  }
   return hasLineOfSight(game.world, px, py, e.x, e.y, isHigh(e) ? AIR_COVER_HEIGHT : 0);
 }
 
@@ -67,10 +73,12 @@ export function updateAutoaim(game: Game): void {
 
     let best = -1;
     let bestScore = -Infinity;
-    const x0 = Math.max(0, Math.floor((p.x - range + h.half) / h.cell));
-    const x1 = Math.min(h.n - 1, Math.floor((p.x + range + h.half) / h.cell));
-    const y0 = Math.max(0, Math.floor((p.y - range + h.half) / h.cell));
-    const y1 = Math.min(h.n - 1, Math.floor((p.y + range + h.half) / h.cell));
+    // Запас на радіус найбільшого тіла (Ядро): його центр може бути поза дальністю.
+    const q = range + 3;
+    const x0 = Math.max(0, Math.floor((p.x - q + h.half) / h.cell));
+    const x1 = Math.min(h.n - 1, Math.floor((p.x + q + h.half) / h.cell));
+    const y0 = Math.max(0, Math.floor((p.y - q + h.half) / h.cell));
+    const y1 = Math.min(h.n - 1, Math.floor((p.y + q + h.half) / h.cell));
     for (let gy = y0; gy <= y1; gy++) {
       for (let gx = x0; gx <= x1; gx++) {
         for (let j = h.head[gy * h.n + gx]!; j >= 0; j = h.next[j]!) {

@@ -18,6 +18,7 @@ import { updateSpider } from '../ai/spider';
 import { updateRepairer } from '../ai/repairer';
 import { updateForeman } from '../ai/foreman';
 import { updateTurret } from '../ai/turret';
+import { updateCore } from '../ai/core';
 
 /** Висота, з якої дрон вилітає з вентиляційного люка й знижується до своєї. */
 const DRONE_SPAWN_ALT = 6;
@@ -169,7 +170,7 @@ export function updateEnemies(game: Game): void {
     steer.x = 0;
     steer.y = 0;
     // Заглушений ЕМІ: стоїть, не атакує, вразливий (автоприціл бере його охочіше).
-    if (e.stun > 0) {
+    if (e.stun > 0 && e.type !== 'core') {
       e.stun--;
       e.exposed = true;
       // Заглушений дрон падає на підлогу (DECISIONS.md, п. 29).
@@ -214,9 +215,14 @@ export function updateEnemies(game: Game): void {
         case 'turret':
           updateTurret(game, e, i);
           break;
+        case 'core':
+          updateCore(game, e, i);
+          break;
       }
       if (!e.alive) continue;
     }
+    // Ядро вросло в реактор: ні відкидання, ні розштовхування.
+    if (e.type === 'core') continue;
 
     let wx = steer.x * e.speed;
     let wy = steer.y * e.speed;

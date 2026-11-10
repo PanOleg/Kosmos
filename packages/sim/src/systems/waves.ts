@@ -7,6 +7,7 @@ import { emit } from '../events';
 import { secToTicks } from '../math';
 import type { Game } from '../state';
 import { spawnEnemy } from './enemies';
+import { initCore } from '../ai/core';
 
 export type WavePhase = 'pause' | 'active' | 'vacuum' | 'done';
 
@@ -57,7 +58,7 @@ function groupCount(game: Game, base: number, air = false): number {
 }
 
 type EnemyTypeArg = Parameters<typeof spawnEnemy>[1];
-const BOSS_TYPES: ReadonlySet<EnemyTypeArg> = new Set(['foreman']);
+const BOSS_TYPES: ReadonlySet<EnemyTypeArg> = new Set(['foreman', 'core']);
 
 /** Скільки окремих ворогів дає група (рій — десяток дронів за одиницю). */
 function unitsOf(game: Game, type: EnemyTypeArg, base: number): number {
@@ -148,7 +149,11 @@ function spawnGroup(
   if (airlock === 'center') {
     // Реакторна зала: на півночі від ядра, всередині бортика.
     for (let k = 0; k < count; k++) {
-      const e = spawnEnemy(game, type, (k - (count - 1) / 2) * 2.5, 6.5);
+      // Ядро — на самому реакторі; решта — на півночі від нього, усередині бортика.
+      const e =
+        type === 'core'
+          ? spawnEnemy(game, type, 0, 0)
+          : spawnEnemy(game, type, (k - (count - 1) / 2) * 2.5, 6.5);
       if (e >= 0) {
         const en = game.state.enemies[e]!;
         en.speed *= w.speedMul;
@@ -158,6 +163,7 @@ function spawnGroup(
             en.maxHp * PLAYER_COUNT_MUL[Math.min(n, PLAYER_COUNT_MUL.length - 1)]!,
           );
         }
+        if (type === 'core') initCore(game, e);
         w.spawnedTotal++;
       }
     }

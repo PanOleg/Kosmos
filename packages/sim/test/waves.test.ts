@@ -22,6 +22,8 @@ function playWithBots(players: number, seed: number, maxSec = 600, immortal = fa
       const t = g.events.list[i]!.type;
       if (t === 'spawn') spawned++;
       else if (t === 'explosion') exploded++;
+      // Ядро прибирає своїх: турелі на зміні фази й усіх, хто лишився після його смерті.
+      else if (t === 'kill' && g.events.list[i]!.b < 0) exploded++;
     }
     for (let i = 0; i < g.events.count; i++)
       if (g.events.list[i]!.type === 'waveCleared' && g.events.list[i]!.b === 1)
@@ -40,7 +42,7 @@ describe('waves', () => {
     const { g, sec, atClear, collected, spawned, exploded } = playWithBots(1, 11, 600, true);
     expect(g.state.phase).toBe('won');
     const p = g.state.players[0]!;
-    // Кожен ворог або вбитий гравцем, або підірвався сам (Камікадзе).
+    // Кожен ворог або вбитий гравцем, або підірвався сам (Камікадзе), або його прибрав бос.
     expect(p.stats.kills + exploded).toBe(spawned);
     // Після зачистки «пилосос» збирає все, що лежало на підлозі: нічого не губиться.
     // (Деталь, що пролежала 25 с недосяжною для бота, згасає ще під час хвилі — так задумано.)
