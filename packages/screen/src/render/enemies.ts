@@ -19,7 +19,7 @@ import { toX, toZ } from './coords';
  * Корпус кожного типу злито в одну геометрію з вершинними кольорами: 2 draw call на ворога
  * (корпус + світні частини) замість десятка. Заміна на glTF — у build*().
  */
-interface EnemyVisual {
+export interface EnemyVisual {
   root: THREE.Group;
   body: THREE.Group;
   hullMat: THREE.MeshStandardMaterial;
@@ -77,7 +77,7 @@ const laserGeo = new THREE.BoxGeometry(0.09, 0.09, 1).translate(0, 0, 0.5);
 
 const ringGeo = new THREE.RingGeometry(0.75, 1, 32).rotateX(-Math.PI / 2);
 
-function build(type: EnemyType): EnemyVisual {
+export function buildEnemyVisual(type: EnemyType): EnemyVisual {
   const root = new THREE.Group();
   const body = new THREE.Group();
   const hullMat = new THREE.MeshStandardMaterial({
@@ -218,7 +218,7 @@ export class EnemyRenderer {
       }
       if (!v || v.type !== e.type) {
         if (v) this.scene.remove(v.root);
-        v = build(e.type);
+        v = buildEnemyVisual(e.type);
         this.views[i] = v;
         this.scene.add(v.root);
       }

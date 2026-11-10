@@ -28,6 +28,7 @@ import { ProjectileRenderer } from './render/projectiles';
 import { PickupRenderer } from './render/pickups';
 import { FxDirector } from './render/fx';
 import { Sfx } from './audio/sfx';
+import { PostFx } from './render/post';
 import { Hud } from './ui/hud';
 import { showResults } from './ui/results';
 import { LobbyView } from './ui/lobby';
@@ -70,6 +71,22 @@ scene.background = new THREE.Color(PALETTE.bg);
 const cam = new GameCamera(window.innerWidth / window.innerHeight);
 const sfx = new Sfx();
 const debug = new DebugOverlay();
+// ?lowfx — без постобробки, для слабких ноутбуків.
+const LOWFX = params.has('lowfx');
+const post = new PostFx(renderer, scene, cam.camera, !LOWFX);
+renderer.info.autoReset = false;
+if (DEBUG) {
+  // Замір вартості кадру: N рендерів підряд, readPixels змушує GPU доробити все до кінця.
+  (window as unknown as { bench: (n?: number) => number }).bench = (n = 30) => {
+    const px = new Uint8Array(4);
+    const gl = renderer.getContext();
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    const t0 = performance.now();
+    for (let i = 0; i < n; i++) post.render();
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    return (performance.now() - t0) / n;
+  };
+}
 const arena = buildArena(createGame().config.map);
 scene.add(arena.group);
 
@@ -288,6 +305,7 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   cam.resize(window.innerWidth / window.innerHeight);
+  post.setSize(window.innerWidth, window.innerHeight);
 });
 
 if (params.has('quick')) {
@@ -415,7 +433,8 @@ function frame(now: number): void {
   if (match) frameMatch(match, now, dt);
   else frameLobby(now, dt);
   arena.update(now / 1000);
-  renderer.render(scene, cam.camera);
+  renderer.info.reset();
+  post.render();
   debug.frame(dt, renderer, debugLine());
   requestAnimationFrame(frame);
 }
