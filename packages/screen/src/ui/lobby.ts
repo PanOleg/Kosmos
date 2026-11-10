@@ -5,6 +5,7 @@ import {
   MOD_RANGE,
   PRESETS,
   WAVES_RANGE,
+  type MapId,
   type PresetId,
   type SessionSettings,
 } from '@horizon/sim';
@@ -70,6 +71,7 @@ export function loadSettings(): SessionSettings {
         preset: v.preset && v.preset in PRESETS ? v.preset : DEFAULT_SETTINGS.preset,
         custom: v.custom && typeof v.custom === 'object' ? v.custom : null,
         waves: typeof v.waves === 'number' ? v.waves : DEFAULT_SETTINGS.waves,
+        map: v.map === 'desert' ? 'desert' : 'station',
       };
     }
   } catch {
@@ -87,6 +89,7 @@ function saveSettings(s: SessionSettings): void {
 }
 
 const PRESET_ORDER: PresetId[] = ['easy', 'normal', 'hard'];
+const MAP_ORDER: MapId[] = ['station', 'desert'];
 
 let installed = false;
 
@@ -223,15 +226,29 @@ export class LobbyView {
     this.commit();
   }
 
+  /** Налаштування змінились (зокрема карта — екран перебудовує арену). */
+  onSettingsChange: (s: SessionSettings) => void = () => {};
+
   private commit(): void {
     saveSettings(this.settings);
     this.renderSettings();
+    this.onSettingsChange(this.settings);
+  }
+
+  /** Наступна карта по колу (клавіша M). */
+  cycleMap(): void {
+    const i = MAP_ORDER.indexOf(this.settings.map ?? 'station');
+    this.settings.map = MAP_ORDER[(i + 1) % MAP_ORDER.length];
+    this.commit();
   }
 
   private onSettingsClick(e: Event): void {
     const b = (e.target as HTMLElement).closest('button');
     if (!b) return;
-    if (b.dataset.preset) {
+    if (b.dataset.map) {
+      this.settings.map = b.dataset.map as MapId;
+      this.commit();
+    } else if (b.dataset.preset) {
       this.settings.preset = b.dataset.preset as PresetId;
       this.settings.custom = null;
       this.commit();
@@ -268,7 +285,12 @@ export class LobbyView {
       return `<div class="row"><span class="lbl">${t.modName[k]}</span><input type="range" min="${MOD_RANGE.min}" max="${MOD_RANGE.max}" step="0.05" value="${v}" data-mod="${k}"><span class="val">×${v.toFixed(2)}</span></div>`;
     }).join('');
     const open = this.settingsEl.classList.contains('open');
-    this.settingsEl.innerHTML = `<div class="row"><span class="lbl">${t.difficulty}</span>${presets}<span class="preset-note" style="opacity:.6;margin-left:auto">${s.custom ? t.customized : ''}</span></div>
+    const maps = MAP_ORDER.map(
+      (m) =>
+        `<button data-map="${m}" class="${m === (s.map ?? 'station') ? 'on' : ''}">${t.mapName[m]}</button>`,
+    ).join('');
+    this.settingsEl.innerHTML = `<div class="row"><span class="lbl">${t.mapLabel}</span>${maps}</div>
+<div class="row"><span class="lbl">${t.difficulty}</span>${presets}<span class="preset-note" style="opacity:.6;margin-left:auto">${s.custom ? t.customized : ''}</span></div>
 <div class="row"><span class="lbl">${t.wavesLabel}</span><button data-waves="-1">−</button><span class="val">${s.waves}</span><button data-waves="1">+</button><button data-adv="1" style="margin-left:auto">${t.advanced}</button></div>
 <div class="adv">${sliders}<div class="row"><button data-reset="1">${t.resetCustom}</button></div></div>`;
     this.settingsEl.classList.toggle('open', open);

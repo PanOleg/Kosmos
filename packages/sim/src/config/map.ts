@@ -33,7 +33,14 @@ export type ObstacleTag =
   | 'planter'
   | 'console'
   | 'rim'
-  | 'barricade';
+  | 'barricade'
+  // Пустеля (п. 49).
+  | 'rock'
+  | 'tent'
+  | 'wreck'
+  | 'crate'
+  | 'palm'
+  | 'sandbag';
 
 export type Obstacle = RectObstacle | CircleObstacle;
 
@@ -44,7 +51,10 @@ export interface SpawnPoint {
   sector: number;
 }
 
+export type MapId = 'station' | 'desert';
+
 export interface MapDef {
+  id: MapId;
   radius: number;
   obstacles: Obstacle[];
   airlocks: SpawnPoint[];
@@ -169,6 +179,7 @@ function sectorPoint(sector: number, r: number): SpawnPoint {
 }
 
 export const MAP: MapDef = {
+  id: 'station',
   radius: 30,
   obstacles: buildObstacles(),
   airlocks: [0, 1, 2, 3].map((s) => sectorPoint(s, 28.5)),
@@ -180,3 +191,91 @@ export const MAP: MapDef = {
     { x: -11, y: -2 },
   ],
 };
+
+/**
+ * Пустельний аванпост (DECISIONS.md, п. 49): той самий скелет, що й станція — центр з
+ * обладнанням (на ньому з'являється Ядро), низький бортик із чотирма проходами на r = 10.5,
+ * скельні хребти на діагоналях, ті самі точки появи (ворота каньйонів і точки скидання дронів) —
+ * тож хвилі, бос і баланс працюють без змін. Різниться наповнення секторів: північ — скелі
+ * каньйону, схід — покинутий табір (намети, ящики, розбитий джип), південь — оаза з пальмами,
+ * захід — відкриті дюни, де з'являються гравці.
+ */
+function buildDesertObstacles(): Obstacle[] {
+  const o: Obstacle[] = [];
+  o.push(circle(0, 0, 2.6, 'core', 4));
+  for (let i = 0; i < 4; i++) {
+    const a = Math.PI / 4 + (i * Math.PI) / 2;
+    o.push(rect(Math.cos(a) * 6.5, Math.sin(a) * 6.5, 1.4, 0.7, 'crate', { rot: a, height: 1 }));
+  }
+  // Низький бортик із мішків з піском — як бортик реакторної зали, з тими ж проходами.
+  const RIM_R = 10.5;
+  const GATE = 2.2 / RIM_R;
+  for (let q = 0; q < 4; q++) {
+    const start = (q * Math.PI) / 2 + GATE;
+    const end = ((q + 1) * Math.PI) / 2 - GATE;
+    const n = 6;
+    for (let k = 0; k < n; k++) {
+      const a0 = start + ((end - start) * k) / n;
+      const a1 = start + ((end - start) * (k + 1)) / n;
+      const am = (a0 + a1) / 2;
+      const len = 2 * RIM_R * Math.sin((a1 - a0) / 2) + 0.12;
+      o.push(
+        rect(Math.cos(am) * RIM_R, Math.sin(am) * RIM_R, len, 0.5, 'sandbag', {
+          rot: am + Math.PI / 2,
+          height: 0.7,
+          blocksShots: false,
+        }),
+      );
+    }
+  }
+  // Скельні хребти на діагоналях (як перегородки станції): високі — Павук чіпляється за них.
+  for (let i = 0; i < 4; i++) {
+    const a = Math.PI / 4 + (i * Math.PI) / 2;
+    o.push(rect(Math.cos(a) * 18, Math.sin(a) * 18, 8, 1.2, 'rock', { rot: a, height: 3 }));
+  }
+  // Північ: каньйон — брили на місці контейнерів, трохи зсунуті й різного розміру.
+  const cols = [-7.5, -2.5, 2.5, 7.5];
+  const rows = [13, 17.5, 22];
+  for (let ri = 0; ri < rows.length; ri++)
+    for (let ci = 0; ci < cols.length; ci++) {
+      const x = cols[ci]! + (ri % 2 === 0 ? 0 : 1.2) + ((ci * 7 + ri * 3) % 5) * 0.12 - 0.24;
+      const y = rows[ri]!;
+      if (Math.hypot(x, y) > 26) continue;
+      const r = 1.1 + ((ci + ri * 2) % 3) * 0.25;
+      o.push(circle(x, y, r, 'rock', 2.4));
+    }
+  // Схід: покинутий табір.
+  o.push(rect(14.5, 4, 3.2, 2.4, 'tent', { height: 2 }));
+  o.push(rect(14.5, -4, 3.2, 2.4, 'tent', { height: 2 }));
+  o.push(rect(20.5, 7, 2.6, 2.2, 'tent', { height: 1.9, rot: 0.3 }));
+  o.push(rect(18, 0, 3.2, 1.6, 'wreck', { height: 1.4, rot: 0.5 }));
+  o.push(rect(22.5, -5.5, 1.2, 1.2, 'crate', { height: 1.1, rot: 0.2 }));
+  o.push(rect(23.5, -3.8, 1.2, 1.2, 'crate', { height: 1.1, rot: -0.3 }));
+  o.push(rect(24.5, 2.5, 1.1, 2.6, 'crate', { height: 0.9 }));
+  o.push(rect(21, -9.5, 2.4, 1.1, 'crate', { height: 0.9, rot: -0.4 }));
+  // Південь: оаза — пальми на піщаних острівцях, у центрі ставок.
+  const palms: [number, number, number][] = [
+    [-6, -13, 1.5],
+    [5, -12.5, 1.3],
+    [0, -17, 1.8],
+    [-9, -19, 1.2],
+    [8.5, -19.5, 1.4],
+    [-3.5, -22.5, 1.1],
+    [4, -23.5, 1.2],
+  ];
+  for (const [x, y, r] of palms) o.push(circle(x, y, r, 'palm', 1));
+  o.push(rect(-12, -14, 1, 4, 'sandbag', { rot: -0.6, height: 0.8 }));
+  o.push(rect(12, -14, 1, 4, 'sandbag', { rot: 0.6, height: 0.8 }));
+  // Захід: дюни — лише кілька каменів біля краю, простір для старту лишається вільним.
+  o.push(circle(-22, 9, 1.0, 'rock', 1.2));
+  o.push(circle(-24, -7, 1.2, 'rock', 1.4));
+  return o;
+}
+
+export const DESERT_MAP: MapDef = {
+  ...MAP,
+  id: 'desert',
+  obstacles: buildDesertObstacles(),
+};
+
+export const MAPS: Record<MapId, MapDef> = { station: MAP, desert: DESERT_MAP };

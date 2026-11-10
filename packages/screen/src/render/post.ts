@@ -70,6 +70,13 @@ export class PostFx {
     this.composer = composer;
   }
 
+  /** Поріг і сила світіння — свої в кожної карти: на сонячному піску поріг вищий. */
+  setBloom(threshold: number, strength: number): void {
+    if (!this.bloom) return;
+    this.bloom.threshold = threshold;
+    this.bloom.strength = strength;
+  }
+
   /** Вимикає постобробку назавжди (автоякість на слабкій графіці). */
   disable(): void {
     this.composer?.dispose();

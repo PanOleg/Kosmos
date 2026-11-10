@@ -1,7 +1,7 @@
 import { PLAYER } from './balance';
 import { CLASSES, AUTOAIM } from './classes';
 import { PRESETS, type DifficultyMods } from './difficulty';
-import { MAP, type MapDef } from './map';
+import { MAP, MAPS, type MapDef, type MapId } from './map';
 import { buildWaves, type WaveDef } from './waves';
 
 export interface GameConfig {
@@ -29,6 +29,8 @@ export interface SessionSettings {
   preset: PresetId;
   custom: Partial<Record<CustomMod, number>> | null;
   waves: number;
+  /** Карта (п. 49); старі збереження без неї — станція. */
+  map?: MapId;
 }
 
 /** Повзунки розширених налаштувань; шкода ворогів іде за пресетом. */
@@ -58,7 +60,8 @@ export function buildConfig(s: SessionSettings): GameConfig {
         mods[k] = clamp(v, MOD_RANGE.min, MOD_RANGE.max);
     }
   const waves = Math.round(clamp(s.waves || WAVES_RANGE.default, WAVES_RANGE.min, WAVES_RANGE.max));
-  return { ...DEFAULT_CONFIG, mods, waves: buildWaves(waves) };
+  const map = (s.map && MAPS[s.map]) || MAP;
+  return { ...DEFAULT_CONFIG, map, mods, waves: buildWaves(waves) };
 }
 
 export * from './balance';

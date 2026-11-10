@@ -22,6 +22,18 @@ export interface ArenaView {
   setDarkness(k: number): void;
   /** Ховає колону й клітку реактора, поки на ньому стоїть Ядро. */
   setReactorVisible(on: boolean): void;
+  /** Небо, серпанок, сила оточення й експозиція — у кожної карти свої (п. 49). */
+  sky: ArenaSky;
+}
+
+export interface ArenaSky {
+  background: number;
+  fog: number;
+  fogDensity: number;
+  env: number;
+  exposure: number;
+  /** Поріг і сила bloom. */
+  bloom: [number, number];
 }
 
 interface FlickerLight {
@@ -337,6 +349,14 @@ export function buildArena(map: MapDef): ArenaView {
   let dark = 0;
   return {
     group: g,
+    sky: {
+      background: PALETTE.bg,
+      fog: 0x0a0507,
+      fogDensity: 0.007,
+      env: 0.32,
+      exposure: 1.1,
+      bloom: [0.9, 0.55],
+    },
     setDarkness(k: number) {
       dark = k;
     },

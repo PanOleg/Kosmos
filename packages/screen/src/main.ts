@@ -12,9 +12,11 @@ import {
   type EnemyType,
   type Game,
   type PlayerInput,
+  type SessionSettings,
 } from '@horizon/sim';
 import { emptyInput } from '@horizon/sim/protocol';
-import { buildArena } from './render/arena';
+import { buildArena, type ArenaView } from './render/arena';
+import { buildDesertArena } from './render/desertArena';
 import { GameCamera } from './render/camera';
 import { PlayerView } from './render/players';
 import { PALETTE } from './render/palette';
@@ -98,8 +100,6 @@ if (DEBUG) {
     return (performance.now() - t0) / n;
   };
 }
-const arena = buildArena(createGame().config.map);
-scene.add(arena.group);
 
 // ---------- Лобі й мережа ----------
 
@@ -109,6 +109,37 @@ const lobby = new LobbyHost(
   () => Array.from(crypto.getRandomValues(new Uint32Array(4)), (n) => n.toString(36)).join(''),
 );
 const lobbyView = new LobbyView(lobby);
+
+/** Арена вибраної в лобі карти: своє небо, серпанок і світло (DECISIONS.md, п. 49). */
+let envBase = 0.32;
+function makeArena(settings: SessionSettings): ArenaView {
+  const map = buildConfig(settings).map;
+  const a = map.id === 'desert' ? buildDesertArena(map) : buildArena(map);
+  (scene.background as THREE.Color).setHex(a.sky.background);
+  (scene.fog as THREE.FogExp2).color.setHex(a.sky.fog);
+  (scene.fog as THREE.FogExp2).density = a.sky.fogDensity;
+  renderer.toneMappingExposure = a.sky.exposure;
+  post.setBloom(...a.sky.bloom);
+  envBase = a.sky.env;
+  scene.environmentIntensity = envBase;
+  scene.add(a.group);
+  return a;
+}
+let currentMapId = buildConfig(lobbyView.settings).map.id;
+let arena = makeArena(lobbyView.settings);
+lobbyView.onSettingsChange = (s) => {
+  if (match || buildConfig(s).map.id === currentMapId) return;
+  scene.remove(arena.group);
+  arena.group.traverse((o) => {
+    const m = o as THREE.Mesh;
+    m.geometry?.dispose();
+    const mat = m.material;
+    if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
+    else mat?.dispose();
+  });
+  arena = makeArena(s);
+  currentMapId = buildConfig(s).map.id;
+};
 
 // Мета-прогрес екіпажу (DECISIONS.md, п. 48): рекорди, досягнення, щоденний контракт.
 const store = (() => {
@@ -313,7 +344,7 @@ function endMatch(): void {
   }
   arena.setDarkness(0);
   arena.setReactorVisible(true);
-  scene.environmentIntensity = 0.32;
+  scene.environmentIntensity = envBase;
   match.fx.destroy();
   match.hud.destroy();
   match.results?.remove();
@@ -361,6 +392,9 @@ window.addEventListener('keydown', (e) => {
     }
     case 'KeyB':
       lobby.addLocal('bot');
+      break;
+    case 'KeyM':
+      lobbyView.cycleMap();
       break;
     case 'KeyC':
       if (kb) lobby.cycleSkin(kb);
@@ -586,7 +620,7 @@ function frameMatch(m: Match, now: number, dt: number): void {
   // Фаза 1 Ядра: станція гасить світло, лишаються ліхтарі гравців і світні смуги.
   arena.setDarkness(m.bossR.darkness);
   arena.setReactorVisible(!m.bossR.present);
-  scene.environmentIntensity = 0.32 * (1 - 0.85 * m.bossR.darkness);
+  scene.environmentIntensity = envBase * (1 - 0.85 * m.bossR.darkness);
   cam.update(m.camPoints, live, dt, time);
   m.enemyR.updateBars(g.state.enemies, alpha, cam.camera);
   m.hud.update(g, cam.camera, dt);

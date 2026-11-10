@@ -12,7 +12,7 @@ const uk = {
   pressStart: 'Усі готові — Enter, щоб почати',
   startingIn: (s: number) => `Старт через ${s}`,
   lobbyKeysHint:
-    'Клавіатура: Пробіл — приєднатися · Q/E — клас · C — забарвлення · Enter — готовий/старт · B — додати бота · Backspace — вийти · D — складність · −/= — хвилі',
+    'Клавіатура: Пробіл — приєднатися · Q/E — клас · C — забарвлення · M — карта · Enter — готовий/старт · B — додати бота · Backspace — вийти · D — складність · −/= — хвилі',
   difficulty: 'Складність',
   preset: { easy: 'Легко', normal: 'Нормально', hard: 'Важко' } as Record<string, string>,
   wavesLabel: 'Хвиль',
@@ -74,6 +74,8 @@ const uk = {
   teamParts: 'деталі',
   teamRevives: 'воскресіння',
   resFoot: (s: number) => `«Ще раз» на будь-якому пульті або Enter · лобі через ${s} с`,
+  mapLabel: 'Карта',
+  mapName: { station: 'Станція', desert: 'Пустеля' } as Record<string, string>,
   crew: 'Екіпаж',
   contract: 'Контракт дня',
   contractDone: 'виконано',
