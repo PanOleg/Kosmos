@@ -1,3 +1,4 @@
-import { SIM_VERSION } from '@horizon/sim';
+import { createGame } from '@horizon/sim';
 
-document.getElementById('app')!.textContent = `Горизонт, sim v${SIM_VERSION}`;
+const game = createGame();
+document.getElementById('app')!.textContent = `Горизонт: ${game.world.obstacles.length} перешкод`;
