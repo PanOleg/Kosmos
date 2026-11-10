@@ -16,6 +16,8 @@ import { updateSwarm, SWARM_GROUPS, swarmCenters } from '../ai/swarm';
 import { updateShell } from '../ai/shell';
 import { updateSpider } from '../ai/spider';
 import { updateRepairer } from '../ai/repairer';
+import { updateForeman } from '../ai/foreman';
+import { updateTurret } from '../ai/turret';
 
 /** Висота, з якої дрон вилітає з вентиляційного люка й знижується до своєї. */
 const DRONE_SPAWN_ALT = 6;
@@ -70,6 +72,7 @@ export function spawnEnemy(game: Game, type: EnemyType, x: number, y: number, gr
     e.shield = 0;
     e.ally = -1;
     e.cd = 0;
+    e.t2 = 0;
     s.enemiesAlive++;
     emit(game.events, 'spawn', x, y, 0, 0, i);
     return i;
@@ -205,6 +208,12 @@ export function updateEnemies(game: Game): void {
         case 'repairer':
           updateRepairer(game, e, i);
           break;
+        case 'foreman':
+          updateForeman(game, e, i);
+          break;
+        case 'turret':
+          updateTurret(game, e, i);
+          break;
       }
       if (!e.alive) continue;
     }
@@ -212,7 +221,7 @@ export function updateEnemies(game: Game): void {
     let wx = steer.x * e.speed;
     let wy = steer.y * e.speed;
     // Панцир повертає корпус сам, повільно; решта дивиться, куди йде.
-    if ((wx !== 0 || wy !== 0) && e.type !== 'shell') {
+    if ((wx !== 0 || wy !== 0) && e.type !== 'shell' && e.type !== 'turret') {
       e.fx = steer.x;
       e.fy = steer.y;
     }

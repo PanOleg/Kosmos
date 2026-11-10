@@ -4,6 +4,7 @@ import type { SpatialHash } from './collision/spatial';
 import type { StaticWorld } from './collision/world';
 import type { Barrier } from './entities/barrier';
 import type { Rocket } from './entities/rocket';
+import type { Prop } from './entities/prop';
 import type { Perches } from './collision/perches';
 import type { Enemy } from './entities/enemy';
 import type { Player } from './entities/player';
@@ -27,6 +28,8 @@ export interface GameState {
   pickups: Pickup[];
   barriers: Barrier[];
   rockets: Rocket[];
+  /** Укриття Прораба (індекс = динамічний слот світу). */
+  props: Prop[];
   enemiesAlive: number;
   wave: WaveState;
   /** Дробовий залишок деталей між дропами. */

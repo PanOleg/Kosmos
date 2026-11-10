@@ -2,6 +2,7 @@ import { PICKUPS, PLAYER_COUNT_MUL } from '../config/waves';
 import { AIR_TYPES, SWARM } from '../config/enemies';
 import { SWARM_GROUPS } from './enemies';
 import { returnOutPlayers } from './revive';
+import { clearProps } from './props';
 import { emit } from '../events';
 import { secToTicks } from '../math';
 import type { Game } from '../state';
@@ -23,6 +24,9 @@ export interface WaveState {
   airlockCursor: number;
   /** Лічильник номерів роїв. */
   groupSeq: number;
+  /** Прораб: скільки поставив за хвилю (черговість) і скільки з того турелей. */
+  builds: number;
+  turretsPlaced: number;
 }
 
 export function createWaveState(): WaveState {
@@ -37,6 +41,8 @@ export function createWaveState(): WaveState {
     speedMul: 1,
     airlockCursor: 0,
     groupSeq: 0,
+    builds: 0,
+    turretsPlaced: 0,
   };
 }
 
@@ -69,6 +75,8 @@ export function startWave(game: Game, index: number): void {
   w.plannedTotal = def.groups.reduce((a, g) => a + unitsOf(game, g.type, g.count), 0);
   w.partsMul = def.partsMul;
   w.speedMul = def.speedMul;
+  w.builds = 0;
+  w.turretsPlaced = 0;
   // Нова пауза — нова аптечка в магазині; вибулі повертаються.
   for (const p of game.state.players) p.medkitBought = false;
   returnOutPlayers(game);
@@ -117,12 +125,29 @@ export function updateWaves(game: Game): void {
     emit(game.events, 'waveCleared', 0, 0, 0, 0, w.index, w.index + 1 >= waves.length ? 1 : 0);
     w.phase = 'vacuum';
     w.timer = secToTicks(PICKUPS.vacuum);
+    clearProps(game);
   }
 }
 
-function spawnGroup(game: Game, type: EnemyTypeArg, count: number, airlock: number | 'any'): void {
+function spawnGroup(
+  game: Game,
+  type: EnemyTypeArg,
+  count: number,
+  airlock: number | 'any' | 'center',
+): void {
   const w = game.state.wave;
   const air = AIR_TYPES.has(type);
+  if (airlock === 'center') {
+    // Реакторна зала: на півночі від ядра, всередині бортика.
+    for (let k = 0; k < count; k++) {
+      const e = spawnEnemy(game, type, (k - (count - 1) / 2) * 2.5, 6.5);
+      if (e >= 0) {
+        game.state.enemies[e]!.speed *= w.speedMul;
+        w.spawnedTotal++;
+      }
+    }
+    return;
+  }
   // Наземні — зі шлюзів, дрони — з вентиляційних люків у стелі (PROMPT, «Сетинг»).
   const points = air ? game.config.map.vents : game.config.map.airlocks;
   const idx = airlock === 'any' ? w.airlockCursor++ % points.length : airlock % points.length;

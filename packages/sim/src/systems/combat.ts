@@ -10,7 +10,7 @@ import { hasLineOfSight } from '../collision/world';
 import { damageBarrier, segBarrier } from './abilities';
 import { weaponDamageMul } from './upgrades';
 import { isHigh, outOfReach, type Enemy } from '../entities/enemy';
-import { AIR_COVER_HEIGHT, KAMIKAZE, SHELL, SPIDER } from '../config/enemies';
+import { AIR_COVER_HEIGHT, KAMIKAZE, SHELL, SPIDER, TURRET } from '../config/enemies';
 import { SPIDER_FLIGHT } from '../ai/spider';
 
 /**
@@ -22,6 +22,7 @@ export function hitMultiplier(e: Enemy, kx: number, ky: number): number {
   if (e.type === 'kamikaze') return e.stun === 0 && along < -KAMIKAZE.frontCos ? 0 : 1;
   // Куля летить у той самий бік, куди він дивиться, — значить, у спину.
   if (e.type === 'shell') return along > SHELL.backCos ? SHELL.backMul : 1;
+  if (e.type === 'turret') return along > TURRET.backCos ? TURRET.backMul : 1;
   if (e.type === 'spider') return e.ai === SPIDER_FLIGHT ? SPIDER.flightMul : 1;
   return 1;
 }

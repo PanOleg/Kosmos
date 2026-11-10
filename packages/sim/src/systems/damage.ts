@@ -71,5 +71,12 @@ export function killEnemy(game: Game, e: Enemy, index: number, bySlot: number): 
   if (p) p.stats.kills++;
   emit(game.events, 'kill', e.x, e.y, e.vx, e.vy, index, bySlot, ENEMIES[e.type].parts);
   dropParts(game, e.x, e.y, ENEMIES[e.type].parts);
+  // Смерть Прораба позбавляє хвилю підкріплення: решта груп не з'явиться (п. 36).
+  if (e.type === 'foreman') {
+    const w = game.state.wave;
+    const def = game.config.waves[w.index];
+    if (def) w.nextGroup = def.groups.length;
+    emit(game.events, 'bossDown', e.x, e.y, 0, 0, index);
+  }
   for (const pl of game.state.players) if (pl.target === index) pl.target = -1;
 }

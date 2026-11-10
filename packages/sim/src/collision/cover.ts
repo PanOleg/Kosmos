@@ -22,7 +22,7 @@ export function buildCover(
   const ys: number[] = [];
   const os: number[] = [];
   for (const o of w.obstacles) {
-    if (!o.blocksShots || o.src.height < minHeight || o.src.tag === 'core') continue;
+    if (!o.active || !o.blocksShots || o.src.height < minHeight || o.src.tag === 'core') continue;
     if (o.isCircle) {
       const r = o.r + offset;
       const n = Math.max(6, Math.round((Math.PI * 2 * r) / spacing));

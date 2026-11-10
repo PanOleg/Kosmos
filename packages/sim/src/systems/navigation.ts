@@ -62,6 +62,29 @@ function pointBlocked(w: StaticWorld, x: number, y: number, inflate: number): bo
   return false;
 }
 
+/** Перерахунок прохідності клітинок у прямокутнику (поставили чи прибрали укриття). */
+export function refreshNavArea(
+  nav: NavField,
+  world: StaticWorld,
+  inflate: number,
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+): void {
+  const n = nav.n;
+  const x0 = Math.max(0, Math.floor((minX - inflate + nav.half) / nav.cell));
+  const x1 = Math.min(n - 1, Math.floor((maxX + inflate + nav.half) / nav.cell));
+  const y0 = Math.max(0, Math.floor((minY - inflate + nav.half) / nav.cell));
+  const y1 = Math.min(n - 1, Math.floor((maxY + inflate + nav.half) / nav.cell));
+  for (let gy = y0; gy <= y1; gy++)
+    for (let gx = x0; gx <= x1; gx++) {
+      const x = -nav.half + (gx + 0.5) * nav.cell;
+      const y = -nav.half + (gy + 0.5) * nav.cell;
+      nav.blocked[gy * n + gx] = pointBlocked(world, x, y, inflate) ? 1 : 0;
+    }
+}
+
 export function navCell(nav: NavField, x: number, y: number): number {
   let gx = Math.floor((x + nav.half) / nav.cell);
   let gy = Math.floor((y + nav.half) / nav.cell);
@@ -112,15 +135,39 @@ const NY = [0, 0, 1, -1, 1, -1, 1, -1];
 const NC = [1, 1, 1, 1, Math.SQRT2, Math.SQRT2, Math.SQRT2, Math.SQRT2];
 
 export function updateNav(nav: NavField, state: GameState): void {
-  const { n, dist, blocked } = nav;
-  dist.fill(INF);
+  nav.dist.fill(INF);
   nav.heapSize = 0;
   for (const p of state.players) {
     if (p.down) continue;
     const c = navCell(nav, p.x, p.y);
-    dist[c] = 0;
+    nav.dist[c] = 0;
     push(nav, 0, c);
   }
+  propagate(nav);
+}
+
+/** Поле відстаней до однієї точки (навігація бота до вибраного ворога). */
+export function navToPoint(nav: NavField, x: number, y: number): void {
+  nav.dist.fill(INF);
+  nav.heapSize = 0;
+  const c = navCell(nav, x, y);
+  nav.dist[c] = 0;
+  push(nav, 0, c);
+  propagate(nav);
+}
+
+/** Поле з тією ж сіткою прохідності, але власними відстанями. */
+export function navSharingBlocked(src: NavField): NavField {
+  return {
+    ...src,
+    dist: new Float32Array(src.dist.length),
+    heap: new Int32Array(src.heap.length),
+    heapSize: 0,
+  };
+}
+
+function propagate(nav: NavField): void {
+  const { n, dist, blocked } = nav;
   while (nav.heapSize > 0) {
     const c = pop(nav);
     const d = dist[c]!;

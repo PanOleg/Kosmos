@@ -10,8 +10,8 @@ export interface SpawnGroup {
   count: number;
   /** Секунди від старту хвилі. */
   at: number;
-  /** Індекс шлюзу 0..3 (пн, сх, пд, зх) або 'any' — наступний за колом. */
-  airlock: number | 'any';
+  /** Індекс шлюзу 0..3 (пн, сх, пд, зх), 'any' — наступний за колом, 'center' — реакторна зала. */
+  airlock: number | 'any' | 'center';
 }
 
 export interface WaveDef {
@@ -24,128 +24,212 @@ export interface WaveDef {
   /** Множник деталей (хвиля-передих). */
   partsMul: number;
   pressureBelow: number;
+  /** Хвиля з босом: смуга здоров'я на екрані й скасування підкріплень з його смертю. */
+  boss?: 'foreman';
 }
 
 /** BALANCE.md: 1 → ×1, 2 → ×1.6, 3 → ×2.3, 4 → ×3. */
 export const PLAYER_COUNT_MUL = [1, 1, 1.6, 2.3, 3];
 
+type G = SpawnGroup;
+const g = (type: G['type'], count: number, at: number, airlock: G['airlock']): G => ({
+  type,
+  count,
+  at,
+  airlock,
+});
+
 /**
- * Тимчасова таблиця до етапу хвиль (DECISIONS.md, п. 34): 1–5 точно з BALANCE.md,
- * 6 — склад хвилі 7, 7 — склад хвилі 8. Міні-боса й боса ще немає. Між хвилями — магазин.
- * Для дронів airlock — номер вентиляційного люка.
+ * Дев'ять хвиль BALANCE.md (кількості — для одного гравця). Групи розкладені в часі, щоб тиск
+ * наростав; для дронів airlock — номер вентиляційного люка. Рахунок за типами збігається з таблицею.
  */
-export const SLICE_WAVES: WaveDef[] = [
+export const BALANCE_WAVES: WaveDef[] = [
   {
-    name: 'Хвиля 1',
+    name: '',
     pause: 10,
     speedMul: 0.75,
     partsMul: 1,
     pressureBelow: 2,
-    groups: [
-      { type: 'scout', count: 4, at: 0, airlock: 0 },
-      { type: 'scout', count: 4, at: 8, airlock: 0 },
-    ],
+    groups: [g('scout', 4, 0, 0), g('scout', 4, 8, 0)],
   },
   {
-    name: 'Хвиля 2',
+    name: '',
     pause: 8,
     speedMul: 0.75,
     partsMul: 1,
     pressureBelow: 3,
     groups: [
-      { type: 'scout', count: 4, at: 0, airlock: 0 },
-      { type: 'gunner', count: 1, at: 3, airlock: 0 },
-      { type: 'scout', count: 4, at: 9, airlock: 0 },
-      { type: 'gunner', count: 1, at: 13, airlock: 0 },
-      { type: 'scout', count: 4, at: 18, airlock: 0 },
-      { type: 'gunner', count: 1, at: 22, airlock: 0 },
+      g('scout', 4, 0, 0),
+      g('gunner', 1, 3, 0),
+      g('scout', 4, 9, 0),
+      g('gunner', 1, 13, 0),
+      g('scout', 4, 18, 0),
+      g('gunner', 1, 22, 0),
     ],
   },
   {
-    name: 'Хвиля 3',
+    name: '',
     pause: 8,
     speedMul: 1,
     partsMul: 1,
     pressureBelow: 3,
     groups: [
-      { type: 'scout', count: 4, at: 0, airlock: 0 },
-      { type: 'gunner', count: 1, at: 2, airlock: 1 },
-      { type: 'wasp', count: 2, at: 6, airlock: 3 },
-      { type: 'scout', count: 4, at: 12, airlock: 1 },
-      { type: 'gunner', count: 2, at: 16, airlock: 0 },
-      { type: 'wasp', count: 2, at: 20, airlock: 1 },
+      g('scout', 4, 0, 0),
+      g('gunner', 1, 2, 1),
+      g('wasp', 2, 6, 3),
+      g('scout', 4, 12, 1),
+      g('gunner', 2, 16, 0),
+      g('wasp', 2, 20, 1),
     ],
   },
   {
-    name: 'Хвиля 4',
+    name: '',
     pause: 8,
     speedMul: 1,
     partsMul: 1,
     pressureBelow: 4,
     groups: [
-      { type: 'scout', count: 5, at: 0, airlock: 0 },
-      { type: 'gunner', count: 2, at: 3, airlock: 1 },
-      { type: 'wasp', count: 2, at: 7, airlock: 0 },
-      { type: 'spider', count: 1, at: 10, airlock: 1 },
-      { type: 'scout', count: 5, at: 14, airlock: 1 },
-      { type: 'gunner', count: 2, at: 18, airlock: 0 },
-      { type: 'wasp', count: 2, at: 21, airlock: 1 },
-      { type: 'spider', count: 1, at: 25, airlock: 0 },
+      g('scout', 5, 0, 0),
+      g('gunner', 2, 3, 1),
+      g('wasp', 2, 7, 0),
+      g('spider', 1, 10, 1),
+      g('scout', 5, 14, 1),
+      g('gunner', 2, 18, 0),
+      g('wasp', 2, 21, 1),
+      g('spider', 1, 25, 0),
     ],
   },
   {
-    name: 'Хвиля 5',
+    name: '',
     pause: 8,
     speedMul: 1,
     partsMul: 1,
     pressureBelow: 4,
     groups: [
-      { type: 'gunner', count: 3, at: 0, airlock: 0 },
-      { type: 'repairer', count: 1, at: 2, airlock: 0 },
-      { type: 'scout', count: 3, at: 4, airlock: 2 },
-      { type: 'wasp', count: 3, at: 8, airlock: 2 },
-      { type: 'spider', count: 2, at: 12, airlock: 0 },
-      { type: 'gunner', count: 2, at: 16, airlock: 2 },
-      { type: 'scout', count: 3, at: 19, airlock: 0 },
-      { type: 'wasp', count: 3, at: 22, airlock: 0 },
-      { type: 'spider', count: 1, at: 26, airlock: 2 },
+      g('gunner', 3, 0, 0),
+      g('repairer', 1, 2, 0),
+      g('scout', 3, 4, 2),
+      g('wasp', 3, 8, 2),
+      g('spider', 2, 12, 0),
+      g('gunner', 2, 16, 2),
+      g('scout', 3, 19, 0),
+      g('wasp', 3, 22, 0),
+      g('spider', 1, 26, 2),
     ],
   },
+  // 6 — передих: лише Скаути, деталі ×2, довша пауза.
   {
-    name: 'Хвиля 6',
+    name: '',
+    pause: 15,
+    speedMul: 1,
+    partsMul: 2,
+    pressureBelow: 3,
+    groups: [g('scout', 5, 0, 0), g('scout', 5, 6, 1), g('scout', 5, 12, 2)],
+  },
+  {
+    name: '',
     pause: 8,
     speedMul: 1,
     partsMul: 1,
     pressureBelow: 3,
     groups: [
-      { type: 'shell', count: 1, at: 0, airlock: 0 },
-      { type: 'repairer', count: 1, at: 1, airlock: 0 },
-      { type: 'gunner', count: 2, at: 4, airlock: 1 },
-      { type: 'wasp', count: 2, at: 8, airlock: 3 },
-      { type: 'shell', count: 1, at: 14, airlock: 2 },
-      { type: 'repairer', count: 1, at: 15, airlock: 2 },
-      { type: 'gunner', count: 2, at: 18, airlock: 1 },
-      { type: 'wasp', count: 2, at: 22, airlock: 1 },
+      g('shell', 1, 0, 0),
+      g('repairer', 1, 1, 0),
+      g('gunner', 2, 4, 1),
+      g('wasp', 2, 8, 3),
+      g('shell', 1, 14, 2),
+      g('repairer', 1, 15, 2),
+      g('gunner', 2, 18, 1),
+      g('wasp', 2, 22, 1),
     ],
   },
   {
-    name: 'Хвиля 7',
+    name: '',
     pause: 8,
     speedMul: 1,
     partsMul: 1,
     pressureBelow: 4,
     groups: [
-      { type: 'scout', count: 4, at: 0, airlock: 0 },
-      { type: 'kamikaze', count: 2, at: 4, airlock: 0 },
-      { type: 'sniper', count: 1, at: 8, airlock: 3 },
-      { type: 'kamikaze', count: 2, at: 12, airlock: 2 },
-      { type: 'swarm', count: 1, at: 16, airlock: 1 },
-      { type: 'scout', count: 4, at: 20, airlock: 2 },
-      { type: 'sniper', count: 1, at: 24, airlock: 1 },
-      { type: 'kamikaze', count: 2, at: 28, airlock: 'any' },
+      g('scout', 4, 0, 0),
+      g('kamikaze', 2, 4, 0),
+      g('sniper', 1, 8, 3),
+      g('kamikaze', 2, 12, 2),
+      g('swarm', 1, 16, 1),
+      g('scout', 4, 20, 2),
+      g('sniper', 1, 24, 1),
+      g('kamikaze', 2, 28, 'any'),
+    ],
+  },
+  {
+    name: '',
+    pause: 10,
+    speedMul: 1,
+    partsMul: 1,
+    pressureBelow: 5,
+    groups: [
+      g('gunner', 2, 0, 0),
+      g('shell', 1, 2, 1),
+      g('repairer', 1, 3, 1),
+      g('spider', 2, 6, 2),
+      g('kamikaze', 2, 8, 0),
+      g('gunner', 2, 11, 3),
+      g('sniper', 1, 13, 2),
+      g('swarm', 1, 16, 1),
+      g('shell', 1, 19, 2),
+      g('repairer', 1, 20, 2),
+      g('kamikaze', 2, 23, 3),
+      g('spider', 2, 26, 3),
+      g('gunner', 2, 28, 0),
+      g('sniper', 1, 30, 1),
+      g('swarm', 1, 33, 3),
     ],
   },
 ];
+
+/** Міні-бос: Прораб + 4 Скаути з центру (BALANCE.md). */
+export const FOREMAN_WAVE: WaveDef = {
+  name: 'Прораб',
+  pause: 12,
+  speedMul: 1,
+  partsMul: 1,
+  pressureBelow: 0,
+  groups: [g('foreman', 1, 0, 'center'), g('scout', 4, 2, 'any')],
+  boss: 'foreman',
+};
+
+/**
+ * Таблиця під повзунок «кількість хвиль» (DECISIONS.md, п. 38): менше 9 — рівномірна вибірка
+ * зі збереженням порядку й останньої; більше — повтор трьох останніх із +15% ворогів за коло.
+ * Прораб — після хвилі ⌈0.55·N⌉.
+ */
+export function buildWaves(count = 9): WaveDef[] {
+  const n = Math.max(1, Math.round(count));
+  const base = BALANCE_WAVES;
+  const picked: WaveDef[] = [];
+  if (n <= base.length) {
+    let last = -1;
+    for (let k = 0; k < n; k++) {
+      let idx = n === 1 ? base.length - 1 : Math.round((k * (base.length - 1)) / (n - 1));
+      if (idx <= last) idx = last + 1;
+      last = idx;
+      picked.push(base[idx]!);
+    }
+  } else {
+    picked.push(...base);
+    for (let k = 1; k <= n - base.length; k++) {
+      const src = base[base.length - 3 + ((k - 1) % 3)]!;
+      const mul = 1 + 0.15 * Math.ceil(k / 3);
+      picked.push({
+        ...src,
+        groups: src.groups.map((gr) => ({ ...gr, count: Math.max(1, Math.round(gr.count * mul)) })),
+      });
+    }
+  }
+  const out: WaveDef[] = picked.map((w, i) => ({ ...w, name: `Хвиля ${i + 1}` }));
+  const after = Math.min(out.length, Math.ceil(0.55 * out.length));
+  out.splice(after, 0, { ...FOREMAN_WAVE });
+  return out;
+}
 
 export const PICKUPS = {
   /** Деталь лежить стільки, потім зникає (останні 3 с блимає). */

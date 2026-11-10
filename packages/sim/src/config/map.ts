@@ -25,7 +25,15 @@ export interface CircleObstacle {
 }
 
 export type ObstacleTag =
-  'core' | 'divider' | 'container' | 'table' | 'glass' | 'planter' | 'console' | 'rim';
+  | 'core'
+  | 'divider'
+  | 'container'
+  | 'table'
+  | 'glass'
+  | 'planter'
+  | 'console'
+  | 'rim'
+  | 'barricade';
 
 export type Obstacle = RectObstacle | CircleObstacle;
 

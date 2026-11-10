@@ -25,7 +25,7 @@ export function buildPerches(w: StaticWorld, spacing = 2.5): Perches {
     alts.push(SPIDER.perchAlt);
   }
   for (const o of w.obstacles) {
-    if (o.src.height < 2 || o.src.tag === 'core') continue;
+    if (!o.active || o.src.height < 2 || o.src.tag === 'core') continue;
     xs.push(o.x);
     ys.push(o.y);
     alts.push(o.src.height + 0.15);

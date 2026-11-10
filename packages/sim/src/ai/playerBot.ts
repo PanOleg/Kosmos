@@ -3,6 +3,25 @@ import { KAMI_DIVE, KAMI_WINDUP } from './kamikaze';
 import { TEAM_ENEMY } from '../entities/projectile';
 import type { PlayerInput } from '../protocol';
 import type { Game } from '../state';
+import { raycast } from '../collision/world';
+import {
+  navDir,
+  navSharingBlocked,
+  navToPoint,
+  sampleNav,
+  type NavField,
+} from '../systems/navigation';
+
+/** Навігація ботів до вибраного ворога: окреме поле на гру й слот, перерахунок раз на 30 тиків. */
+const botNavs = new WeakMap<Game, NavField[]>();
+function botNav(game: Game, slot: number): NavField {
+  let list = botNavs.get(game);
+  if (!list) {
+    list = [];
+    botNavs.set(game, list);
+  }
+  return (list[slot] ??= navSharingBlocked(game.nav));
+}
 import { shopOpen, upgradePrice, wholeParts } from '../systems/upgrades';
 import { reviveCost } from '../systems/revive';
 import { REVIVE } from '../config/revive';
@@ -65,8 +84,19 @@ export function botInput(game: Game, slot: number, out: PlayerInput): void {
     // Ціль не взята (далеко або за укриттям) — підходимо, поки її не візьме автоприціл.
     if (nd < Infinity && nd > 2.5 * 2.5) {
       const d = Math.sqrt(nd);
-      ax += ((nx - p.x) / d) * 1.2;
-      ay += ((ny - p.y) / d) * 1.2;
+      let ux = (nx - p.x) / d;
+      let uy = (ny - p.y) / d;
+      // Пряма закрита (контейнери, скло, бортик) — іде полем навігації до цього ворога.
+      if (raycast(game.world, p.x, p.y, nx, ny, false) < 1) {
+        const nav = botNav(game, slot);
+        if ((s.tick + slot) % 30 === 0 || nav.dist[0] === 0) navToPoint(nav, nx, ny);
+        if (sampleNav(nav, p.x, p.y)) {
+          ux = navDir.x;
+          uy = navDir.y;
+        }
+      }
+      ax += ux * 1.2;
+      ay += uy * 1.2;
     }
   }
   for (const b of s.projectiles) {

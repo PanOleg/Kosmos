@@ -7,6 +7,8 @@ import { createPlayer } from './entities/player';
 import { createPickupPool } from './entities/pickup';
 import { createBarrierPool } from './entities/barrier';
 import { createRocketPool } from './entities/rocket';
+import { createPropPool } from './entities/prop';
+import { DYNAMIC_SLOTS } from './collision/world';
 import { buildPerches } from './collision/perches';
 import { createProjectilePool } from './entities/projectile';
 import { createEventBuffer } from './events';
@@ -53,6 +55,7 @@ export function createGame(
     pickups: createPickupPool(PICKUP_CAPACITY),
     barriers: createBarrierPool(4),
     rockets: createRocketPool(24),
+    props: createPropPool(DYNAMIC_SLOTS),
     enemiesAlive: 0,
     wave: createWaveState(),
     partsCarry: 0,
@@ -128,6 +131,9 @@ export {
   SPIDER_LANDED,
 } from './ai/spider';
 export type { Rocket } from './entities/rocket';
+export type { Prop } from './entities/prop';
+export { FOREMAN_STRIKE } from './ai/foreman';
+export { TURRET_WINDUP, TURRET_BURST } from './ai/turret';
 export { abilityReadiness, ABILITY_CLASS_INDEX } from './systems/abilities';
 export { shopOpen, upgradePrice, wholeParts } from './systems/upgrades';
 export { reviveCost, downedAllyNear } from './systems/revive';

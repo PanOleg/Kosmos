@@ -1,9 +1,26 @@
 /** Вороги. Час — секунди, відстань — метри. Множники складності накладаються в рантаймі. */
 export type EnemyType =
-  'scout' | 'gunner' | 'wasp' | 'kamikaze' | 'sniper' | 'swarm' | 'shell' | 'spider' | 'repairer';
+  | 'scout'
+  | 'gunner'
+  | 'wasp'
+  | 'kamikaze'
+  | 'sniper'
+  | 'swarm'
+  | 'shell'
+  | 'spider'
+  | 'repairer'
+  | 'foreman'
+  | 'turret';
 
 /** Наземні роботи, яких лікує Ремонтник (не дрони й не він сам). */
-export const ROBOT_TYPES: ReadonlySet<EnemyType> = new Set(['scout', 'gunner', 'shell', 'spider']);
+export const ROBOT_TYPES: ReadonlySet<EnemyType> = new Set([
+  'scout',
+  'gunner',
+  'shell',
+  'spider',
+  'foreman',
+  'turret',
+]);
 
 /** Дрони літають; решта — наземні. */
 export const AIR_TYPES: ReadonlySet<EnemyType> = new Set(['wasp', 'kamikaze', 'sniper', 'swarm']);
@@ -210,7 +227,55 @@ export const REPAIRER = {
   keepAway: 10,
 } satisfies EnemyDef & Record<string, number>;
 
+export const FOREMAN = {
+  hp: 900,
+  speed: 2.5,
+  radius: 1.1,
+  damage: 25,
+  parts: 20,
+  threat: 18,
+  /** Підходить на цю дистанцію. */
+  approach: 5,
+  /** Удар кранами: зона перед ним, підсвічена до удару. */
+  strikeRange: 4.5,
+  strikeOffset: 2.5,
+  strikeRadius: 3,
+  strikeWarn: 1.2,
+  strikeEvery: 3.5,
+  /** Раз на buildEvery — укриття або турель (по черзі), турелей ≤ maxTurrets за хвилю. */
+  buildEvery: 8,
+  maxTurrets: 2,
+  /** Раз на summonEvery — summonCount Скаутів. */
+  summonEvery: 12,
+  summonCount: 3,
+  /** Стіна-укриття, яку він ставить. */
+  wallLength: 3,
+  wallThick: 0.6,
+  wallHeight: 1.4,
+} satisfies EnemyDef & Record<string, number>;
+
+export const TURRET = {
+  hp: 150,
+  speed: 0,
+  radius: 0.7,
+  damage: 8,
+  parts: 3,
+  threat: 14,
+  /** Поворот, рад/с (90°/с). */
+  turnRate: Math.PI / 2,
+  burst: 5,
+  burstGap: 0.12,
+  period: 3,
+  windup: 0.4,
+  range: 14,
+  projectileSpeed: 20,
+  backCos: 0.5,
+  backMul: 3,
+} satisfies EnemyDef & Record<string, number>;
+
 export const ENEMIES: Record<EnemyType, EnemyDef> = {
+  foreman: FOREMAN,
+  turret: TURRET,
   shell: SHELL,
   spider: SPIDER,
   repairer: REPAIRER,

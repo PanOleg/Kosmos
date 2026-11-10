@@ -17,6 +17,8 @@ export interface StaticWorld {
   /** Буфер результатів queryNear: індекси перешкод, валідні до наступного запиту. */
   query: Int32Array;
   queryCount: number;
+  /** Індекс першого динамічного слота в obstacles. */
+  dynamicBase: number;
 }
 
 export interface PreparedObstacle {
@@ -35,6 +37,8 @@ export interface PreparedObstacle {
   minY: number;
   maxX: number;
   maxY: number;
+  /** Динамічні слоти (укриття Прораба) неактивні, поки їх не поставили. */
+  active: boolean;
 }
 
 function prepare(o: Obstacle, index: number): PreparedObstacle {
@@ -55,6 +59,7 @@ function prepare(o: Obstacle, index: number): PreparedObstacle {
       minY: o.y - o.r,
       maxX: o.x + o.r,
       maxY: o.y + o.r,
+      active: true,
     };
   }
   const c = Math.cos(o.rot);
@@ -77,7 +82,23 @@ function prepare(o: Obstacle, index: number): PreparedObstacle {
     minY: o.y - ey,
     maxX: o.x + ex,
     maxY: o.y + ey,
+    active: true,
   };
+}
+
+/** Скільки динамічних перешкод (укриття Прораба) може стояти одночасно. */
+export const DYNAMIC_SLOTS = 8;
+
+function cellRange(
+  w: Pick<StaticWorld, 'gridMin' | 'cellSize' | 'gridN'>,
+  p: PreparedObstacle,
+  fn: (cell: number) => void,
+): void {
+  const x0 = Math.max(0, Math.floor((p.minX - w.gridMin) / w.cellSize));
+  const x1 = Math.min(w.gridN - 1, Math.floor((p.maxX - w.gridMin) / w.cellSize));
+  const y0 = Math.max(0, Math.floor((p.minY - w.gridMin) / w.cellSize));
+  const y1 = Math.min(w.gridN - 1, Math.floor((p.maxY - w.gridMin) / w.cellSize));
+  for (let gy = y0; gy <= y1; gy++) for (let gx = x0; gx <= x1; gx++) fn(gy * w.gridN + gx);
 }
 
 export function buildWorld(map: MapDef, cellSize = 4): StaticWorld {
@@ -85,13 +106,26 @@ export function buildWorld(map: MapDef, cellSize = 4): StaticWorld {
   const gridN = Math.ceil((map.radius * 2 + cellSize * 2) / cellSize);
   const cells: number[][] = Array.from({ length: gridN * gridN }, () => []);
   const obstacles = map.obstacles.map(prepare);
-  for (const p of obstacles) {
-    const x0 = Math.floor((p.minX - gridMin) / cellSize);
-    const x1 = Math.floor((p.maxX - gridMin) / cellSize);
-    const y0 = Math.floor((p.minY - gridMin) / cellSize);
-    const y1 = Math.floor((p.maxY - gridMin) / cellSize);
-    for (let gy = y0; gy <= y1; gy++)
-      for (let gx = x0; gx <= x1; gx++) cells[gy * gridN + gx]!.push(p.index);
+  for (const p of obstacles)
+    cellRange({ gridMin, cellSize, gridN }, p, (c) => cells[c]!.push(p.index));
+  // Динамічні слоти в кінці масиву: вимкнені, у сітці не зареєстровані.
+  for (let i = 0; i < DYNAMIC_SLOTS; i++) {
+    const p = prepare(
+      {
+        kind: 'rect',
+        x: 0,
+        y: 0,
+        hw: 0.1,
+        hh: 0.1,
+        rot: 0,
+        height: 1.4,
+        blocksShots: true,
+        tag: 'barricade',
+      },
+      obstacles.length,
+    );
+    p.active = false;
+    obstacles.push(p);
   }
   return {
     radius: map.radius,
@@ -104,7 +138,52 @@ export function buildWorld(map: MapDef, cellSize = 4): StaticWorld {
     stampValue: 0,
     query: new Int32Array(obstacles.length),
     queryCount: 0,
+    dynamicBase: obstacles.length - DYNAMIC_SLOTS,
   };
+}
+
+/** Ставить прямокутну перешкоду в динамічний слот (укриття Прораба). */
+export function setDynamic(
+  w: StaticWorld,
+  slot: number,
+  x: number,
+  y: number,
+  len: number,
+  thick: number,
+  rot: number,
+  height: number,
+): PreparedObstacle {
+  clearDynamic(w, slot);
+  const index = w.dynamicBase + slot;
+  const p = prepare(
+    {
+      kind: 'rect',
+      x,
+      y,
+      hw: len / 2,
+      hh: thick / 2,
+      rot,
+      height,
+      blocksShots: true,
+      tag: 'barricade',
+    },
+    index,
+  );
+  w.obstacles[index] = p;
+  cellRange(w, p, (c) => w.cells[c]!.push(index));
+  return p;
+}
+
+export function clearDynamic(w: StaticWorld, slot: number): void {
+  const index = w.dynamicBase + slot;
+  const p = w.obstacles[index]!;
+  if (!p.active) return;
+  cellRange(w, p, (c) => {
+    const cell = w.cells[c]!;
+    const k = cell.indexOf(index);
+    if (k >= 0) cell.splice(k, 1);
+  });
+  p.active = false;
 }
 
 /** Заповнює w.query перешкодами з клітинок, які перетинає AABB, без дублікатів. Повертає кількість. */
@@ -129,6 +208,7 @@ export function queryNear(
         const idx = cell[i]!;
         if (w.stamp[idx] === v) continue;
         w.stamp[idx] = v;
+        if (!w.obstacles[idx]!.active) continue;
         w.query[count++] = idx;
       }
     }
