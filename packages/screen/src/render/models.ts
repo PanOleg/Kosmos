@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 /**
  * Готові glTF-моделі замість примітивів (DECISIONS.md, п. 24; вимоги — docs/models/README.md).
@@ -12,6 +13,50 @@ export interface ModelEntry {
   height: number;
   /** Поворот у градусах, якщо модель дивиться не на +Z. */
   yaw?: number;
+  /**
+   * Статична модель ворога (DECISIONS.md, п. 45): без скелета й кліпів, замінює примітиви
+   * й малюється тим самим InstancedMesh на тип. Меші з «glow» у назві — світне око, решта —
+   * корпус з кольорами вершин. Початок координат моделі — центр тіла: зсуваємо лише по висоті.
+   */
+  static?: boolean;
+}
+
+export interface StaticParts {
+  hull: THREE.BufferGeometry;
+  glow: THREE.BufferGeometry;
+}
+
+const staticParts = new Map<string, StaticParts>();
+
+/** Лише позиція, нормаль і колір (RGB): так геометрії однакові з примітивами й зливаються. */
+function bakeStatic(scene: THREE.Object3D, scale: number, lift: number): StaticParts {
+  scene.updateMatrixWorld(true);
+  const hull: THREE.BufferGeometry[] = [];
+  const glow: THREE.BufferGeometry[] = [];
+  const m = new THREE.Matrix4().makeScale(scale, scale, scale);
+  m.premultiply(new THREE.Matrix4().makeTranslation(0, lift * scale, 0));
+  scene.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const src = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', src.getAttribute('position').clone());
+    const n = src.getAttribute('position').count;
+    const col = new Float32Array(n * 3).fill(1);
+    const c = src.getAttribute('color');
+    if (c) for (let i = 0; i < n; i++) col.set([c.getX(i), c.getY(i), c.getZ(i)], i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(m, mesh.matrixWorld));
+    g.computeVertexNormals();
+    (/glow/i.test(mesh.name) ? glow : hull).push(g);
+  });
+  const merge = (list: THREE.BufferGeometry[]) =>
+    list.length === 0
+      ? new THREE.BufferGeometry()
+      : list.length === 1
+        ? list[0]!
+        : mergeGeometries(list)!;
+  return { hull: merge(hull), glow: merge(glow) };
 }
 
 interface Loaded {
@@ -59,7 +104,12 @@ function findClip(clips: THREE.AnimationClip[], name: string): THREE.AnimationCl
 
 export const models = {
   has(id: string): boolean {
-    return loaded.has(id);
+    return loaded.has(id) || staticParts.has(id);
+  },
+
+  /** Статична модель ворога замість примітивів; null — немає. */
+  staticParts(id: string): StaticParts | null {
+    return staticParts.get(id) ?? null;
   },
 
   /** Завантажує все з маніфесту. Помилки окремих файлів не валять гру: модель просто лишається примітивом. */
@@ -85,6 +135,10 @@ export const models = {
           const size = box.getSize(new THREE.Vector3());
           const scale = entry.height / Math.max(1e-6, size.y);
           const center = box.getCenter(new THREE.Vector3());
+          if (entry.static) {
+            staticParts.set(id, bakeStatic(gltf.scene, scale, -box.min.y));
+            return;
+          }
           gltf.scene.traverse((o) => {
             const m = o as THREE.Mesh;
             if (m.isMesh) {
@@ -103,7 +157,7 @@ export const models = {
         }
       }),
     );
-    return [...loaded.keys()];
+    return [...loaded.keys(), ...staticParts.keys()];
   },
 
   instantiate(id: string): ModelInstance | null {

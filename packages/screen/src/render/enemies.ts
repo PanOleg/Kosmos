@@ -395,6 +395,9 @@ const DRONE_GEO = {
 };
 
 function geometryOf(type: EnemyType): { hull: THREE.BufferGeometry; glow: THREE.BufferGeometry } {
+  // Статична модель з Blender (public/models) замінює примітиви, якщо завантажена.
+  const model = models.staticParts(type);
+  if (model) return model;
   if (type === 'scout') return scoutGeo;
   if (type === 'gunner') return gunnerGeo;
   if (type === 'wasp' || type === 'kamikaze' || type === 'sniper' || type === 'swarm')
