@@ -34,3 +34,9 @@ B — бот, Backspace — прибрати, Enter — старт / з резу
 - `?debug` — fps, draw calls, затримка кожного пульта; `window.game`; F1/F2 спавнять ворогів.
 - `?seed=N` — сід матчу.
 - `VITE_CONTROLLER_URL` — адреса пульта в QR замість автовизначеної; `CONTROLLER_HTTP=1` — пульт без TLS.
+
+## Розміщення (Vercel)
+
+`vercel.json` уже налаштований: збірка `pnpm build:web`, сайт — `packages/screen/dist` (пульт у `/controller/`).
+Змінна середовища `VITE_TURN_URL` = `https://<app>.metered.live/api/v1/turn/credentials?apiKey=<ключ>`
+(безкоштовний TURN від Metered) — щоб телефони з'єднувалися в будь-якій мережі. Після зміни змінної — перезібрати.

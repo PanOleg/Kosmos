@@ -103,7 +103,8 @@ scene.add(arena.group);
 
 const lobby = new LobbyHost(
   () => performance.now(),
-  () => crypto.randomUUID(),
+  // randomUUID — лише в захищеному контексті; екран за http://<LAN-IP> його не має.
+  () => Array.from(crypto.getRandomValues(new Uint32Array(4)), (n) => n.toString(36)).join(''),
 );
 const lobbyView = new LobbyView(lobby);
 const keyboardLayout = new Map<Slot, KeyLayout>();
@@ -118,7 +119,10 @@ function roomCode(): string {
 // ?net=local — без інтернету: пульти в інших вкладках цього ж origin (/controller/).
 const LOCAL_NET = params.get('net') === 'local';
 const transport = LOCAL_NET ? new LocalHost() : new PeerJsHost();
-const controllerUrl = LOCAL_NET ? `${location.origin}/controller/` : __CONTROLLER_URL__;
+// Відносна адреса (продакшн: пульт поруч з екраном) — повна, бо QR сканує інший пристрій.
+const controllerUrl = LOCAL_NET
+  ? `${location.origin}/controller/`
+  : new URL(__CONTROLLER_URL__, location.href).href;
 const roomQuery = (code: string) => `?room=${code}${LOCAL_NET ? '&net=local' : ''}`;
 transport.onLink = (link) => lobby.attach(link);
 

@@ -7,7 +7,9 @@ export class LocalNet implements ClientTransport {
   onMessage: (m: ScreenMessage) => void = () => {};
   onPacket: (v: DataView) => void = () => {};
   onState: (s: NetState) => void = () => {};
-  private readonly id = crypto.randomUUID();
+  private readonly id = Array.from(crypto.getRandomValues(new Uint32Array(4)), (n) =>
+    n.toString(36),
+  ).join('');
   private readonly ch: BroadcastChannel;
 
   constructor(room: string) {

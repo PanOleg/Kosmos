@@ -1,6 +1,7 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { ControllerMessage, ScreenMessage } from '@horizon/sim/protocol';
 import { RoomTakenError, type HostTransport, type Link } from './transport';
+import { iceServers } from './ice';
 
 export const PEER_PREFIX = 'horizon-room-';
 /** Узгоджений канал вводу: той самий id на обох кінцях, без нового обміну SDP. */
@@ -15,9 +16,10 @@ export class PeerJsHost implements HostTransport {
   private peer: Peer | null = null;
   onLink: (link: Link) => void = () => {};
 
-  start(roomCode: string): Promise<void> {
+  async start(roomCode: string): Promise<void> {
+    const ice = await iceServers();
     return new Promise((resolve, reject) => {
-      const peer = new Peer(PEER_PREFIX + roomCode);
+      const peer = new Peer(PEER_PREFIX + roomCode, { config: { iceServers: ice } });
       this.peer = peer;
       let opened = false;
       peer.on('open', () => {

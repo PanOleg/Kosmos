@@ -1,6 +1,7 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { ControllerMessage, ScreenMessage } from '@horizon/sim/protocol';
 import type { ClientTransport, NetState } from './transport';
+import { iceServers } from './ice';
 
 const PEER_PREFIX = 'horizon-room-';
 const INPUT_CHANNEL_ID = 100;
@@ -30,9 +31,14 @@ export class ControllerNet implements ClientTransport {
     window.addEventListener('online', () => this.state !== 'open' && this.reconnectSoon(0));
   }
 
+  private ice: RTCIceServer[] = [];
+
   start(hello: () => ControllerMessage): void {
     this.helloFactory = hello;
-    this.connect();
+    void iceServers().then((ice) => {
+      this.ice = ice;
+      this.connect();
+    });
   }
 
   private setState(s: NetState): void {
@@ -45,7 +51,7 @@ export class ControllerNet implements ClientTransport {
     window.clearTimeout(this.retryTimer);
     this.setState(this.state === 'open' || this.state === 'lost' ? 'lost' : 'connecting');
     if (!this.peer || this.peer.destroyed) {
-      this.peer = new Peer();
+      this.peer = new Peer({ config: { iceServers: this.ice } });
       this.peer.on('error', (err) => {
         console.warn('[net]', err);
         this.dropConn();
