@@ -1,11 +1,10 @@
 import { SCOUT } from '../config/enemies';
-import { hasLineOfSight } from '../collision/world';
 import type { Enemy } from '../entities/enemy';
 import { emit } from '../events';
 import { secToTicks } from '../math';
 import type { Game } from '../state';
 import { damagePlayer } from '../systems/damage';
-import { steerTo, steer } from '../systems/enemies';
+import { canWalk, steerTo, steer } from '../systems/enemies';
 
 export const SCOUT_CHASE = 0;
 export const SCOUT_WINDUP = 1;
@@ -76,7 +75,7 @@ export function updateScout(game: Game, e: Enemy, index: number): void {
     tx = p.x + Math.cos(e.flank) * ring;
     ty = p.y + Math.sin(e.flank) * ring;
   }
-  if (d < 8 && hasLineOfSight(game.world, e.x, e.y, p.x, p.y)) {
+  if (d < 8 && canWalk(game, e.x, e.y, p.x, p.y, e.radius)) {
     steer.x = tx - e.x;
     steer.y = ty - e.y;
     const l = Math.sqrt(steer.x * steer.x + steer.y * steer.y) || 1;

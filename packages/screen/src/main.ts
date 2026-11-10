@@ -39,13 +39,15 @@ const playerViews = game.state.players.map((p) => {
 const enemyR = new EnemyRenderer(scene, game.state.enemies.length);
 const bulletR = new ProjectileRenderer(scene, game.state.projectiles.length);
 
-// Налагодження до появи хвиль: 1 — група Скаутів з випадкового шлюзу.
+// Налагодження до появи хвиль: 1 — група Скаутів, 2 — пара Стрільців з наступного шлюзу.
 let spawnSeq = 0;
 window.addEventListener('keydown', (e) => {
-  if (e.code !== 'Digit1') return;
+  if (e.code !== 'Digit1' && e.code !== 'Digit2') return;
   const a = game.config.map.airlocks[spawnSeq++ % 4]!;
-  for (let k = 0; k < 4; k++)
-    spawnEnemy(game, 'scout', a.x * 0.95 + (k % 2), a.y * 0.95 + (k >> 1));
+  if (e.code === 'Digit1')
+    for (let k = 0; k < 4; k++)
+      spawnEnemy(game, 'scout', a.x * 0.95 + (k % 2), a.y * 0.95 + (k >> 1));
+  else for (let k = 0; k < 2; k++) spawnEnemy(game, 'gunner', a.x * 0.93 + k * 1.2, a.y * 0.93);
 });
 
 const sfx = new Sfx();
@@ -91,7 +93,7 @@ function frame(now: number): void {
     camPoints[i]!.x = toX(p.x);
     camPoints[i]!.z = toZ(p.y);
   }
-  enemyR.update(game.state.enemies, alpha, dt, time);
+  enemyR.update(game.state.enemies, game.state.players, alpha, dt, time);
   bulletR.update(game.state.projectiles, alpha);
   fx.update(game, dt);
   arena.update(time);
@@ -101,3 +103,6 @@ function frame(now: number): void {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+if (new URLSearchParams(location.search).has('debug'))
+  (window as unknown as { game: typeof game }).game = game;

@@ -128,6 +128,11 @@ export class Sfx {
     this.burst('bandpass', 900, 300, 2, 0.08, 0.2, pan);
   }
 
+  enemyShot(pan: number): void {
+    this.tone('sawtooth', 300, 120, 0.12, 0.12, pan);
+    this.burst('bandpass', 1500, 500, 2, 0.1, 0.18, pan);
+  }
+
   playerHit(): void {
     this.tone('sine', 110, 50, 0.25, 0.6);
     this.burst('lowpass', 900, 100, 1, 0.2, 0.4);

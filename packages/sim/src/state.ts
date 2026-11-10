@@ -1,4 +1,5 @@
 import type { GameConfig } from './config';
+import type { CoverPoints } from './collision/cover';
 import type { SpatialHash } from './collision/spatial';
 import type { StaticWorld } from './collision/world';
 import type { Enemy } from './entities/enemy';
@@ -34,4 +35,5 @@ export interface Game {
   events: EventBuffer;
   hash: SpatialHash;
   nav: NavField;
+  cover: CoverPoints;
 }

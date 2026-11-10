@@ -140,6 +140,22 @@ export class FxDirector {
       case 'enemyWindup':
         this.sfx.windup(this.pan(e.x));
         break;
+      case 'enemyShot':
+        this.sfx.enemyShot(this.pan(e.x));
+        this.sparks.burst(
+          6,
+          X + e.x2 * 0.7,
+          1.1,
+          Z - e.y2 * 0.7,
+          e.x2,
+          -e.y2,
+          7,
+          0.7,
+          0.12,
+          0.2,
+          PALETTE.enemyShot,
+        );
+        break;
       case 'enemyAttack':
         this.sfx.enemyAttack(this.pan(e.x));
         this.sparks.burst(

@@ -1,6 +1,16 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { SCOUT, SCOUT_WINDUP, TICKS_PER_SEC, type Enemy, type EnemyType } from '@horizon/sim';
+import {
+  GUNNER,
+  GUNNER_PEEK,
+  GUNNER_OPEN,
+  SCOUT,
+  SCOUT_WINDUP,
+  TICKS_PER_SEC,
+  type Enemy,
+  type EnemyType,
+  type Player,
+} from '@horizon/sim';
 import { PALETTE } from './palette';
 import { toX, toZ } from './coords';
 
@@ -15,6 +25,7 @@ interface EnemyVisual {
   hullMat: THREE.MeshStandardMaterial;
   glowMat: THREE.MeshStandardMaterial;
   ring: THREE.Mesh;
+  laser: THREE.Mesh;
   type: EnemyType;
   flash: number;
   spawnT: number;
@@ -93,6 +104,9 @@ const gunnerGlow = merge([
   part(box, 0xffffff, 0.48, 0.95, 0.71, 0, 0, 0, 0.12, 0.12, 0.04),
 ]);
 
+// Одинична довжина вздовж +Z від початку координат, масштабується на відстань до цілі.
+const laserGeo = new THREE.BoxGeometry(0.09, 0.09, 1).translate(0, 0, 0.5);
+
 const ringGeo = new THREE.RingGeometry(0.75, 1, 32).rotateX(-Math.PI / 2);
 
 function build(type: EnemyType): EnemyVisual {
@@ -127,10 +141,27 @@ function build(type: EnemyType): EnemyVisual {
   ring.position.y = 0.03;
   ring.visible = false;
   root.add(ring);
-  return { root, body, hullMat, glowMat, ring, type, flash: 0, spawnT: 0 };
+  // Лазер прицілювання Стрільця: тонка лінія до цілі — видно, звідки і куди прилетить.
+  const laser = new THREE.Mesh(
+    laserGeo,
+    new THREE.MeshBasicMaterial({
+      color: PALETTE.danger,
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  laser.visible = false;
+  root.add(laser);
+  // Візуально більші за хітбокс, як і гравці: на телевізорі здалеку інакше губляться.
+  body.scale.setScalar(type === 'scout' ? 1.2 : 1.35);
+  return { root, body, hullMat, glowMat, ring, laser, type, flash: 0, spawnT: 0 };
 }
 
 const windupTicks = SCOUT.windup * TICKS_PER_SEC;
+const peekTicks = Math.round(GUNNER.peek * TICKS_PER_SEC);
+const aimTicks = Math.round(GUNNER.aim * TICKS_PER_SEC);
 
 export class EnemyRenderer {
   private readonly views: (EnemyVisual | null)[] = [];
@@ -151,7 +182,7 @@ export class EnemyRenderer {
     if (v) v.flash = 1;
   }
 
-  update(enemies: Enemy[], alpha: number, dt: number, time: number): void {
+  update(enemies: Enemy[], players: Player[], alpha: number, dt: number, time: number): void {
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i]!;
       let v = this.views[i];
@@ -183,7 +214,8 @@ export class EnemyRenderer {
       const crouch = windup ? 1 - prog * 0.3 : 1;
       const speed = Math.hypot(e.vx, e.vy);
       const bob = Math.abs(Math.sin(time * 18 + i)) * 0.05 * Math.min(1, speed / 3);
-      v.body.scale.set(1, crouch * v.spawnT, 1);
+      const bs = v.type === 'scout' ? 1.2 : 1.35;
+      v.body.scale.set(bs, bs * crouch * v.spawnT, bs);
       v.body.position.y = bob;
       v.glowMat.emissiveIntensity = windup ? 4 + prog * 8 : 2;
       v.ring.visible = windup;
@@ -193,8 +225,30 @@ export class EnemyRenderer {
         (v.ring.material as THREE.MeshBasicMaterial).opacity = 0.35 + prog * 0.6;
       }
 
+      // Стрілець цілиться: від початку визирання до пострілу (або перед пострілом у відкритому бою).
+      const aiming =
+        e.type === 'gunner' &&
+        ((e.ai === GUNNER_PEEK && e.aiT > peekTicks - aimTicks) ||
+          (e.ai === GUNNER_OPEN && e.aiT <= aimTicks));
+      const tp = aiming && e.target >= 0 ? players[e.target] : undefined;
+      v.laser.visible = !!tp;
+      if (tp) {
+        const dx = toX(tp.x) - v.root.position.x;
+        const dz = toZ(tp.y) - v.root.position.z;
+        const len = Math.hypot(dx, dz);
+        v.laser.position.y = 1.15;
+        v.laser.rotation.y = Math.atan2(dx, dz);
+        v.laser.scale.set(1, 1, len);
+        const prog = e.ai === GUNNER_PEEK ? (peekTicks - e.aiT) / aimTicks : 1 - e.aiT / aimTicks;
+        // Пульсація частішає ближче до пострілу.
+        (v.laser.material as THREE.MeshBasicMaterial).opacity =
+          0.25 + 0.6 * prog * (0.6 + 0.4 * Math.sin(time * (20 + prog * 40)));
+        v.glowMat.emissiveIntensity = 3 + prog * 8;
+      }
+
       v.flash = Math.max(0, v.flash - dt * 12);
-      v.hullMat.emissive.setRGB(v.flash, v.flash * 0.9, v.flash * 0.8);
+      // Слабке власне тепле світіння: ворог видно навіть у тіні контейнерів.
+      v.hullMat.emissive.setRGB(0.22 + v.flash, 0.05 + v.flash * 0.9, 0.02 + v.flash * 0.8);
     }
   }
 }

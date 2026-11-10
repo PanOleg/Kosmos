@@ -1,3 +1,4 @@
+import { buildCover } from './collision/cover';
 import { createSpatialHash } from './collision/spatial';
 import { buildWorld } from './collision/world';
 import { DEFAULT_CONFIG, type ClassId, type GameConfig } from './config';
@@ -47,6 +48,7 @@ export function createGame(
     events: createEventBuffer(),
     hash: createSpatialHash(config.map.radius + 2, 2, ENEMY_CAPACITY),
     nav: buildNav(world, 0.45),
+    cover: buildCover(world, 0.6, 0.8),
   };
   updateNav(game.nav, state);
   return game;
@@ -84,3 +86,4 @@ export { spawnEnemy } from './systems/enemies';
 export { threatOf } from './systems/autoaim';
 export { serializeState, hashState } from './serialize';
 export { SCOUT_WINDUP } from './ai/scout';
+export { GUNNER_HIDE, GUNNER_PEEK, GUNNER_SEEK, GUNNER_OPEN, GUNNER_RETURN } from './ai/gunner';

@@ -40,7 +40,30 @@ export const GUNNER = {
   damage: 12,
   parts: 2,
   threat: 15,
-} satisfies EnemyDef;
+  /** Укриття шукається на такій відстані від цілі. */
+  coverMin: 6,
+  coverMax: 10,
+  /** Пауза за укриттям між пострілами. Ритм з BALANCE: постріл раз на ~1.5 с. */
+  hide: 0.9,
+  /** Скільки триває визирання; з них aim — видимий телеграф перед пострілом. */
+  peek: 0.6,
+  aim: 0.45,
+  projectileSpeed: 16,
+  projectileRadius: 0.25,
+  range: 14,
+  /** Скільки секунд терпить, коли гравець обійшов укриття, перш ніж тікати на нове. */
+  flankedPatience: 0.9,
+  /** Без укриття стріляє з відкритої позиції на цій дистанції, кружляючи. */
+  openRange: 8,
+  /** Відстань, на якій укриття вважається зайнятим іншим Стрільцем. */
+  coverSpacing: 2.5,
+  /** Перебір кандидатів не частіше, тики. */
+  coverSearchEvery: 20,
+  /** Крок визирання й повернення швидший за звичайний біг. */
+  peekSpeed: 1.6,
+  /** Нове укриття мусить бути кращим на стільки балів, щоб змінити вже вибране. */
+  coverHysteresis: 3,
+} satisfies EnemyDef & Record<string, number>;
 
 export const ENEMIES: Record<EnemyType, EnemyDef> = { scout: SCOUT, gunner: GUNNER };
 

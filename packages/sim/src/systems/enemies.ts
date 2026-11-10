@@ -1,5 +1,5 @@
 import { clearHash, insertHash } from '../collision/spatial';
-import { hasLineOfSight, resolveCircle } from '../collision/world';
+import { raycast, resolveCircle } from '../collision/world';
 import { CROWD, ENEMIES, type EnemyType } from '../config/enemies';
 import type { Enemy } from '../entities/enemy';
 import { emit } from '../events';
@@ -51,9 +51,40 @@ export function spawnEnemy(game: Game, type: EnemyType, x: number, y: number): n
   return -1;
 }
 
-/** Рух до точки: напряму, якщо видно, інакше по полю навігації. */
+/**
+ * Чи пролізе тіло радіуса r по прямій: центр і два бокові промені на ширину тіла.
+ * Тонкий промінь «бачить» прохід повз кут, у який тіло потім упирається назавжди.
+ * Скло лабораторії кулі пропускає, а тіла — ні, тому тут shotsOnly=false.
+ */
+export function canWalk(
+  game: Game,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  r = 0.5,
+): boolean {
+  const w = game.world;
+  if (raycast(w, ax, ay, bx, by, false) < 1) return false;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const l = Math.sqrt(dx * dx + dy * dy);
+  if (l < 1e-6) return true;
+  const nx = (-dy / l) * r;
+  const ny = (dx / l) * r;
+  return (
+    raycast(w, ax + nx, ay + ny, bx + nx, by + ny, false) >= 1 &&
+    raycast(w, ax - nx, ay - ny, bx - nx, by - ny, false) >= 1
+  );
+}
+
+/**
+ * Рух до точки: напряму, якщо прохід вільний, інакше по полю навігації.
+ * Поле веде до найближчого гравця, а всі цілі ворогів (укриття, кільце оточення) лежать
+ * поруч із гравцем — тож спуск по ньому рано чи пізно відкриває пряму дорогу до точки.
+ */
 export function steerTo(game: Game, e: Enemy, tx: number, ty: number): void {
-  if (hasLineOfSight(game.world, e.x, e.y, tx, ty)) {
+  if (canWalk(game, e.x, e.y, tx, ty, e.radius)) {
     const dx = tx - e.x;
     const dy = ty - e.y;
     const l = Math.sqrt(dx * dx + dy * dy) || 1;

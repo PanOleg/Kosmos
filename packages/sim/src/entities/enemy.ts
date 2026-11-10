@@ -29,6 +29,9 @@ export interface Enemy {
   cover: number;
   coverX: number;
   coverY: number;
+  /** Точка визирання: поруч з укриттям, звідки видно ціль. */
+  peekX: number;
+  peekY: number;
   /** Тики відкидання після влучання. */
   stagger: number;
   /** Ворог «відкритий»: у вікні вразливості (визирає, замахується). */
@@ -62,6 +65,8 @@ export function createEnemyPool(capacity: number): Enemy[] {
       cover: -1,
       coverX: 0,
       coverY: 0,
+      peekX: 0,
+      peekY: 0,
       stagger: 0,
       exposed: false,
     });
