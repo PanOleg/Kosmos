@@ -157,6 +157,38 @@ export class FxDirector {
         this.flashT = 0.2;
         break;
       }
+      case 'rocketHit': {
+        this.sfx.explosion(this.pan(e.x));
+        this.cam.shake(0.4);
+        this.sparks.burst(30, X, 0.6, Z, 1, 0, 11, Math.PI * 2, 0.4, 0.3, 0xffb050);
+        this.sparks.burst(16, X, 0.3, Z, 1, 0, 5, Math.PI * 2, 0.7, 0.45, 0xff3a1a);
+        this.flashLight.position.x = X;
+        this.flashLight.position.z = Z;
+        this.flashT = 0.18;
+        break;
+      }
+      case 'rocket':
+        this.sfx.rocketLaunch(this.pan(e.x));
+        break;
+      case 'weakHit': {
+        // Слабке місце: великий помаранчевий спалах і окремий звук — «саме так і треба».
+        this.enemies.hit(e.a);
+        this.sfx.weakHit(this.pan(e.x));
+        this.cam.shake(0.06);
+        this.sparks.burst(12, X, 1.2, Z, e.x2, -e.y2, 11, 1.2, 0.25, 0.2, 0xffa030);
+        break;
+      }
+      case 'spiderJump':
+        this.sfx.spiderJump(this.pan(e.x));
+        break;
+      case 'shieldUp':
+        this.sfx.shieldUp(this.pan(e.x));
+        this.sparks.burst(14, X, 1.6, Z, 1, 0, 4, Math.PI * 2, 0.4, 0.16, 0x6aa0ff);
+        break;
+      case 'shieldBreak':
+        this.sfx.barrierBreak();
+        this.sparks.burst(20, X, 1.6, Z, 1, 0, 7, Math.PI * 2, 0.4, 0.16, 0x6aa0ff);
+        break;
       case 'armor':
         // Куля відскочила від лобової броні: біла іскра й дзвін — «стріляй збоку».
         this.sparks.burst(5, X, 1.8, Z, e.x2, -e.y2, 8, 1.2, 0.15, 0.12, 0xffffff);

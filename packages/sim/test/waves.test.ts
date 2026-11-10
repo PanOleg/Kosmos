@@ -1,13 +1,14 @@
 import { describe, expect, test } from 'vitest';
 import { createGame, step, botInput, emptyInput, hashState, type PlayerInput } from '../src/index';
 
-function playWithBots(players: number, seed: number, maxSec = 360) {
+function playWithBots(players: number, seed: number, maxSec = 600, immortal = false) {
   const g = createGame(
     undefined,
     seed,
     Array.from({ length: players }, () => ({ classId: 'assault' as const })),
   );
   const inputs: PlayerInput[] = g.state.players.map(() => emptyInput());
+  if (immortal) for (const p of g.state.players) p.hp = p.maxHp = 1e9;
   let ticks = 0;
   // Скільки деталей лежало на підлозі й було вже зібрано в момент зачистки останньої хвилі.
   let atClear: { onFloor: number; collected: number } | null = null;
@@ -34,8 +35,9 @@ function playWithBots(players: number, seed: number, maxSec = 360) {
 }
 
 describe('waves', () => {
-  test('solo bot clears all waves', () => {
-    const { g, sec, atClear, collected, spawned, exploded } = playWithBots(1, 11);
+  test('every wave can be finished: nothing stalls, every enemy dies', () => {
+    // Безсмертний бот: перевіряємо хвилі, а не його вміння вижити.
+    const { g, sec, atClear, collected, spawned, exploded } = playWithBots(1, 11, 600, true);
     expect(g.state.phase).toBe('won');
     const p = g.state.players[0]!;
     // Кожен ворог або вбитий гравцем, або підірвався сам (Камікадзе).
@@ -45,9 +47,18 @@ describe('waves', () => {
     expect(atClear).not.toBeNull();
     expect(collected).toBe(atClear!.collected + atClear!.onFloor);
     expect(p.stats.partsCollected).toBeGreaterThan(20);
-    // Три хвилі з паузами: орієнтир ~2–3 хв; бот грає інакше за людину, тож межа ширша.
-    expect(sec).toBeGreaterThan(90);
-    expect(sec).toBeLessThan(300);
+    // Сім хвиль із паузами: орієнтир ~5–7 хв; бот грає інакше за людину, тож межа ширша.
+    expect(sec).toBeGreaterThan(180);
+    expect(sec).toBeLessThan(600);
+  });
+
+  test('no wave stalls for 1 and 2 players across seeds', () => {
+    // Регресія: Павук на опорі без видимості, Камікадзе з точкою за стіною — хвиля не закінчувалась.
+    for (const seed of [6, 7])
+      for (const n of [1, 2]) {
+        const { g } = playWithBots(n, seed, 600, true);
+        expect(g.state.phase).toBe('won');
+      }
   });
 
   test('enemy count scales non-linearly with players', () => {

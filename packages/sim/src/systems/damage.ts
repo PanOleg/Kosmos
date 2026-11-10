@@ -34,8 +34,21 @@ export function damageEnemy(
   ky: number,
   knock: number,
   bySlot: number,
+  /** Влучання в слабке місце (спина Панцира, Павук у польоті) — рендер показує крит. */
+  weak = false,
 ): void {
   if (!e.alive) return;
+  // Щит від Ремонтника поглинає шкоду першим.
+  if (e.shield > 0) {
+    const absorbed = Math.min(e.shield, amount);
+    e.shield -= absorbed;
+    amount -= absorbed;
+    if (e.shield <= 0) emit(game.events, 'shieldBreak', e.x, e.y, 0, 0, index);
+    if (amount <= 0) {
+      emit(game.events, 'hit', e.x, e.y, kx, ky, index, bySlot, 0);
+      return;
+    }
+  }
   e.hp -= amount;
   const p = game.state.players[bySlot];
   if (p) p.stats.damageDealt += amount;
@@ -44,7 +57,7 @@ export function damageEnemy(
     e.vy += ky * knock;
     e.stagger = Math.max(e.stagger, 3);
   }
-  emit(game.events, 'hit', e.x, e.y, kx, ky, index, bySlot, amount);
+  emit(game.events, weak ? 'weakHit' : 'hit', e.x, e.y, kx, ky, index, bySlot, amount);
   if (e.hp <= 0) killEnemy(game, e, index, bySlot);
 }
 

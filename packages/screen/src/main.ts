@@ -32,6 +32,7 @@ import { FxDirector } from './render/fx';
 import { Sfx } from './audio/sfx';
 import { PostFx } from './render/post';
 import { AbilityRenderer } from './render/abilities';
+import { RocketRenderer } from './render/hazards';
 import { models } from './render/models';
 import { Hud } from './ui/hud';
 import { showResults } from './ui/results';
@@ -181,6 +182,7 @@ interface Match {
   pickupR: PickupRenderer;
   fx: FxDirector;
   abilityR: AbilityRenderer;
+  rocketR: RocketRenderer;
   hud: Hud;
   camPoints: { x: number; z: number }[];
   results: HTMLDivElement | null;
@@ -226,6 +228,7 @@ function startMatch(): void {
     bulletR: new ProjectileRenderer(scene, game.state.projectiles.length),
     pickupR: new PickupRenderer(scene, game.state.pickups.length),
     fx,
+    rocketR: new RocketRenderer(scene, game.state.rockets.length),
     abilityR: new AbilityRenderer(
       scene,
       fx.sparks,
@@ -486,6 +489,7 @@ function frameMatch(m: Match, now: number, dt: number): void {
   m.pickupR.update(g.state.pickups, alpha, time);
   m.fx.update(g, dt);
   m.abilityR.update(g, dt, time);
+  m.rocketR.update(g.state.rockets, time);
   cam.update(m.camPoints, live, dt, time);
   m.enemyR.updateBars(g.state.enemies, alpha, cam.camera);
   m.hud.update(g, cam.camera, dt);

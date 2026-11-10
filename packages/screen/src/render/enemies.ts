@@ -10,6 +10,10 @@ import {
   SCOUT,
   SNIPER,
   SNIPER_AIM,
+  SPIDER,
+  SPIDER_FLIGHT,
+  SPIDER_WINDUP,
+  REPAIRER,
   WASP_WINDUP,
   SCOUT_WINDUP,
   TICKS_PER_SEC,
@@ -18,7 +22,7 @@ import {
   type Player,
 } from '@horizon/sim';
 import { PALETTE } from './palette';
-import { BOX, CONE4, SPHERE, merge, part, seg, type Part } from './mesh';
+import { BOX, CONE4, CYL, SPHERE, merge, part, seg, type Part } from './mesh';
 import { models, type ModelInstance } from './models';
 import { toX, toZ } from './coords';
 
@@ -35,6 +39,8 @@ export interface EnemyVisual {
   ring: THREE.Mesh;
   laser: THREE.Mesh;
   shadow: THREE.Mesh;
+  /** Бульбашка щита від Ремонтника. */
+  bubble: THREE.Mesh | null;
   type: EnemyType;
   flash: number;
   spawnT: number;
@@ -50,6 +56,9 @@ const VISUAL_SCALE: Record<EnemyType, number> = {
   kamikaze: 1.3,
   sniper: 1.25,
   swarm: 1.1,
+  shell: 1.1,
+  spider: 1.2,
+  repairer: 1.3,
 };
 const AIR = new Set<EnemyType>(['wasp', 'kamikaze', 'sniper', 'swarm']);
 
@@ -200,6 +209,96 @@ function droneParts(type: 'wasp' | 'kamikaze' | 'sniper' | 'swarm'): {
   return { hull: merge(hull), glow: merge(glow) };
 }
 
+// Панцир (concept: SHELL): величезний мех, ракетні блоки на плечах, світне ядро в грудях
+// і на спині — спина світиться, бо це слабке місце (×3).
+function shellParts(): { hull: THREE.BufferGeometry; glow: THREE.BufferGeometry } {
+  const hull: Part[] = [];
+  const glow: Part[] = [];
+  for (const sx of [1, -1]) {
+    hull.push(
+      seg(BOX, P.enemyDark, [0.45 * sx, 1.2, 0], [0.55 * sx, 0.6, 0.12], 0.36, 0.42),
+      seg(BOX, P.enemy, [0.55 * sx, 0.62, 0.12], [0.55 * sx, 0.1, -0.02], 0.4, 0.46),
+      part(BOX, P.enemyDark, [0.55 * sx, 0.07, 0.08], [0.48, 0.14, 0.7]),
+      // Ракетні блоки на плечах.
+      part(BOX, P.enemyMid, [0.95 * sx, 2.15, -0.05], [0.6, 0.6, 0.7]),
+      part(BOX, P.enemyDark, [0.95 * sx, 2.15, 0.3], [0.5, 0.5, 0.06]),
+      // Руки-гармати.
+      seg(BOX, P.enemyDark, [1.05 * sx, 1.75, 0], [1.1 * sx, 1.2, 0.3], 0.3),
+      part(BOX, P.enemy, [1.1 * sx, 1.1, 0.45], [0.36, 0.36, 0.6]),
+    );
+    for (let r = 0; r < 2; r++)
+      for (let c = 0; c < 2; c++)
+        glow.push(
+          part(
+            BOX,
+            0xffffff,
+            [0.95 * sx + (c - 0.5) * 0.24, 2.15 + (r - 0.5) * 0.24, 0.34],
+            [0.12, 0.12, 0.03],
+          ),
+        );
+  }
+  hull.push(
+    part(BOX, P.enemyDark, [0, 1.35, 0], [1.2, 0.5, 0.8]),
+    part(BOX, P.enemy, [0, 1.85, 0], [1.6, 0.8, 1.1]),
+    part(BOX, P.enemyMid, [0, 2.35, 0.05], [0.7, 0.3, 0.6]),
+    part(BOX, P.enemyDark, [0, 2.4, 0.38], [0.4, 0.12, 0.06]),
+  );
+  glow.push(
+    part(CYL, 0xffffff, [0, 1.85, 0.56], [0.5, 0.04, 0.5], [Math.PI / 2, 0, 0]),
+    part(CYL, 0xffffff, [0, 1.85, -0.56], [0.42, 0.04, 0.42], [Math.PI / 2, 0, 0]),
+    part(BOX, 0xffffff, [0, 2.4, 0.42], [0.22, 0.05, 0.02]),
+  );
+  return { hull: merge(hull), glow: merge(glow) };
+}
+
+// Павук: світле тіло, шість тонких ламаних ніг, червоні очі.
+function spiderParts(): { hull: THREE.BufferGeometry; glow: THREE.BufferGeometry } {
+  const hull: Part[] = [
+    part(SPHERE, P.enemy, [0, 0.45, 0], [0.55, 0.32, 0.65]),
+    part(BOX, P.enemyMid, [0, 0.5, 0.32], [0.28, 0.2, 0.2]),
+  ];
+  for (const sx of [1, -1])
+    for (const z of [0.25, 0, -0.25]) {
+      const knee: [number, number, number] = [0.5 * sx, 0.75, z * 1.4];
+      hull.push(
+        seg(BOX, P.enemyDark, [0.18 * sx, 0.48, z], knee, 0.05),
+        seg(BOX, P.enemyMid, knee, [0.72 * sx, 0, z * 1.8], 0.04),
+      );
+    }
+  const glow = [
+    part(BOX, 0xffffff, [0.07, 0.55, 0.42], [0.05, 0.05, 0.02]),
+    part(BOX, 0xffffff, [-0.07, 0.55, 0.42], [0.05, 0.05, 0.02]),
+  ];
+  return { hull: merge(hull), glow: merge(glow) };
+}
+
+// Ремонтник: згорблений, зварювальні руки, синя пластина-щит (concept: REPAIRER).
+function repairerParts(): { hull: THREE.BufferGeometry; glow: THREE.BufferGeometry } {
+  const rust = 0x7a4a3a;
+  const hull: Part[] = [];
+  for (const sx of [1, -1])
+    hull.push(
+      seg(BOX, P.enemyDark, [0.16 * sx, 0.6, -0.05], [0.18 * sx, 0.3, 0.06], 0.16),
+      seg(BOX, rust, [0.18 * sx, 0.32, 0.06], [0.18 * sx, 0.05, 0], 0.16, 0.2),
+      seg(BOX, P.enemyDark, [0.32 * sx, 1.0, 0.1], [0.38 * sx, 0.78, 0.36], 0.1),
+      seg(BOX, rust, [0.38 * sx, 0.78, 0.36], [0.26 * sx, 0.72, 0.62], 0.08),
+    );
+  hull.push(
+    part(BOX, P.enemyDark, [0, 0.68, 0], [0.42, 0.18, 0.3]),
+    part(BOX, rust, [0, 0.95, 0.06], [0.56, 0.42, 0.42], [0.45, 0, 0]),
+    part(SPHERE, P.enemy, [0, 1.06, 0.34], [0.26, 0.24, 0.26]),
+    // Синя пластина-щит на лівій руці.
+    part(BOX, 0x2d5aa8, [-0.5, 0.8, 0.4], [0.06, 0.6, 0.5], [0, 0.3, 0]),
+  );
+  const glow = [
+    part(BOX, 0xffffff, [0, 1.07, 0.47], [0.08, 0.05, 0.02]),
+    part(BOX, 0xffffff, [0.26, 0.72, 0.64], [0.06, 0.06, 0.06]),
+  ];
+  return { hull: merge(hull), glow: merge(glow) };
+}
+
+const GROUND_GEO = { shell: shellParts(), spider: spiderParts(), repairer: repairerParts() };
+
 const DRONE_GEO = {
   wasp: droneParts('wasp'),
   kamikaze: droneParts('kamikaze'),
@@ -210,6 +309,7 @@ const DRONE_GEO = {
 function geometryOf(type: EnemyType): { hull: THREE.BufferGeometry; glow: THREE.BufferGeometry } {
   if (type === 'scout') return scoutGeo;
   if (type === 'gunner') return gunnerGeo;
+  if (type === 'shell' || type === 'spider' || type === 'repairer') return GROUND_GEO[type];
   return DRONE_GEO[type];
 }
 
@@ -284,7 +384,41 @@ export function buildEnemyVisual(type: EnemyType): EnemyVisual {
   shadow.visible = AIR.has(type);
   root.add(shadow);
   body.scale.setScalar(VISUAL_SCALE[type]);
-  return { root, body, hullMat, glowMat, ring, laser, shadow, type, flash: 0, spawnT: 0, model };
+  let bubble: THREE.Mesh | null = null;
+  if (type === 'shell') {
+    bubble = new THREE.Mesh(
+      new THREE.SphereGeometry(1.9, 24, 16),
+      new THREE.MeshStandardMaterial({
+        color: 0x4f8cff,
+        emissive: 0x2f6cff,
+        emissiveIntensity: 0.8,
+        transparent: true,
+        opacity: 0.18,
+        depthWrite: false,
+      }),
+    );
+    bubble.position.y = 1.4;
+    bubble.visible = false;
+    root.add(bubble);
+  }
+  if (type === 'repairer') {
+    // Промінь лікування — той самий «лазер», але зелено-блакитний.
+    (laser.material as THREE.MeshBasicMaterial).color.setHex(0x6af0c0);
+  }
+  return {
+    root,
+    body,
+    hullMat,
+    glowMat,
+    ring,
+    laser,
+    shadow,
+    bubble,
+    type,
+    flash: 0,
+    spawnT: 0,
+    model,
+  };
 }
 
 /** Око світиться помірно: з bloom сильніше світіння розпливається в кулю й ховає голову. */
@@ -351,7 +485,13 @@ export class EnemyRenderer {
       if (!e.alive || e.hp >= e.maxHp) continue;
       const x = e.px + (e.x - e.px) * alpha;
       const y = e.py + (e.y - e.py) * alpha;
-      const h = e.air ? e.alt + 0.9 : e.type === 'scout' ? 2.0 : 2.4;
+      const h = e.air
+        ? e.alt + 0.9
+        : e.type === 'shell'
+          ? 3.6
+          : e.type === 'scout'
+            ? 2.0
+            : 2.4 + e.alt;
       this.pos.set(toX(x), h, toZ(y));
       this.m4.compose(this.pos, q, this.scl.set(W + 0.06, 0.16, 1));
       this.barBg.setMatrixAt(n, this.m4);
@@ -421,7 +561,43 @@ export class EnemyRenderer {
         v.body.rotation.z = e.stun > 0 ? 0.6 : Math.sin(time * 2 + i) * 0.08;
         const sh = Math.max(0.35, 1 - e.alt * 0.12);
         v.shadow.scale.set(sh * bs, 1, sh * bs);
-      } else v.body.position.y = bob;
+      } else v.body.position.y = e.alt > 0 ? e.alt : bob;
+      if (v.bubble) {
+        v.bubble.visible = e.shield > 0;
+        (v.bubble.material as THREE.MeshStandardMaterial).opacity =
+          0.1 + 0.15 * (e.shield / 100) + Math.sin(time * 4) * 0.03;
+      }
+      if (e.type === 'spider') {
+        // Точка приземлення на підлозі під час замаху й польоту.
+        const marking = e.ai === SPIDER_WINDUP || e.ai === SPIDER_FLIGHT;
+        v.ring.visible = marking;
+        if (marking) {
+          v.ring.position.set(toX(e.tx) - v.root.position.x, 0.03, toZ(e.ty) - v.root.position.z);
+          v.ring.scale.set(SPIDER.landRadius, 1, SPIDER.landRadius);
+          (v.ring.material as THREE.MeshBasicMaterial).opacity = 0.5 + Math.sin(time * 30) * 0.3;
+        } else v.ring.position.set(0, 0.03, 0);
+        v.glowMat.emissiveIntensity = e.ai === SPIDER_WINDUP ? 5 : EYE_GLOW;
+      }
+      if (e.type === 'repairer') {
+        const a = e.ally >= 0 ? enemies[e.ally] : undefined;
+        const beam =
+          !!a && a.alive && (a.x - e.x) ** 2 + (a.y - e.y) ** 2 <= REPAIRER.healRange ** 2;
+        v.laser.visible = beam;
+        if (beam) {
+          v.root.updateMatrixWorld();
+          v.laser.position.set(0, 0.9, 0.5);
+          this.tmp.set(toX(a.x), a.type === 'shell' ? 1.8 : 1, toZ(a.y));
+          v.laser.lookAt(this.tmp);
+          v.laser.scale.set(
+            0.7,
+            0.7,
+            this.tmp.distanceTo(v.root.localToWorld(this.tmp2.set(0, 0.9, 0.5))),
+          );
+          (v.laser.material as THREE.MeshBasicMaterial).opacity = 0.35 + Math.sin(time * 20) * 0.15;
+        }
+        continue_flash(v, e, dt, speed);
+        continue;
+      }
       v.glowMat.emissiveIntensity = windup ? 2.5 + prog * 5 : EYE_GLOW;
       v.ring.visible = windup;
       if (windup) {

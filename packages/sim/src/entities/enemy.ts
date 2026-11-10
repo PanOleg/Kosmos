@@ -44,9 +44,18 @@ export interface Enemy {
   group: number;
   /** Лічильник для черг і укусів. */
   shots: number;
-  /** Точка удару (пікірування Камікадзе, ціль снайпера). */
+  /** Точка удару (пікірування Камікадзе, ціль снайпера, приземлення Павука). */
   tx: number;
   ty: number;
+  /** Точка старту стрибка Павука. */
+  ox: number;
+  oy: number;
+  /** Щит від Ремонтника: поглинає шкоду першим. */
+  shield: number;
+  /** Індекс союзника, якого лікує Ремонтник; −1 — нікого. */
+  ally: number;
+  /** Перезарядка другорядної дії (щит Ремонтника). */
+  cd: number;
   /** Ворог «відкритий»: у вікні вразливості (визирає, замахується). */
   exposed: boolean;
 }
@@ -88,6 +97,11 @@ export function createEnemyPool(capacity: number): Enemy[] {
       shots: 0,
       tx: 0,
       ty: 0,
+      ox: 0,
+      oy: 0,
+      shield: 0,
+      ally: -1,
+      cd: 0,
       exposed: false,
     });
   }
@@ -97,4 +111,10 @@ export function createEnemyPool(capacity: number): Enemy[] {
 /** Ворог «у повітрі»: над низькими перешкодами. Рій (1.2 м) і заглушені дрони — ні. */
 export function isHigh(e: Enemy): boolean {
   return e.air && e.alt > 1.5;
+}
+
+/** Павук на стіні чи на контейнері: вище за кулі й поза автоприцілом (DECISIONS.md, п. 32). */
+export function outOfReach(e: Enemy): boolean {
+  // 3 — SPIDER_FLIGHT; без імпорту з ai/spider, щоб не замикати цикл модулів.
+  return e.type === 'spider' && e.alt > 1 && e.ai !== 3;
 }

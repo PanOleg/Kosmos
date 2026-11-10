@@ -1,5 +1,9 @@
 /** Вороги. Час — секунди, відстань — метри. Множники складності накладаються в рантаймі. */
-export type EnemyType = 'scout' | 'gunner' | 'wasp' | 'kamikaze' | 'sniper' | 'swarm';
+export type EnemyType =
+  'scout' | 'gunner' | 'wasp' | 'kamikaze' | 'sniper' | 'swarm' | 'shell' | 'spider' | 'repairer';
+
+/** Наземні роботи, яких лікує Ремонтник (не дрони й не він сам). */
+export const ROBOT_TYPES: ReadonlySet<EnemyType> = new Set(['scout', 'gunner', 'shell', 'spider']);
 
 /** Дрони літають; решта — наземні. */
 export const AIR_TYPES: ReadonlySet<EnemyType> = new Set(['wasp', 'kamikaze', 'sniper', 'swarm']);
@@ -150,7 +154,66 @@ export const SWARM = {
   count: 12,
 } satisfies EnemyDef & Record<string, number>;
 
+export const SHELL = {
+  hp: 400,
+  speed: 2,
+  radius: 1.0,
+  damage: 35,
+  parts: 6,
+  threat: 15,
+  /** Зупиняється на цій відстані й обстрілює. */
+  holdRange: 9,
+  /** Поворот корпусу, рад/с: повільний — тому обхід працює (DECISIONS.md, п. 31). */
+  turnRate: Math.PI / 3,
+  rocketEvery: 4,
+  rocketWarn: 1.2,
+  rocketRadius: 3,
+  rocketRange: 16,
+  /** Удар ззаду: куля в межах ±60° від напрямку його погляду. */
+  backCos: 0.5,
+  backMul: 3,
+} satisfies EnemyDef & Record<string, number>;
+
+export const SPIDER = {
+  hp: 60,
+  speed: 5,
+  radius: 0.45,
+  damage: 20,
+  parts: 2,
+  threat: 12,
+  /** Висота на стіні / на контейнері. */
+  perchAlt: 2.3,
+  jumpRange: 8,
+  jumpEvery: 3,
+  windup: 0.45,
+  flight: 0.5,
+  landRadius: 1.6,
+  recover: 0.6,
+  /** У польоті шкода по ньому ×2 і він — пріоритетна ціль. */
+  flightMul: 2,
+  flightThreat: 40,
+} satisfies EnemyDef & Record<string, number>;
+
+export const REPAIRER = {
+  hp: 80,
+  speed: 3.5,
+  radius: 0.5,
+  damage: 0,
+  parts: 4,
+  /** Пріоритет після Камікадзе (BALANCE: Камікадзе → Ремонтник → найближчий). */
+  threat: 30,
+  healPerSecond: 20,
+  healRange: 7,
+  shield: 100,
+  shieldEvery: 10,
+  /** Тримається не ближче до гравців. */
+  keepAway: 10,
+} satisfies EnemyDef & Record<string, number>;
+
 export const ENEMIES: Record<EnemyType, EnemyDef> = {
+  shell: SHELL,
+  spider: SPIDER,
+  repairer: REPAIRER,
   scout: SCOUT,
   gunner: GUNNER,
   wasp: WASP,

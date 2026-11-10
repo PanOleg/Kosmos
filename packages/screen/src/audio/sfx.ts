@@ -171,6 +171,23 @@ export class Sfx {
     this.burst('lowpass', 3000, 80, 0.7, 0.7, 0.7, pan);
   }
 
+  rocketLaunch(pan: number): void {
+    this.burst('bandpass', 400, 1600, 1, 0.5, 0.25, pan);
+  }
+
+  weakHit(pan: number): void {
+    this.tone('square', 1200, 600, 0.08, 0.12, pan);
+    this.burst('bandpass', 3000, 1200, 2, 0.06, 0.25, pan);
+  }
+
+  spiderJump(pan: number): void {
+    this.tone('sawtooth', 900, 300, 0.25, 0.1, pan);
+  }
+
+  shieldUp(pan: number): void {
+    this.tone('sine', 400, 900, 0.3, 0.12, pan);
+  }
+
   ricochet(pan: number): void {
     this.tone('triangle', 2400, 1800, 0.08, 0.1, pan);
   }

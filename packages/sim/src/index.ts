@@ -6,6 +6,8 @@ import { createEnemyPool } from './entities/enemy';
 import { createPlayer } from './entities/player';
 import { createPickupPool } from './entities/pickup';
 import { createBarrierPool } from './entities/barrier';
+import { createRocketPool } from './entities/rocket';
+import { buildPerches } from './collision/perches';
 import { createProjectilePool } from './entities/projectile';
 import { createEventBuffer } from './events';
 import { createRng } from './rng';
@@ -14,6 +16,7 @@ import type { Game, GameState } from './state';
 import { updateAutoaim } from './systems/autoaim';
 import { updateAbilities } from './systems/abilities';
 import { updateUpgrades } from './systems/upgrades';
+import { updateRockets } from './systems/rockets';
 import { updatePlayerFire, updateProjectiles } from './systems/combat';
 import { updateEnemies } from './systems/enemies';
 import { updatePlayers } from './systems/movement';
@@ -47,6 +50,7 @@ export function createGame(
     projectiles: createProjectilePool(PROJECTILE_CAPACITY),
     pickups: createPickupPool(PICKUP_CAPACITY),
     barriers: createBarrierPool(4),
+    rockets: createRocketPool(24),
     enemiesAlive: 0,
     wave: createWaveState(),
     partsCarry: 0,
@@ -60,6 +64,7 @@ export function createGame(
     hash: createSpatialHash(config.map.radius + 2, 2, ENEMY_CAPACITY),
     nav: buildNav(world, 0.45),
     cover: buildCover(world, 0.6, 0.8),
+    perches: buildPerches(world),
   };
   updateNav(game.nav, state);
   if (config.waves.length > 0) startWave(game, 0);
@@ -80,6 +85,7 @@ export function step(game: Game, inputs: readonly PlayerInput[]): GameState {
   updateAbilities(game);
   updateWaves(game);
   updateEnemies(game);
+  updateRockets(game);
   updateAutoaim(game);
   updatePlayerFire(game);
   updateProjectiles(game);
@@ -109,6 +115,14 @@ export { botInput } from './ai/playerBot';
 export { WASP_WINDUP } from './ai/wasp';
 export { KAMI_WINDUP, KAMI_DIVE } from './ai/kamikaze';
 export { SNIPER_AIM } from './ai/sniper';
+export {
+  SPIDER_CLIMB,
+  SPIDER_PERCH,
+  SPIDER_WINDUP,
+  SPIDER_FLIGHT,
+  SPIDER_LANDED,
+} from './ai/spider';
+export type { Rocket } from './entities/rocket';
 export { abilityReadiness, ABILITY_CLASS_INDEX } from './systems/abilities';
 export { shopOpen, upgradePrice, wholeParts } from './systems/upgrades';
 export type { Barrier } from './entities/barrier';

@@ -1,5 +1,6 @@
-import { AIR_COVER_HEIGHT, ENEMIES, KAMIKAZE, SCOUT, SNIPER } from '../config/enemies';
-import { isHigh } from '../entities/enemy';
+import { AIR_COVER_HEIGHT, ENEMIES, KAMIKAZE, SCOUT, SNIPER, SPIDER } from '../config/enemies';
+import { isHigh, outOfReach } from '../entities/enemy';
+import { SPIDER_FLIGHT } from '../ai/spider';
 import { SNIPER_AIM } from '../ai/sniper';
 import { hasLineOfSight } from '../collision/world';
 import { SCOUT_WINDUP } from '../ai/scout';
@@ -15,6 +16,7 @@ export function threatOf(e: Enemy): number {
   let t = ENEMIES[e.type].threat;
   if (e.type === 'scout' && e.ai === SCOUT_WINDUP) t += SCOUT.windupThreat;
   if (e.type === 'sniper' && e.ai === SNIPER_AIM) t += SNIPER.aimThreat;
+  if (e.type === 'spider' && e.ai === SPIDER_FLIGHT) t += SPIDER.flightThreat;
   if (e.exposed) t += 10;
   return t;
 }
@@ -44,6 +46,7 @@ function valid(game: Game, p: Player, idx: number, range: number): boolean {
   const r = range + e.radius;
   if (dx * dx + dy * dy > r * r) return false;
   if (e.type === 'kamikaze' && !kamikazeHittable(e, p.x, p.y)) return false;
+  if (outOfReach(e)) return false;
   return canSee(game, p.x, p.y, e);
 }
 
@@ -79,6 +82,7 @@ export function updateAutoaim(game: Game): void {
           const r = range + e.radius;
           if (d2 > r * r) continue;
           if (e.type === 'kamikaze' && !kamikazeHittable(e, p.x, p.y)) continue;
+          if (outOfReach(e)) continue;
           const d = Math.sqrt(d2);
           let score = threatOf(e) + (1 - d / r) * cfg.proximity;
           if (j === current) score += cfg.stickiness;

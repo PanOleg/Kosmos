@@ -3,6 +3,8 @@ import type { CoverPoints } from './collision/cover';
 import type { SpatialHash } from './collision/spatial';
 import type { StaticWorld } from './collision/world';
 import type { Barrier } from './entities/barrier';
+import type { Rocket } from './entities/rocket';
+import type { Perches } from './collision/perches';
 import type { Enemy } from './entities/enemy';
 import type { Player } from './entities/player';
 import type { Pickup } from './entities/pickup';
@@ -24,6 +26,7 @@ export interface GameState {
   projectiles: Projectile[];
   pickups: Pickup[];
   barriers: Barrier[];
+  rockets: Rocket[];
   enemiesAlive: number;
   wave: WaveState;
   /** Дробовий залишок деталей між дропами. */
@@ -44,4 +47,5 @@ export interface Game {
   hash: SpatialHash;
   nav: NavField;
   cover: CoverPoints;
+  perches: Perches;
 }

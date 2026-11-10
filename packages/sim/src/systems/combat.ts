@@ -9,16 +9,21 @@ import { ABILITIES, type ArcDef } from '../config/classes';
 import { hasLineOfSight } from '../collision/world';
 import { damageBarrier, segBarrier } from './abilities';
 import { weaponDamageMul } from './upgrades';
-import { isHigh, type Enemy } from '../entities/enemy';
-import { AIR_COVER_HEIGHT, KAMIKAZE } from '../config/enemies';
+import { isHigh, outOfReach, type Enemy } from '../entities/enemy';
+import { AIR_COVER_HEIGHT, KAMIKAZE, SHELL, SPIDER } from '../config/enemies';
+import { SPIDER_FLIGHT } from '../ai/spider';
 
 /**
- * Лобова броня Камікадзе (DECISIONS.md, п. 29): удар назустріч носу не шкодить.
- * kx, ky — напрям руху кулі/дуги. На землі після ЕМІ броня не працює.
+ * Множник шкоди залежно від того, куди влучили (kx, ky — напрям руху кулі/дуги):
+ * Камікадзе в лоб — 0 (п. 29), Панцир ззаду — ×3 (п. 31), Павук у польоті — ×2 (п. 32).
  */
-export function armorBlocks(e: Enemy, kx: number, ky: number): boolean {
-  if (e.type !== 'kamikaze' || e.stun > 0) return false;
-  return kx * e.fx + ky * e.fy < -KAMIKAZE.frontCos;
+export function hitMultiplier(e: Enemy, kx: number, ky: number): number {
+  const along = kx * e.fx + ky * e.fy;
+  if (e.type === 'kamikaze') return e.stun === 0 && along < -KAMIKAZE.frontCos ? 0 : 1;
+  // Куля летить у той самий бік, куди він дивиться, — значить, у спину.
+  if (e.type === 'shell') return along > SHELL.backCos ? SHELL.backMul : 1;
+  if (e.type === 'spider') return e.ai === SPIDER_FLIGHT ? SPIDER.flightMul : 1;
+  return 1;
 }
 
 const arcHit = new Int32Array(8);
@@ -53,8 +58,9 @@ function fireArc(
     const l = Math.sqrt(dx * dx + dy * dy) || 1;
     const ex = e.x;
     const ey = e.y;
-    if (armorBlocks(e, dx / l, dy / l)) emit(game.events, 'armor', e.x, e.y, -dx / l, -dy / l, cur);
-    else damageEnemy(game, e, cur, dmg, dx / l, dy / l, knock, slot);
+    const mul = hitMultiplier(e, dx / l, dy / l);
+    if (mul === 0) emit(game.events, 'armor', e.x, e.y, -dx / l, -dy / l, cur);
+    else damageEnemy(game, e, cur, dmg * mul, dx / l, dy / l, knock, slot, mul > 1);
     fromX = ex;
     fromY = ey;
     dmg *= arc.falloff;
@@ -227,7 +233,7 @@ export function updateProjectiles(game: Game): void {
           for (let j = h.head[gy * h.n + gx]!; j >= 0; j = h.next[j]!) {
             const e = s.enemies[j]!;
             // Куля по дрону летить над наземними, куля по наземному — під дронами.
-            if (!e.alive || isHigh(e) !== b.air) continue;
+            if (!e.alive || isHigh(e) !== b.air || outOfReach(e)) continue;
             const t = segCircle(b.x, b.y, nx, ny, e.x, e.y, e.radius + b.radius);
             if (t < hitT) {
               hitT = t;
@@ -266,8 +272,9 @@ export function updateProjectiles(game: Game): void {
         damageBarrier(game, s.barriers[-2 - hitIdx]!, b.damage, b.x, b.y);
       } else if (hitIdx >= 0 && b.team === TEAM_PLAYER) {
         const e = s.enemies[hitIdx]!;
-        if (armorBlocks(e, kx, ky)) emit(game.events, 'armor', b.x, b.y, -kx, -ky, hitIdx);
-        else damageEnemy(game, e, hitIdx, b.damage, kx, ky, b.knockback, b.owner);
+        const mul = hitMultiplier(e, kx, ky);
+        if (mul === 0) emit(game.events, 'armor', b.x, b.y, -kx, -ky, hitIdx);
+        else damageEnemy(game, e, hitIdx, b.damage * mul, kx, ky, b.knockback, b.owner, mul > 1);
       } else if (hitIdx >= 0 && b.team === TEAM_ENEMY) {
         const p = s.players[hitIdx]!;
         // Ривок «пропускає» кулю крізь себе — невразливість, а не промах.
