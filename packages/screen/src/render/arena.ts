@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { buildDecor } from './decor';
 import type { MapDef, Obstacle } from '@horizon/sim';
 import { PALETTE } from './palette';
 import { toX, toZ } from './coords';
@@ -324,6 +325,9 @@ export function buildArena(map: MapDef): ArenaView {
     grp.rotation.y = a;
     g.add(grp);
   }
+
+  // Наповнення відсіків (труби, розмітка, обладнання, трава) — вже злите у три меші.
+  g.add(buildDecor(map));
 
   // Сотні деталей реквізиту → десятки draw call. Мерехтливі лампи лишаються окремими:
   // їхні матеріали спільні, тож злиття не заважає анімації емісиву.
