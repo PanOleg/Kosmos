@@ -19,6 +19,8 @@ export interface ModelEntry {
    * корпус з кольорами вершин. Початок координат моделі — центр тіла: зсуваємо лише по висоті.
    */
   static?: boolean;
+  /** Статична: 'feet' (типово) — ставимо на підлогу; 'center' — дрон, висоту дає код. */
+  origin?: 'feet' | 'center';
 }
 
 export interface StaticParts {
@@ -136,7 +138,10 @@ export const models = {
           const scale = entry.height / Math.max(1e-6, size.y);
           const center = box.getCenter(new THREE.Vector3());
           if (entry.static) {
-            staticParts.set(id, bakeStatic(gltf.scene, scale, -box.min.y));
+            staticParts.set(
+              id,
+              bakeStatic(gltf.scene, scale, entry.origin === 'center' ? 0 : -box.min.y),
+            );
             return;
           }
           gltf.scene.traverse((o) => {

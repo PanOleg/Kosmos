@@ -1,1 +1,50 @@
-{ "scout": { "height": 1.62, "static": true } }
+{
+  "scout": {
+    "height": 1.62,
+    "static": true
+  },
+  "gunner": {
+    "height": 1.455,
+    "static": true
+  },
+  "wasp": {
+    "height": 0.3503,
+    "static": true,
+    "origin": "center"
+  },
+  "kamikaze": {
+    "height": 0.45,
+    "static": true,
+    "origin": "center"
+  },
+  "sniper": {
+    "height": 0.3303,
+    "static": true,
+    "origin": "center"
+  },
+  "swarm": {
+    "height": 0.32,
+    "static": true,
+    "origin": "center"
+  },
+  "shell": {
+    "height": 2.51,
+    "static": true
+  },
+  "spider": {
+    "height": 0.835,
+    "static": true
+  },
+  "repairer": {
+    "height": 1.3268,
+    "static": true
+  },
+  "turret": {
+    "height": 1.2275,
+    "static": true
+  },
+  "foreman": {
+    "height": 3.0,
+    "static": true
+  }
+}
