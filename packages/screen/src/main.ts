@@ -423,26 +423,44 @@ function handleMatchEvents(m: Match): void {
 
 let last = performance.now();
 let acc = 0;
-// Автоякість: перші ~2 с міряємо кадр; якщо повільніше за ~45 fps — без bloom/MSAA і з меншою
-// роздільністю. Перші кадри пропускаємо: там компіляція шейдерів.
-let qFrames = 0;
+// Автоякість (DECISIONS.md, п. 44): постійно міряємо кадр у вікнах по 2 с; якщо повільніше за
+// ~45 fps — крок униз і пауза 3 с на перевірку. Назад не піднімаємо: інакше якість «гойдалася б»
+// разом із кількістю ворогів. Рівні: 1 — без bloom/MSAA, роздільність 1; 2 — без тіней;
+// 3 — роздільність 0.75. Перше вікно після старту/зміни пропускаємо: там компіляція шейдерів.
+let qLevel = LOWFX ? 1 : 0;
 let qTime = 0;
+let qFrames = 0;
+let qSkip = 1;
 function autoQuality(dt: number): void {
   // ?hifx — завжди повна якість (запис відео, вкладка в фоні на старті).
-  if (qFrames < 0 || params.has('hifx')) return;
-  qFrames++;
-  if (qFrames <= 30) return;
+  if (qLevel >= 3 || params.has('hifx')) return;
   qTime += dt;
-  if (qFrames < 150) return;
-  const avg = qTime / (qFrames - 30);
-  qFrames = -1;
-  if (avg > 1 / 45 && post.enabled) {
+  qFrames++;
+  if (qTime < (qSkip > 0 ? 3 : 2)) return;
+  const avg = qTime / qFrames;
+  qTime = 0;
+  qFrames = 0;
+  if (qSkip > 0) {
+    qSkip--;
+    return;
+  }
+  if (avg <= 1 / 45) return;
+  qLevel++;
+  qSkip = 1;
+  if (qLevel === 1) {
     post.disable();
     renderer.setPixelRatio(1);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    console.info(`[quality] кадр ${(avg * 1000).toFixed(1)} мс — постобробку вимкнено`);
-  }
+  } else if (qLevel === 2) {
+    // Без проходу тіней кожен об'єкт малюється один раз, а не двічі.
+    renderer.shadowMap.enabled = false;
+    scene.traverse((o) => {
+      if ((o as THREE.Light).isLight) (o as THREE.Light).castShadow = false;
+    });
+  } else renderer.setPixelRatio(0.75);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  console.info(`[quality] кадр ${(avg * 1000).toFixed(1)} мс — рівень ${qLevel}`);
 }
+(window as unknown as { quality: () => number }).quality = () => qLevel;
 let lobbyRenderAt = 0;
 
 function frameLobby(now: number, dt: number): void {

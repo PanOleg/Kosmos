@@ -51,6 +51,11 @@ export interface EnemyVisual {
   spawnT: number;
   /** Готова glTF-модель замість примітивів, якщо є. */
   model: ModelInstance | null;
+  /**
+   * Корпус і око малює спільний InstancedMesh типу (EnemyInstances), а не власні меші.
+   * hullMat/glowMat тоді — лише носії кольору спалаху й світіння ока для цього ворога.
+   */
+  instanced: boolean;
 }
 
 /** Візуально більші за хітбокс, як і гравці: на телевізорі здалеку інакше губляться. */
@@ -410,7 +415,8 @@ const laserGeo = new THREE.BoxGeometry(0.09, 0.09, 1).translate(0, 0, 0.5);
 
 const ringGeo = new THREE.RingGeometry(0.75, 1, 32).rotateX(-Math.PI / 2);
 
-export function buildEnemyVisual(type: EnemyType): EnemyVisual {
+/** instanced — корпус і око малює EnemyInstances (матч); false — власні меші (галерея). */
+export function buildEnemyVisual(type: EnemyType, instanced = false): EnemyVisual {
   const root = new THREE.Group();
   const body = new THREE.Group();
   const hullMat = new THREE.MeshStandardMaterial({
@@ -428,7 +434,7 @@ export function buildEnemyVisual(type: EnemyType): EnemyVisual {
   if (model) {
     model.root.scale.setScalar(1 / VISUAL_SCALE[type]);
     body.add(model.root);
-  } else {
+  } else if (!instanced) {
     const geo = geometryOf(type);
     const hull = new THREE.Mesh(geo.hull, hullMat);
     const glow = new THREE.Mesh(geo.glow, glowMat);
@@ -465,7 +471,8 @@ export function buildEnemyVisual(type: EnemyType): EnemyVisual {
   // Тінь під дроном: без неї висоту й позицію в повітрі не прочитати згори.
   const shadow = new THREE.Mesh(shadowGeo, shadowMat);
   shadow.position.y = 0.025;
-  shadow.visible = AIR.has(type);
+  // В інстансованому режимі тінь теж малює EnemyInstances; меш лишається носієм позиції.
+  shadow.visible = AIR.has(type) && (model !== null || !instanced);
   root.add(shadow);
   body.scale.setScalar(VISUAL_SCALE[type]);
   let bubble: THREE.Mesh | null = null;
@@ -502,7 +509,136 @@ export function buildEnemyVisual(type: EnemyType): EnemyVisual {
     flash: 0,
     spawnT: 0,
     model,
+    instanced: instanced && model === null,
   };
+}
+
+/**
+ * Емісія на інстанс: атрибут instanceEmissive додається до totalEmissiveRadiance. Так спалах
+ * влучання й світіння ока лишаються індивідуальними, а тип ворога малюється одним викликом.
+ */
+function withInstanceEmissive<M extends THREE.Material>(mat: M): M {
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nattribute vec3 instanceEmissive;\nvarying vec3 vInstEm;',
+      )
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvInstEm = instanceEmissive;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vInstEm;')
+      .replace(
+        '#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vInstEm;',
+      );
+  };
+  mat.customProgramCacheKey = () => 'instEm';
+  return mat;
+}
+
+interface Batch {
+  mesh: THREE.InstancedMesh;
+  emissive: THREE.InstancedBufferAttribute;
+}
+
+/**
+ * Один InstancedMesh на тип для корпусу й один для ока, плюс спільний для тіней дронів.
+ * На слабкому телевізорі сотня ворогів як окремі об'єкти (з власними матеріалами й проходом
+ * тіней) з'їдала кадр на процесорі; так — ~2 виклики на тип незалежно від кількості.
+ */
+class EnemyInstances {
+  private readonly hulls = new Map<EnemyType, Batch>();
+  private readonly glows = new Map<EnemyType, Batch>();
+  private readonly shadows: THREE.InstancedMesh;
+  private readonly hullMat = withInstanceEmissive(
+    new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.5,
+      metalness: 0.4,
+      flatShading: true,
+      emissive: 0x000000,
+    }),
+  );
+  private readonly glowMat = withInstanceEmissive(
+    new THREE.MeshStandardMaterial({ color: 0xffb0a0, emissive: 0x000000 }),
+  );
+  private nShadow = 0;
+  private readonly counts = new Map<THREE.InstancedMesh, number>();
+
+  constructor(
+    private readonly scene: THREE.Scene,
+    private readonly capacity: number,
+  ) {
+    this.shadows = new THREE.InstancedMesh(shadowGeo, shadowMat, capacity);
+    this.shadows.frustumCulled = false;
+    this.shadows.count = 0;
+    scene.add(this.shadows);
+  }
+
+  private batch(map: Map<EnemyType, Batch>, type: EnemyType, glow: boolean): Batch {
+    let b = map.get(type);
+    if (b) return b;
+    const geo = geometryOf(type);
+    const mesh = new THREE.InstancedMesh(
+      glow ? geo.glow : geo.hull,
+      glow ? this.glowMat : this.hullMat,
+      this.capacity,
+    );
+    const emissive = new THREE.InstancedBufferAttribute(new Float32Array(this.capacity * 3), 3);
+    emissive.setUsage(THREE.DynamicDrawUsage);
+    mesh.geometry = mesh.geometry.clone();
+    mesh.geometry.setAttribute('instanceEmissive', emissive);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    mesh.castShadow = !glow;
+    mesh.count = 0;
+    this.scene.add(mesh);
+    b = { mesh, emissive };
+    map.set(type, b);
+    return b;
+  }
+
+  begin(): void {
+    this.counts.clear();
+    this.nShadow = 0;
+  }
+
+  private push(b: Batch, m: THREE.Matrix4, r: number, g: number, bl: number): void {
+    const n = this.counts.get(b.mesh) ?? 0;
+    b.mesh.setMatrixAt(n, m);
+    b.emissive.setXYZ(n, r, g, bl);
+    this.counts.set(b.mesh, n + 1);
+  }
+
+  add(v: EnemyVisual): void {
+    v.body.updateWorldMatrix(true, false);
+    const m = v.body.matrixWorld;
+    const he = v.hullMat.emissive;
+    this.push(this.batch(this.hulls, v.type, false), m, he.r, he.g, he.b);
+    const k = v.glowMat.emissiveIntensity;
+    const ge = v.glowMat.emissive;
+    this.push(this.batch(this.glows, v.type, true), m, ge.r * k, ge.g * k, ge.b * k);
+    if (AIR.has(v.type)) {
+      v.shadow.updateWorldMatrix(true, false);
+      this.shadows.setMatrixAt(this.nShadow++, v.shadow.matrixWorld);
+    }
+  }
+
+  end(): void {
+    for (const map of [this.hulls, this.glows])
+      for (const b of map.values()) {
+        const n = this.counts.get(b.mesh) ?? 0;
+        b.mesh.count = n;
+        b.mesh.visible = n > 0;
+        if (n > 0) {
+          b.mesh.instanceMatrix.needsUpdate = true;
+          b.emissive.needsUpdate = true;
+        }
+      }
+    this.shadows.count = this.nShadow;
+    this.shadows.visible = this.nShadow > 0;
+    this.shadows.instanceMatrix.needsUpdate = true;
+  }
 }
 
 /** Око світиться помірно: з bloom сильніше світіння розпливається в кулю й ховає голову. */
@@ -526,11 +662,13 @@ export class EnemyRenderer {
   private readonly scl = new THREE.Vector3();
   private readonly tmp = new THREE.Vector3();
   private readonly tmp2 = new THREE.Vector3();
+  private readonly instances: EnemyInstances;
 
   constructor(
     private readonly scene: THREE.Scene,
     capacity: number,
   ) {
+    this.instances = new EnemyInstances(scene, capacity);
     for (let i = 0; i < capacity; i++) {
       this.views.push(null);
       this.gens.push(-1);
@@ -602,6 +740,23 @@ export class EnemyRenderer {
   }
 
   update(enemies: Enemy[], players: Player[], alpha: number, dt: number, time: number): void {
+    this.updateViews(enemies, players, alpha, dt, time);
+    // Трансформи й кольори готові — переносимо в спільні InstancedMesh.
+    this.instances.begin();
+    for (let i = 0; i < enemies.length; i++) {
+      const v = this.views[i];
+      if (v && v.instanced && v.root.visible) this.instances.add(v);
+    }
+    this.instances.end();
+  }
+
+  private updateViews(
+    enemies: Enemy[],
+    players: Player[],
+    alpha: number,
+    dt: number,
+    time: number,
+  ): void {
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i]!;
       let v = this.views[i];
@@ -611,7 +766,7 @@ export class EnemyRenderer {
       }
       if (!v || v.type !== e.type) {
         if (v) this.scene.remove(v.root);
-        v = buildEnemyVisual(e.type);
+        v = buildEnemyVisual(e.type, true);
         this.views[i] = v;
         this.scene.add(v.root);
       }
