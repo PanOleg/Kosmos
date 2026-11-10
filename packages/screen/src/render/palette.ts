@@ -1,3 +1,6 @@
+import type { ClassId } from '@horizon/sim';
+import { CLASS_COLOR } from '@horizon/sim/protocol';
+
 /**
  * Єдина палітра за концептами (docs/concepts). Гравці — насичений колір класу на темній броні;
  * вороги — бліда броня з червоними очима; кулі гравців жовто-білі, ворожі — червоні.
@@ -35,16 +38,8 @@ export const PALETTE = {
   workLight: 0xffc860,
 };
 
-/** Колір гравця = колір класу (DECISIONS.md, п. 22). */
-export const CLASS_COLOR: Record<string, number> = {
-  assault: 0xe8323a,
-  engineer: 0xff8a1f,
-  medic: 0x3fd45a,
-  tech: 0x2f7bff,
-};
-
 export function classColor(classId: string): number {
-  return CLASS_COLOR[classId] ?? 0xffffff;
+  return CLASS_COLOR[classId as ClassId] ?? 0xffffff;
 }
 
 export function hexCss(c: number): string {

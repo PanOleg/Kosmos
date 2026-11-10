@@ -7,5 +7,12 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
     "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@horizon/sim": "workspace:*",
+    "peerjs": "^1.5.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.3.0"
   }
 }
