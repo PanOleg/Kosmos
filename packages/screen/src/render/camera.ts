@@ -7,9 +7,10 @@ import * as THREE from 'three';
 export class GameCamera {
   readonly camera: THREE.PerspectiveCamera;
   private readonly focus = new THREE.Vector3();
-  private distance = 34;
+  private distance = 24;
   private trauma = 0;
-  private readonly offsetDir = new THREE.Vector3(0, Math.sin(1.0), Math.cos(1.0));
+  // Нахил ~52° і ближча дистанція — як на концепті hud.jpg: персонажі великі й читаються.
+  private readonly offsetDir = new THREE.Vector3(0, Math.sin(0.9), Math.cos(0.9));
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(45, aspect, 0.5, 400);
@@ -40,7 +41,7 @@ export class GameCamera {
       cx /= count;
       cz /= count;
       const spread = Math.max(maxX - minX, (maxZ - minZ) * 1.4);
-      const want = Math.min(56, Math.max(34, 26 + spread * 0.9));
+      const want = Math.min(52, Math.max(23, 19 + spread * 0.95));
       const k = 1 - Math.exp(-dt * 4);
       this.focus.x += (cx - this.focus.x) * k;
       this.focus.z += (cz - this.focus.z) * k;

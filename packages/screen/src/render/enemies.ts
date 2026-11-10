@@ -134,6 +134,12 @@ const aimTicks = Math.round(GUNNER.aim * TICKS_PER_SEC);
 export class EnemyRenderer {
   private readonly views: (EnemyVisual | null)[] = [];
   private readonly gens: number[] = [];
+  // Смужки здоров'я над пораненими ворогами (як на концепті hud.jpg): фон + заливка.
+  private readonly barBg: THREE.InstancedMesh;
+  private readonly barFill: THREE.InstancedMesh;
+  private readonly m4 = new THREE.Matrix4();
+  private readonly pos = new THREE.Vector3();
+  private readonly scl = new THREE.Vector3();
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -143,6 +149,58 @@ export class EnemyRenderer {
       this.views.push(null);
       this.gens.push(-1);
     }
+    const plane = new THREE.PlaneGeometry(1, 1);
+    // Заливка росте від лівого краю: зсуваємо геометрію, щоб масштаб тягнув праворуч.
+    const fillGeo = plane.clone().translate(0.5, 0, 0);
+    this.barBg = new THREE.InstancedMesh(
+      plane,
+      new THREE.MeshBasicMaterial({
+        color: 0x120a0a,
+        transparent: true,
+        opacity: 0.75,
+        depthTest: false,
+      }),
+      capacity,
+    );
+    this.barFill = new THREE.InstancedMesh(
+      fillGeo,
+      new THREE.MeshBasicMaterial({ color: PALETTE.enemyShot, depthTest: false }),
+      capacity,
+    );
+    for (const b of [this.barBg, this.barFill]) {
+      b.frustumCulled = false;
+      b.count = 0;
+      b.renderOrder = 10;
+      scene.add(b);
+    }
+  }
+
+  /** Окремо від update: потрібна орієнтація камери, а смужки мають бути поверх усього. */
+  updateBars(enemies: Enemy[], alpha: number, camera: THREE.Camera): void {
+    let n = 0;
+    const q = camera.quaternion;
+    const W = 0.9;
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i]!;
+      if (!e.alive || e.hp >= e.maxHp) continue;
+      const x = e.px + (e.x - e.px) * alpha;
+      const y = e.py + (e.y - e.py) * alpha;
+      const h = e.type === 'scout' ? 2.0 : 2.4;
+      this.pos.set(toX(x), h, toZ(y));
+      this.m4.compose(this.pos, q, this.scl.set(W + 0.06, 0.16, 1));
+      this.barBg.setMatrixAt(n, this.m4);
+      // Лівий край заливки = лівий край фону; зсув уздовж правого вектора камери.
+      this.pos.x -= ((W / 2) * this.m4.elements[0]!) / (W + 0.06);
+      this.pos.y -= ((W / 2) * this.m4.elements[1]!) / (W + 0.06);
+      this.pos.z -= ((W / 2) * this.m4.elements[2]!) / (W + 0.06);
+      this.m4.compose(this.pos, q, this.scl.set(W * Math.max(0, e.hp / e.maxHp), 0.1, 1));
+      this.barFill.setMatrixAt(n, this.m4);
+      n++;
+    }
+    this.barBg.count = n;
+    this.barFill.count = n;
+    this.barBg.instanceMatrix.needsUpdate = true;
+    this.barFill.instanceMatrix.needsUpdate = true;
   }
 
   hit(index: number): void {

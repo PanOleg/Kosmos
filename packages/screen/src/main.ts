@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   createGame,
   step,
@@ -58,6 +59,14 @@ container.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(PALETTE.bg);
+// Слабке оточення для металу: без нього металеві плити й броня виходять майже чорними.
+// Генерується раз (PMREM), у кадрі нічого не коштує.
+{
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.32;
+  pmrem.dispose();
+}
 const cam = new GameCamera(window.innerWidth / window.innerHeight);
 const sfx = new Sfx();
 const debug = new DebugOverlay();
@@ -383,6 +392,7 @@ function frameMatch(m: Match, now: number, dt: number): void {
   m.pickupR.update(g.state.pickups, alpha, time);
   m.fx.update(g, dt);
   cam.update(m.camPoints, live, dt, time);
+  m.enemyR.updateBars(g.state.enemies, alpha, cam.camera);
   m.hud.update(g, cam.camera, dt);
 }
 

@@ -11,7 +11,8 @@ export class DebugOverlay {
   constructor() {
     Object.assign(this.el.style, {
       position: 'fixed',
-      left: '8px',
+      left: '50%',
+      transform: 'translateX(-50%)',
       bottom: '8px',
       font: '12px/1.4 ui-monospace, monospace',
       color: '#9fe',

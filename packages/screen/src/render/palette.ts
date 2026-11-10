@@ -7,11 +7,11 @@ import { CLASS_COLOR } from '@horizon/sim/protocol';
  */
 export const PALETTE = {
   bg: 0x05060a,
-  floor: 0x4a4f5a,
-  floorCenter: 0x4a3a3c,
-  floorGreen: 0x3a4a3c,
-  floorLab: 0x48505e,
-  floorDeck: 0x434a5c,
+  floor: 0x3a3c42,
+  floorCenter: 0x3a2e30,
+  floorGreen: 0x2f3a30,
+  floorLab: 0x3c434e,
+  floorDeck: 0x34373f,
   line: 0x7a8494,
   hull: 0x15171c,
   wall: 0x3a3e48,

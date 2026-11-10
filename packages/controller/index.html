@@ -2,6 +2,10 @@
 <html lang="uk">
   <head>
     <meta charset="UTF-8" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2714%27 fill=%27%23111%27 stroke=%27%23ffaa22%27 stroke-width=%273%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%275%27 fill=%27%23ff3322%27/%3E%3C/svg%3E"
+    />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
@@ -301,6 +305,44 @@
         #rotate {
           display: flex !important;
         }
+      }
+    </style>
+    <style>
+      /* Акцент класу (концепт controller.jpg): світлий відтінок кольору класу на насиченому фоні. */
+      :root {
+        --accent: #ffffff;
+      }
+      .top {
+        height: 52px;
+        letter-spacing: 0.08em;
+      }
+      #cls {
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+      .top .hp i {
+        background: var(--accent);
+        box-shadow: 0 0 8px var(--accent);
+      }
+      .stick-base {
+        border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+      }
+      .stick-knob {
+        background: var(--accent);
+        opacity: 0.9;
+      }
+      .ability {
+        color: var(--accent);
+      }
+      .ability.ready {
+        background: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 0 40px color-mix(in srgb, var(--accent) 60%, transparent);
+      }
+      .ability.ready #ring {
+        filter: drop-shadow(0 0 4px var(--accent));
+      }
+      #ring {
+        stroke: var(--accent);
       }
     </style>
   </head>

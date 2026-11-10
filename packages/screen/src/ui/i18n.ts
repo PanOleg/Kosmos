@@ -17,6 +17,8 @@ const uk = {
   backToLobby: 'Enter — до лобі',
   waveStartsIn: (s: number) => `до хвилі ${s} с`,
   enemiesLeft: (n: number) => `ворогів: ${n}`,
+  untilWave: 'до хвилі',
+  enemiesWord: 'ворогів',
   stationSignal: 'Сигнал станції',
   waveCleared: 'Хвилю відбито',
   victory: 'Станцію утримано',

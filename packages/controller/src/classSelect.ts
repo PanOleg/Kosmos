@@ -6,7 +6,7 @@ export const CLASS_META: Record<ClassId, { name: string; role: string; icon: str
   assault: { name: 'Штурмовик', role: 'Шкода', icon: '▲' },
   engineer: { name: 'Інженер', role: 'Захист', icon: '⬢' },
   medic: { name: 'Медик', role: 'Підтримка', icon: '✚' },
-  tech: { name: 'Технік', role: 'Контроль', icon: '⚡' },
+  tech: { name: 'Технік', role: 'Контроль', icon: '⚡\uFE0E' },
 };
 
 const IDS: ClassId[] = ['assault', 'engineer', 'medic', 'tech'];

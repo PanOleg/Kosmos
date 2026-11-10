@@ -6,11 +6,17 @@ import { t } from './i18n';
 
 const css = `
 .hud { position: fixed; inset: 0; pointer-events: none; font-family: 'Inter', system-ui, sans-serif; color: #e8ecf4; z-index: 6; }
-.hud-top { position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; gap: 18px; align-items: baseline;
-  padding: 6px 18px; background: rgba(8,10,16,.55); border: 1px solid rgba(255,170,34,.25); border-top: none; border-radius: 0 0 10px 10px;
-  font-size: 15px; letter-spacing: .04em; white-space: nowrap; }
-.hud-top b { color: #ffaa22; font-weight: 700; text-transform: uppercase; }
-.hud-card { position: absolute; width: 210px; padding: 8px 10px; background: rgba(8,10,16,.6); border-radius: 8px; border-left: 4px solid; font-size: 13px; }
+.hud-top { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 360px; text-align: center;
+  padding: 8px 18px 6px; background: linear-gradient(rgba(10,12,18,.88), rgba(10,12,18,.7)); border: 1px solid rgba(255,255,255,.12);
+  border-top: none; border-radius: 0 0 12px 12px; letter-spacing: .08em; }
+.hud-top .wv { font-size: 14px; font-weight: 700; text-transform: uppercase; opacity: .9; }
+.hud-top .pb { height: 6px; margin: 6px 0 4px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; }
+.hud-top .pb > i { display: block; height: 100%; background: #e8323a; box-shadow: 0 0 8px #e8323a; transition: width .2s; }
+.hud-top .big { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.hud-top .big small { font-size: 12px; font-weight: 600; opacity: .6; margin-left: 6px; letter-spacing: .06em; }
+.hud-card { position: absolute; width: 250px; padding: 8px 10px 8px 64px; min-height: 58px; background: rgba(8,10,16,.72); border-radius: 10px; border-left: 4px solid; font-size: 13px; }
+.hud-card .pt { position: absolute; left: 8px; top: 8px; width: 46px; height: 46px; border-radius: 8px; background: rgba(255,255,255,.06); }
+.hud-card .cls { text-transform: uppercase; }
 .hud-card .row { display: flex; justify-content: space-between; align-items: center; }
 .hud-card .cls { font-weight: 700; letter-spacing: .03em; }
 .hud-card .parts { color: #9ff4ff; font-weight: 700; font-variant-numeric: tabular-nums; display: inline-block; }
@@ -75,7 +81,7 @@ export class Hud {
       const el = document.createElement('div');
       el.className = 'hud-card';
       Object.assign(el.style, CORNERS[p.slot % 4], { borderColor: color });
-      el.innerHTML = `<div class="row"><span class="cls"><span style="opacity:.6">P${p.slot + 1}</span> <span style="color:${color}">${t.className[p.classId]}</span></span><span class="parts">⚙ 0</span></div><div class="bar"><i style="background:${color};width:100%"></i></div>`;
+      el.innerHTML = `${portrait(color)}<div class="row"><span class="cls"><span style="opacity:.6">P${p.slot + 1}</span> <span style="color:${color}">${t.className[p.classId]}</span></span><span class="parts">⚙ 0</span></div><div class="bar"><i style="background:${color};width:100%"></i></div>`;
       this.root.appendChild(el);
       this.cards.push({
         el,
@@ -111,10 +117,18 @@ export class Hud {
     let topText = '';
     if (def) {
       const left = Math.max(0, w.plannedTotal - w.spawnedTotal) + s.enemiesAlive;
-      topText =
+      // Смужка: у паузі — відлік, у бою — частка знищених.
+      const prog =
         w.phase === 'pause'
-          ? `<b>${def.name}</b><span>${t.waveStartsIn(Math.ceil(w.timer / TICKS_PER_SEC))}</span>`
-          : `<b>${def.name}</b><span>${t.enemiesLeft(left)}</span>`;
+          ? 1 - w.timer / (def.pause * TICKS_PER_SEC)
+          : w.plannedTotal > 0
+            ? 1 - left / w.plannedTotal
+            : 1;
+      const big =
+        w.phase === 'pause'
+          ? `${Math.ceil(w.timer / TICKS_PER_SEC)} с<small>${t.untilWave}</small>`
+          : `${left}<small>${t.enemiesWord}</small>`;
+      topText = `<div class="wv">${def.name}</div><div class="pb"><i style="width:${Math.round(prog * 100)}%"></i></div><div class="big">${big}</div>`;
     }
     if (topText !== this.lastTop) {
       this.top.innerHTML = topText;
@@ -180,4 +194,13 @@ export class Hud {
   destroy(): void {
     this.root.remove();
   }
+}
+
+/** Портрет класу: шолом із візором кольору класу (SVG, як іконки на концепті hud.jpg). */
+function portrait(color: string): string {
+  return `<svg class="pt" viewBox="0 0 46 46"><rect width="46" height="46" rx="8" fill="rgba(255,255,255,.05)"/>
+    <path d="M9 40 Q9 30 23 30 Q37 30 37 40 Z" fill="#2b2f37"/>
+    <ellipse cx="23" cy="19" rx="12" ry="12.5" fill="${color}"/>
+    <rect x="13" y="16" width="20" height="6" rx="3" fill="#dff6ff" opacity=".9"/>
+    <rect x="13" y="16" width="20" height="6" rx="3" fill="${color}" opacity=".35"/></svg>`;
 }

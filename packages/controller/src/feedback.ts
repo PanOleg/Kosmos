@@ -15,22 +15,20 @@ export function setPlayerColor(color: number | null): void {
   if (color === null) {
     root.setProperty('--bg', '#0b1020');
     root.setProperty('--c', '#ffffff');
+    root.setProperty('--accent', '#ffffff');
     return;
   }
   const r = (color >> 16) & 255;
   const g = (color >> 8) & 255;
   const b = color & 255;
+  // Як на концепті controller.jpg: насичений, але притемнений фон кольору класу
+  // і світлий відтінок того ж кольору для смужки здоров'я, кільця, стіка й іконки.
+  const bg = `rgb(${Math.round(r * 0.42)}, ${Math.round(g * 0.42)}, ${Math.round(b * 0.5)})`;
+  const accent = `rgb(${Math.round(r * 0.55 + 115)}, ${Math.round(g * 0.55 + 115)}, ${Math.round(b * 0.55 + 115)})`;
   root.setProperty('--c', hexCss(color));
-  root.setProperty(
-    '--bg',
-    `rgb(${Math.round(r * 0.35)}, ${Math.round(g * 0.35)}, ${Math.round(b * 0.35)})`,
-  );
-  document
-    .querySelector('meta[name="theme-color"]')
-    ?.setAttribute(
-      'content',
-      `rgb(${Math.round(r * 0.35)}, ${Math.round(g * 0.35)}, ${Math.round(b * 0.35)})`,
-    );
+  root.setProperty('--bg', bg);
+  root.setProperty('--accent', accent);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
 }
 
 export function hurt(amount: number): void {

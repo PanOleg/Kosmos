@@ -23,7 +23,8 @@ export function buildArena(map: MapDef): ArenaView {
   const R = map.radius;
   const flick: FlickerLight[] = [];
 
-  // Підлога: чотири сектори різного відтінку + центр.
+  // Підлога: металеві плити 2×2 м з швами (як на концепті hud.jpg), чотири сектори різного відтінку.
+  const tiles = floorTiles(R);
   const sectorColors = [PALETTE.floor, PALETTE.floorLab, PALETTE.floorGreen, PALETTE.floorDeck];
   for (let s = 0; s < 4; s++) {
     // Сектор s центрований на куті π/2 − s·π/2 (північ, схід, південь, захід).
@@ -32,14 +33,24 @@ export function buildArena(map: MapDef): ArenaView {
     geo.rotateX(-Math.PI / 2);
     const m = new THREE.Mesh(
       geo,
-      new THREE.MeshStandardMaterial({ color: sectorColors[s], roughness: 0.85, metalness: 0.2 }),
+      new THREE.MeshStandardMaterial({
+        color: sectorColors[s],
+        map: tiles,
+        roughness: 0.45,
+        metalness: 0.45,
+      }),
     );
     m.receiveShadow = true;
     g.add(m);
   }
   const center = new THREE.Mesh(
     new THREE.CircleGeometry(10, 48).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: PALETTE.floorCenter, roughness: 0.7, metalness: 0.3 }),
+    new THREE.MeshStandardMaterial({
+      color: PALETTE.floorCenter,
+      map: tiles,
+      roughness: 0.38,
+      metalness: 0.5,
+    }),
   );
   center.position.y = 0.005;
   center.receiveShadow = true;
@@ -178,8 +189,9 @@ export function buildArena(map: MapDef): ArenaView {
   }
 
   // Світло. Мало точкових джерел — інтегрована графіка; решту настрою дають емісивні смуги.
-  g.add(new THREE.HemisphereLight(0x8a9aba, 0x2a1a18, 1.4));
-  const moon = new THREE.DirectionalLight(0xb0c8ff, 1.6);
+  // Розсіяне світло з червонуватим відтінком: станція залита аварійним світлом.
+  g.add(new THREE.HemisphereLight(0x9a8a96, 0x3a1410, 1.25));
+  const moon = new THREE.DirectionalLight(0xb0c0e0, 1.2);
   moon.position.set(-30, 40, 10);
   moon.target.position.set(0, 0, 0);
   moon.castShadow = true;
@@ -194,12 +206,12 @@ export function buildArena(map: MapDef): ArenaView {
   moon.shadow.bias = -0.0008;
   g.add(moon, moon.target);
 
-  const coreLight = new THREE.PointLight(PALETTE.core, 40, 22, 1.6);
+  const coreLight = new THREE.PointLight(PALETTE.core, 75, 28, 1.5);
   coreLight.position.set(0, 3, 0);
   g.add(coreLight);
-  flick.push({ light: coreLight, base: 40, phase: 0 });
+  flick.push({ light: coreLight, base: 75, phase: 0 });
 
-  // Світло секторів за картою-концептом: вантажний — бурштинове робоче, лабораторія — холодне
+  // Світло секторів за картою-концептом: вантажний — червоне аварійне, лабораторія — холодне
   // блакитне, оранжерея — тепле жовте, палуба — червоне аварійне. По одному джерелу на сектор.
   const sectorLight = [
     PALETTE.emergencyAmber,
@@ -473,4 +485,42 @@ function makePlanet(): THREE.Object3D {
   );
   g.add(atmo);
   return g;
+}
+
+/** Процедурна текстура плит: шви, болти й легкі плями — підлога читається як метал без ассетів. */
+function floorTiles(radius: number): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#b8b8b8';
+  x.fillRect(0, 0, 256, 256);
+  // Легка неоднорідність всередині плити.
+  for (let i = 0; i < 60; i++) {
+    x.fillStyle = `rgba(${i % 2 ? 255 : 0},${i % 2 ? 255 : 0},${i % 2 ? 255 : 0},0.035)`;
+    x.fillRect((i * 97) % 256, (i * 53) % 256, 40 + (i % 5) * 12, 30 + (i % 7) * 10);
+  }
+  x.strokeStyle = '#5a5a5a';
+  x.lineWidth = 6;
+  x.strokeRect(0, 0, 256, 256);
+  x.strokeStyle = '#d8d8d8';
+  x.lineWidth = 2;
+  x.strokeRect(5, 5, 246, 246);
+  x.fillStyle = '#6a6a6a';
+  for (const [bx, by] of [
+    [18, 18],
+    [238, 18],
+    [18, 238],
+    [238, 238],
+  ] as const) {
+    x.beginPath();
+    x.arc(bx, by, 5, 0, Math.PI * 2);
+    x.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  // UV кола покривають діаметр: плита 2 м.
+  tex.repeat.set(radius, radius);
+  tex.anisotropy = 4;
+  return tex;
 }
