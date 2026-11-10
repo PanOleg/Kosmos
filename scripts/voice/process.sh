@@ -2,11 +2,17 @@
 # Озвучка власним голосом (DECISIONS.md, п. 55): записи з /record.html (scripts/voice/raw/<id>.webm)
 # → public/voice/<id>.mp3. Обрізає тишу на краях, знімає гул і шум, вирівнює гучність (−16 LUFS).
 # Фрази без запису лишаються згенерованими (generate.sh). Запуск із кореня: sh scripts/voice/process.sh
+# Лише окремі фрази: sh scripts/voice/process.sh foreman core
 set -e
 RAW=scripts/voice/raw
 OUT=packages/screen/public/voice
 n=0
-for f in "$RAW"/*.webm; do
+if [ $# -gt 0 ]; then
+  FILES=$(for id in "$@"; do echo "$RAW/$id.webm"; done)
+else
+  FILES=$(ls "$RAW"/*.webm 2>/dev/null)
+fi
+for f in $FILES; do
   [ -e "$f" ] || continue
   id=$(basename "$f" .webm)
   ffmpeg -loglevel error -y -i "$f" \
