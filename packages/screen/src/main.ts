@@ -18,6 +18,8 @@ import { emptyInput } from '@horizon/sim/protocol';
 import { buildArena, type ArenaView } from './render/arena';
 import { buildDesertArena } from './render/desertArena';
 import { Music, type MusicLevel } from './audio/music';
+import { Voice } from './audio/voice';
+import { loadAudioPrefs, saveAudioPrefs, type AudioChannel } from './audio/prefs';
 import { GameCamera } from './render/camera';
 import { PlayerView } from './render/players';
 import { PALETTE } from './render/palette';
@@ -85,7 +87,25 @@ scene.fog = new THREE.FogExp2(0x0a0507, 0.007);
 const cam = new GameCamera(window.innerWidth / window.innerHeight);
 const sfx = new Sfx();
 const music = new Music(() => sfx.audio());
-if (DEBUG) Object.assign(window as unknown as Record<string, unknown>, { sfx, music });
+const voice = new Voice(() => sfx.audio());
+voice.onSpeaking = (on) => music.setDucked(on);
+
+// Музика / звуки / озвучка окремо (DECISIONS.md, п. 53): пульт на паузі, N / J / V, лобі.
+const audioPrefs = loadAudioPrefs();
+function applyAudio(): void {
+  music.setMuted(!audioPrefs.music);
+  sfx.setEnabled(audioPrefs.sfx);
+  voice.setEnabled(audioPrefs.voice);
+  lobby.audio = { ...audioPrefs };
+}
+function toggleAudio(what: AudioChannel): void {
+  audioPrefs[what] = !audioPrefs[what];
+  saveAudioPrefs(audioPrefs);
+  applyAudio();
+  lobbyView.setAudio(audioPrefs);
+  match?.hud.announce(t.audioName[what] ?? what, audioPrefs[what] ? t.audioOn : t.audioOff, 1.2);
+}
+if (DEBUG) Object.assign(window as unknown as Record<string, unknown>, { sfx, music, voice });
 const debug = new DebugOverlay();
 // ?lowfx — без постобробки, для слабких ноутбуків.
 const LOWFX = params.has('lowfx');
@@ -127,6 +147,7 @@ function makeArena(settings: SessionSettings): ArenaView {
   // Звук за картою (п. 50–51): своя музика й фон; у пустелі ще ріг і піщані пориви.
   sfx.theme = map.id === 'desert' ? 'desert' : 'station';
   music.setTheme(map.id === 'desert' ? 'desert' : 'station');
+  voice.setTheme(map.id === 'desert' ? 'desert' : 'station');
   scene.environmentIntensity = envBase;
   scene.add(a.group);
   return a;
@@ -254,6 +275,10 @@ interface Match {
 let match: Match | null = null;
 const RESULTS_AUTO_MS = 60000;
 lobby.onAgain = () => endMatch();
+lobby.onAudio = (what) => toggleAudio(what);
+applyAudio();
+lobbyView.setAudio(audioPrefs);
+lobbyView.onAudioToggle = (what) => toggleAudio(what);
 let countdown: number | null = null;
 let seed = Number(params.get('seed') ?? Date.now() % 100000);
 
@@ -331,6 +356,8 @@ function startMatch(): void {
   const first = game.config.waves[0];
   if (first) {
     match.hud.announce(first.name, t.stationSignal, 2.5);
+    voice.say(game.config.map.id === 'desert' ? 'startDesert' : 'start', 2);
+    voice.say('wave1', 1);
     sfx.stationSignal();
   }
 }
@@ -366,6 +393,13 @@ function firstLocal(kind: Slot['kind']): Slot | undefined {
 }
 
 window.addEventListener('keydown', (e) => {
+  // Звук перемикається будь-коли — і в лобі, і в матчі.
+  const ch: AudioChannel | null =
+    e.code === 'KeyN' ? 'music' : e.code === 'KeyJ' ? 'sfx' : e.code === 'KeyV' ? 'voice' : null;
+  if (ch) {
+    toggleAudio(ch);
+    return;
+  }
   if (match) {
     if (e.code === 'Enter' && match.results) endMatch();
     if ((e.code === 'Escape' || e.code === 'KeyP') && !match.results)
@@ -468,17 +502,28 @@ function handleMatchEvents(m: Match): void {
       } else sfx.purchase(false);
     }
     const def = g.config.waves[e.a];
+    const desert = g.config.map.id === 'desert';
     if (e.type === 'wavePause' && def) {
       m.hud.announce(def.name, t.stationSignal, 2.5);
       sfx.stationSignal();
+      voice.say(
+        def.boss === 'foreman' ? 'foreman' : def.boss === 'core' ? 'core' : `wave${e.a + 1}`,
+        def.boss ? 3 : 2,
+      );
     } else if (e.type === 'revived' && e.b >= 0) {
       m.hud.announce(t.revived(e.a + 1), '', 1.6);
+      voice.say('revived', 1);
     } else if (e.type === 'waveCleared' && def && e.b === 0) {
       m.hud.announce(t.waveCleared, '', 2);
+      voice.say('cleared', 1);
     } else if (e.type === 'bossPhase') {
       m.hud.announce(t.bossPhase(e.b), e.b === 1 ? t.lightsOut : '', 2.2);
+      voice.say(e.b === 1 ? (desert ? 'sandstorm' : 'lightsOut') : `phase${e.b}`, 3);
     } else if (e.type === 'airlockWarn') {
       m.hud.announce(t.airlockAlert, '', 1.5);
+      voice.say(desert ? 'airlockDesert' : 'airlock', 3);
+    } else if (e.type === 'playerDown' && g.state.players.length > 1) {
+      voice.say('down', 2);
     }
   }
 }
@@ -582,6 +627,13 @@ function frameMatch(m: Match, now: number, dt: number): void {
     lobby.setSkins(unlockedSkins(progress));
     lobbyView.setProgress(progress, day);
     m.results = showResults(summary, t.preset[lobbyView.settings.preset] ?? '', outcome);
+    voice.say(
+      summary.won ? (g.config.map.id === 'desert' ? 'victoryDesert' : 'victory') : 'defeat',
+      3,
+    );
+    if (outcome.newAchievements.length) voice.say('achievement', 1);
+    else if (outcome.newRecords.length) voice.say('record', 1);
+    if (outcome.contractDone) voice.say('contract', 1);
     m.resultsAt = now;
     lobby.endMatch(summary);
   }
@@ -597,8 +649,10 @@ function frameMatch(m: Match, now: number, dt: number): void {
 
   for (let i = 0; i < m.slots.length; i++) {
     const bot = lobby.botControlled(m.slots[i]!);
-    if (bot && !m.botAnnounced[i] && m.slots[i]!.kind === 'phone')
+    if (bot && !m.botAnnounced[i] && m.slots[i]!.kind === 'phone') {
       m.hud.announce(t.botTookOver(i + 1), '', 2.5);
+      voice.say('bot', 2);
+    }
     m.botAnnounced[i] = bot;
   }
 
@@ -644,6 +698,9 @@ function debugLine(): string {
   return parts.join('  ');
 }
 
+let wasPaused = false;
+let wasCounting = false;
+
 /** Інтенсивність музики: лобі й пауза між хвилями — спокій, бій, бос (Прораб і Ядро). */
 function musicLevel(): MusicLevel {
   if (!match) return 'calm';
@@ -660,6 +717,13 @@ function frame(now: number): void {
   lobby.update();
   music.tick();
   music.setLevel(musicLevel());
+  // Пауза й відлік — голосом.
+  const paused = !!match && lobby.pause !== null;
+  const counting = !!match && !paused && lobby.resumeIn() > 0;
+  if (paused && !wasPaused) voice.say('pause', 2);
+  if (counting && !wasCounting) voice.say('countdown', 3);
+  wasPaused = paused;
+  wasCounting = counting;
   music.setMuffled(!!match && (lobby.pause !== null || lobby.resumeIn() > 0 || !!match.results));
   if (match) frameMatch(match, now, dt);
   else frameLobby(now, dt);

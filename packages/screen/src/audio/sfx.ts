@@ -4,15 +4,24 @@
  */
 export class Sfx {
   private ctx: AudioContext | null = null;
+  /** Шина звуків подій (вимикається окремо); музика й голос ідуть повз неї в out. */
   private master!: GainNode;
+  private out!: GainNode;
+  private fxOn = true;
   private noise!: AudioBuffer;
   private lastShot = new Map<number, number>();
   /** Тема карти: у пустелі сигнал хвилі — ріг, шлюзи боса — піщані пориви (п. 50). */
   theme: 'station' | 'desert' = 'station';
 
+  /** Звуки подій увімк./вимк. (музика й озвучка — окремо). */
+  setEnabled(on: boolean): void {
+    this.fxOn = on;
+    if (this.ctx) this.master.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.05);
+  }
+
   /** Спільний контекст і вихід для музики; null — ще не було жесту користувача. */
   audio(): { ctx: AudioContext; out: AudioNode } | null {
-    return this.ctx ? { ctx: this.ctx, out: this.master } : null;
+    return this.ctx ? { ctx: this.ctx, out: this.out } : null;
   }
 
   constructor() {
@@ -31,9 +40,12 @@ export class Sfx {
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14;
     comp.ratio.value = 6;
+    this.out = ctx.createGain();
+    this.out.gain.value = 0.5;
+    this.out.connect(comp).connect(ctx.destination);
     this.master = ctx.createGain();
-    this.master.gain.value = 0.5;
-    this.master.connect(comp).connect(ctx.destination);
+    this.master.gain.value = this.fxOn ? 1 : 0;
+    this.master.connect(this.out);
     this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;

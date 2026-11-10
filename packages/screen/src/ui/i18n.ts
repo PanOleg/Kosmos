@@ -12,7 +12,7 @@ const uk = {
   pressStart: 'Усі готові — Enter, щоб почати',
   startingIn: (s: number) => `Старт через ${s}`,
   lobbyKeysHint:
-    'Клавіатура: Пробіл — приєднатися · Q/E — клас · C — забарвлення · M — карта · Enter — готовий/старт · B — додати бота · Backspace — вийти · D — складність · −/= — хвилі',
+    'Клавіатура: Пробіл — приєднатися · Q/E — клас · C — забарвлення · M — карта · N/J/V — музика/звуки/озвучка · Enter — готовий/старт · B — додати бота · Backspace — вийти · D — складність · −/= — хвилі',
   difficulty: 'Складність',
   preset: { easy: 'Легко', normal: 'Нормально', hard: 'Важко' } as Record<string, string>,
   wavesLabel: 'Хвиль',
@@ -34,7 +34,7 @@ const uk = {
   pauseTitle: 'ПАУЗА',
   pausedBy: (who: string) => `Паузу поставив ${who}`,
   pauseWaiting: (who: string) => `Чекаємо ${who} — немає зв'язку`,
-  pauseHint: 'Продовжити — кнопка на пульті або Esc',
+  pauseHint: 'Продовжити — кнопка на пульті або Esc · звук — на пульті або N/J/V',
   pauseHintBot: 'Продовжити без нього (керуватиме бот) — кнопка на пульті або Esc',
   dropSoon: (who: string, s: number) =>
     `${who} без зв'язку · бот через ${s} с · на пульті — «Чекати»`,
@@ -75,6 +75,10 @@ const uk = {
   teamRevives: 'воскресіння',
   resFoot: (s: number) => `«Ще раз» на будь-якому пульті або Enter · лобі через ${s} с`,
   mapLabel: 'Карта',
+  soundLabel: 'Звук',
+  audioName: { music: 'Музика', sfx: 'Звуки', voice: 'Озвучка' } as Record<string, string>,
+  audioOn: 'увімкнено',
+  audioOff: 'вимкнено',
   mapName: { station: 'Станція', desert: 'Пустеля' } as Record<string, string>,
   crew: 'Екіпаж',
   contract: 'Контракт дня',

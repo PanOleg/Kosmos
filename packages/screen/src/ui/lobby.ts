@@ -226,6 +226,19 @@ export class LobbyView {
     this.commit();
   }
 
+  private audio: { music: boolean; sfx: boolean; voice: boolean } = {
+    music: true,
+    sfx: true,
+    voice: true,
+  };
+  /** Клік по перемикачу звуку в лобі. */
+  onAudioToggle: (what: 'music' | 'sfx' | 'voice') => void = () => {};
+
+  setAudio(a: { music: boolean; sfx: boolean; voice: boolean }): void {
+    this.audio = { ...a };
+    this.renderSettings();
+  }
+
   /** Налаштування змінились (зокрема карта — екран перебудовує арену). */
   onSettingsChange: (s: SessionSettings) => void = () => {};
 
@@ -245,7 +258,9 @@ export class LobbyView {
   private onSettingsClick(e: Event): void {
     const b = (e.target as HTMLElement).closest('button');
     if (!b) return;
-    if (b.dataset.map) {
+    if (b.dataset.audio) {
+      this.onAudioToggle(b.dataset.audio as 'music' | 'sfx' | 'voice');
+    } else if (b.dataset.map) {
       this.settings.map = b.dataset.map as MapId;
       this.commit();
     } else if (b.dataset.preset) {
@@ -289,7 +304,14 @@ export class LobbyView {
       (m) =>
         `<button data-map="${m}" class="${m === (s.map ?? 'station') ? 'on' : ''}">${t.mapName[m]}</button>`,
     ).join('');
+    const audio = (['music', 'sfx', 'voice'] as const)
+      .map(
+        (k) =>
+          `<button data-audio="${k}" class="${this.audio[k] ? 'on' : ''}">${this.audio[k] ? '' : '🔇 '}${t.audioName[k]}</button>`,
+      )
+      .join('');
     this.settingsEl.innerHTML = `<div class="row"><span class="lbl">${t.mapLabel}</span>${maps}</div>
+<div class="row"><span class="lbl">${t.soundLabel}</span>${audio}</div>
 <div class="row"><span class="lbl">${t.difficulty}</span>${presets}<span class="preset-note" style="opacity:.6;margin-left:auto">${s.custom ? t.customized : ''}</span></div>
 <div class="row"><span class="lbl">${t.wavesLabel}</span><button data-waves="-1">−</button><span class="val">${s.waves}</span><button data-waves="1">+</button><button data-adv="1" style="margin-left:auto">${t.advanced}</button></div>
 <div class="adv">${sliders}<div class="row"><button data-reset="1">${t.resetCustom}</button></div></div>`;

@@ -43,6 +43,7 @@ const semi = (n: number) => D3 * Math.pow(2, n / 12);
 export class Music {
   private ctx: AudioContext | null = null;
   private delay: DelayNode | null = null;
+  private amb!: GainNode;
   private bus!: GainNode;
   private lp!: BiquadFilterNode;
   private noise!: AudioBuffer;
@@ -93,7 +94,30 @@ export class Music {
     this.muffled = m;
     const t = this.ctx.currentTime;
     this.lp.frequency.setTargetAtTime(m ? 420 : 9000, t, 0.25);
-    this.bus.gain.setTargetAtTime(m ? 0.1 : 0.22, t, 0.3);
+    this.bus.gain.setTargetAtTime(this.targetGain(), t, 0.3);
+  }
+
+  private ducked = false;
+  private muted = false;
+
+  /** Музику вимкнено гравцями (налаштування звуку). */
+  setMuted(m: boolean): void {
+    this.muted = m;
+    if (!this.ctx) return;
+    this.bus.gain.setTargetAtTime(this.targetGain(), this.ctx.currentTime, 0.1);
+    this.amb.gain.setTargetAtTime(m ? 0 : 1, this.ctx.currentTime, 0.1);
+  }
+
+  /** Поки звучить озвучка, музика тихішає вдвічі з лишком. */
+  setDucked(d: boolean): void {
+    this.ducked = d;
+    if (this.ctx)
+      this.bus.gain.setTargetAtTime(this.targetGain(), this.ctx.currentTime, d ? 0.08 : 0.4);
+  }
+
+  private targetGain(): number {
+    if (this.muted) return 0;
+    return (this.muffled ? 0.1 : 0.22) * (this.ducked ? 0.4 : 1);
   }
 
   /** Раз на кадр: запускає все, щойно з'явився аудіоконтекст (перший дотик). */
@@ -108,14 +132,18 @@ export class Music {
     this.lp.frequency.value = this.muffled ? 420 : 9000;
     this.bus = ctx.createGain();
     this.bus.gain.value = 0;
-    this.bus.gain.setTargetAtTime(this.muffled ? 0.1 : 0.22, ctx.currentTime, 1.5);
+    this.bus.gain.setTargetAtTime(this.targetGain(), ctx.currentTime, 1.5);
     this.bus.connect(this.lp).connect(a.out);
+    // Фон (вітер / гул) — повз фільтр приглушення, але вимикається разом із музикою.
+    this.amb = ctx.createGain();
+    this.amb.gain.value = this.muted ? 0 : 1;
+    this.amb.connect(a.out);
     this.noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     if (this.theme === 'desert') {
       this.droneNodes = this.drone();
-      this.windNodes = this.wind(a.out);
+      this.windNodes = this.wind(this.amb);
     } else {
       // Луна для арпеджіо: затримка на крапковану вісімку з затуханням.
       const dl = ctx.createDelay(1);
@@ -127,7 +155,7 @@ export class Music {
       dl.connect(fb).connect(dl);
       dl.connect(wet).connect(this.bus);
       this.delay = dl;
-      this.windNodes = this.hum(a.out);
+      this.windNodes = this.hum(this.amb);
     }
     this.nextT = ctx.currentTime + 0.1;
     this.timer = window.setInterval(() => this.schedule(), 25);

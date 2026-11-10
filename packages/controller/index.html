@@ -419,6 +419,27 @@
         padding: 14px 18px;
         background: rgba(255, 255, 255, 0.12);
       }
+      .audio {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .audio button {
+        font: inherit;
+        font-size: 15px;
+        font-weight: 700;
+        padding: 10px 16px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.55);
+        text-decoration: line-through;
+      }
+      .audio button.on {
+        background: rgba(255, 255, 255, 0.92);
+        color: #111;
+        text-decoration: none;
+      }
       .conn-hint {
         margin-top: 14px;
         max-width: 34em;
@@ -712,6 +733,11 @@
         <h1 id="paused-title">Пауза</h1>
         <div id="paused-sub" class="muted"></div>
         <button id="resume" class="btn resume">Продовжити</button>
+        <div id="audio" class="audio">
+          <button data-audio="music">Музика</button>
+          <button data-audio="sfx">Звуки</button>
+          <button data-audio="voice">Озвучка</button>
+        </div>
       </div>
     </div>
     <div id="reconnect" class="overlay">

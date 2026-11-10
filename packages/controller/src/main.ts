@@ -143,6 +143,13 @@ function run(room: string): void {
   });
   pauseBtn.addEventListener('pointerup', holdEnd);
   pauseBtn.addEventListener('pointercancel', holdEnd);
+  // Звук на екрані: музика / звуки / озвучка окремо — з будь-якого пульта на паузі.
+  $('audio').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-audio]');
+    if (!b) return;
+    blip(620, 0.05);
+    net.send({ t: 'audio', what: b.dataset.audio as 'music' | 'sfx' | 'voice' });
+  });
   $('resume').addEventListener('click', () => {
     blip(880, 0.08);
     net.send({ t: 'pause', on: false });
@@ -157,7 +164,7 @@ function run(room: string): void {
   let pauseSig = '';
   const renderPause = (m: Extract<ScreenMessage, { t: 'status' }>) => {
     const inMatch = m.phase === 'match';
-    const sig = JSON.stringify([inMatch, m.pause, m.resumeIn, m.dropped]);
+    const sig = JSON.stringify([inMatch, m.pause, m.resumeIn, m.dropped, m.audio]);
     if (sig === pauseSig) return;
     pauseSig = sig;
     const p = inMatch ? m.pause : null;
@@ -166,6 +173,9 @@ function run(room: string): void {
     el.classList.toggle('on', !!p || counting);
     el.classList.toggle('count', counting);
     $('resume').hidden = !p;
+    $('audio').hidden = !p;
+    for (const b of document.querySelectorAll<HTMLElement>('#audio button'))
+      b.classList.toggle('on', !!m.audio?.[b.dataset.audio as 'music' | 'sfx' | 'voice']);
     if (p) {
       const who = (n: number[]) => n.map((i) => `P${i + 1}`).join(', ');
       $('paused-title').textContent = 'Пауза';

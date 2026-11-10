@@ -234,4 +234,18 @@ describe('lobby', () => {
     host.setSkins(['standard']);
     expect(host.slots[0]!.skin).toBe('standard');
   });
+
+  test('audio toggles from any controller reach the screen; status carries the state', () => {
+    const { host, a, advance } = inMatch();
+    const got: string[] = [];
+    host.onAudio = (w) => got.push(w);
+    a.onReliable({ t: 'audio', what: 'music' });
+    a.onReliable({ t: 'audio', what: 'voice' });
+    a.onReliable({ t: 'audio', what: 'bogus' as 'music' });
+    expect(got).toEqual(['music', 'voice']);
+    host.audio = { music: false, sfx: true, voice: false };
+    advance(200);
+    host.update();
+    expect(a.last('status')?.audio).toEqual({ music: false, sfx: true, voice: false });
+  });
 });

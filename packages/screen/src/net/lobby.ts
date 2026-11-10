@@ -25,6 +25,7 @@ import {
   encodePing,
   seqNewer,
   type ControllerMessage,
+  type AudioPrefs,
   type DroppedInfo,
   type MatchSummary,
   type LobbySlotInfo,
@@ -88,6 +89,10 @@ export class LobbyHost {
   onChange: () => void = () => {};
   /** Відкриті забарвлення (мета-прогрес); перше — стандартне. */
   skins: string[] = ['standard'];
+  /** Стан звуку для пультів; змінює екран (main.ts). */
+  audio: AudioPrefs = { music: true, sfx: true, voice: true };
+  /** Пульт перемкнув канал звуку. */
+  onAudio: (what: keyof AudioPrefs) => void = () => {};
   /** Пульт на екрані результатів натиснув «Ще раз». */
   onAgain: () => void = () => {};
   /** Підсумок останнього матчу: пульт, що перепідключився на екрані результатів, теж його отримає. */
@@ -163,6 +168,10 @@ export class LobbyHost {
     }
     if (m.t === 'wait') {
       this.waitFor(m.slot);
+      return;
+    }
+    if (m.t === 'audio') {
+      if (m.what === 'music' || m.what === 'sfx' || m.what === 'voice') this.onAudio(m.what);
       return;
     }
     if (m.t === 'again') {
@@ -500,6 +509,7 @@ export class LobbyHost {
           pause: this.pause && { by: this.pause.by, waiting: [...this.pause.waiting] },
           resumeIn: this.resumeIn(),
           dropped,
+          audio: this.audio,
         });
       }
     }

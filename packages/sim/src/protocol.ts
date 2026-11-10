@@ -63,7 +63,9 @@ export type ControllerMessage =
   /** Не віддавати відключеного гравця боту, а чекати його на паузі. */
   | { t: 'wait'; slot: number }
   /** З екрана результатів — назад у лобі (будь-який пульт). */
-  | { t: 'again' };
+  | { t: 'again' }
+  /** Перемкнути музику / звуки / озвучку (пауза на пульті). */
+  | { t: 'audio'; what: keyof AudioPrefs };
 
 /** Екран → пульт. */
 export type ScreenMessage =
@@ -99,6 +101,8 @@ export type ScreenMessage =
       resumeIn: number;
       /** Відключені гравці, яких не чекаємо: їх веде або скоро поведе бот. */
       dropped: DroppedInfo[];
+      /** Що зараз грає на екрані — для перемикачів на пульті. */
+      audio: AudioPrefs;
     }
   | { t: 'hurt'; amount: number }
   /** Підсумок матчу для цього гравця — пульт показує власну картку. */
@@ -125,6 +129,12 @@ export interface PlayerSummary {
   damageTaken: number;
   /** Ключі відзнак (awards.ts): 'kills', 'revives', 'parts', 'tank', 'untouched'. */
   awards: string[];
+}
+
+export interface AudioPrefs {
+  music: boolean;
+  sfx: boolean;
+  voice: boolean;
 }
 
 export interface PauseInfo {
