@@ -57,9 +57,12 @@ function groupCount(game: Game, base: number, air = false): number {
 }
 
 type EnemyTypeArg = Parameters<typeof spawnEnemy>[1];
+const BOSS_TYPES: ReadonlySet<EnemyTypeArg> = new Set(['foreman']);
 
 /** Скільки окремих ворогів дає група (рій — десяток дронів за одиницю). */
 function unitsOf(game: Game, type: EnemyTypeArg, base: number): number {
+  // Бос завжди один; більшій команді він стає міцнішим (DECISIONS.md, п. 39).
+  if (BOSS_TYPES.has(type)) return base;
   const c = groupCount(game, base, AIR_TYPES.has(type));
   return type === 'swarm' ? c * SWARM.count : c;
 }
@@ -116,7 +119,12 @@ export function updateWaves(game: Game): void {
     const g = def.groups[w.nextGroup]!;
     const due = w.timer >= secToTicks(g.at) || s.enemiesAlive < def.pressureBelow;
     if (!due) break;
-    spawnGroup(game, g.type, groupCount(game, g.count, AIR_TYPES.has(g.type)), g.airlock);
+    spawnGroup(
+      game,
+      g.type,
+      BOSS_TYPES.has(g.type) ? g.count : groupCount(game, g.count, AIR_TYPES.has(g.type)),
+      g.airlock,
+    );
     w.nextGroup++;
   }
 
@@ -142,7 +150,14 @@ function spawnGroup(
     for (let k = 0; k < count; k++) {
       const e = spawnEnemy(game, type, (k - (count - 1) / 2) * 2.5, 6.5);
       if (e >= 0) {
-        game.state.enemies[e]!.speed *= w.speedMul;
+        const en = game.state.enemies[e]!;
+        en.speed *= w.speedMul;
+        if (BOSS_TYPES.has(type)) {
+          const n = game.state.players.length;
+          en.hp = en.maxHp = Math.round(
+            en.maxHp * PLAYER_COUNT_MUL[Math.min(n, PLAYER_COUNT_MUL.length - 1)]!,
+          );
+        }
         w.spawnedTotal++;
       }
     }

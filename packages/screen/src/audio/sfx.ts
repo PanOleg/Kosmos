@@ -236,6 +236,29 @@ export class Sfx {
     this.burst('bandpass', 3000, 400, 1.5, 0.4, 0.3);
   }
 
+  /** Прораб заносить крани: низький скрегіт, що росте. */
+  craneWarn(pan: number): void {
+    this.tone('sawtooth', 70, 160, 1.1, 0.12, pan);
+  }
+
+  craneHit(pan: number): void {
+    this.tone('sine', 90, 25, 0.5, 0.8, pan);
+    this.burst('lowpass', 1500, 60, 0.8, 0.5, 0.6, pan);
+  }
+
+  /** Стіна виростає з підлоги: металевий брязкіт. */
+  propPlaced(pan: number): void {
+    this.tone('square', 220, 110, 0.15, 0.1, pan);
+    this.burst('bandpass', 1800, 600, 3, 0.2, 0.2, pan);
+  }
+
+  bossDown(): void {
+    this.tone('sine', 160, 30, 1.4, 0.8);
+    [523, 659, 784, 1047].forEach((f, i) =>
+      setTimeout(() => this.tone('triangle', f, f, 0.25, 0.15), 400 + i * 110),
+    );
+  }
+
   /** Сигнал станції перед хвилею: дві низькі ноти сирени. */
   stationSignal(): void {
     const ctx = this.ctx;

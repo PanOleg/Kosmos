@@ -156,3 +156,38 @@ describe('wave table', () => {
     expect(total(fifteen[fifteen.length - 1]!)).toBeGreaterThan(total(buildWaves(9)[9]!));
   });
 });
+
+describe('session settings', () => {
+  test('preset, custom sliders and wave count end up in the config, clamped', async () => {
+    const { buildConfig, PRESETS } = await import('../src/index');
+    const c = buildConfig({ preset: 'hard', custom: { enemyHp: 5, enemySpeed: 0.7 }, waves: 30 });
+    expect(c.mods.enemyDamage).toBe(PRESETS.hard.enemyDamage);
+    expect(c.mods.enemyHp).toBe(2);
+    expect(c.mods.enemySpeed).toBe(0.7);
+    expect(c.mods.enemyCount).toBe(PRESETS.hard.enemyCount);
+    expect(c.waves.filter((w) => !w.boss).length).toBe(15);
+    const e = buildConfig({ preset: 'easy', custom: null, waves: 5 });
+    expect(e.mods).toEqual(PRESETS.easy);
+    expect(e.waves.filter((w) => !w.boss).length).toBe(5);
+  });
+});
+
+test('foreman is always alone, but tougher for a bigger crew', () => {
+  for (const n of [1, 2, 4]) {
+    const g = createGame(
+      undefined,
+      5,
+      Array.from({ length: n }, () => ({ classId: 'assault' as const })),
+    );
+    g.config = { ...g.config, waves: buildWaves(9) };
+    const w = g.state.wave;
+    w.index = 5;
+    w.phase = 'active';
+    w.timer = 0;
+    w.nextGroup = 0;
+    step(g, g.state.players.map(idle));
+    const f = g.state.enemies.filter((e) => e.alive && e.type === 'foreman');
+    expect(f.length).toBe(1);
+    expect(f[0]!.maxHp).toBe(Math.round(900 * [1, 1, 1.6, 2.3, 3][n]!));
+  }
+});

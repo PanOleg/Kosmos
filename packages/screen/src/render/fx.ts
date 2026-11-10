@@ -178,6 +178,38 @@ export class FxDirector {
         this.sparks.burst(12, X, 1.2, Z, e.x2, -e.y2, 11, 1.2, 0.25, 0.2, 0xffa030);
         break;
       }
+      case 'craneWarn':
+        this.sfx.craneWarn(this.pan(e.x));
+        break;
+      case 'craneHit': {
+        this.sfx.craneHit(this.pan(e.x));
+        this.cam.shake(0.7);
+        this.hitStop = Math.max(this.hitStop, 0.06);
+        this.debris.burst(16, X, 0.3, Z, 1, 0, 7, Math.PI * 2, 1.2, 0.2, 0x6a6058);
+        this.sparks.burst(24, X, 0.3, Z, 1, 0, 9, Math.PI * 2, 0.35, 0.25, 0xffb050);
+        this.flashLight.position.x = X;
+        this.flashLight.position.z = Z;
+        this.flashT = 0.15;
+        break;
+      }
+      case 'propPlaced':
+        this.sfx.propPlaced(this.pan(e.x));
+        this.sparks.burst(14, X, 0.2, Z, 1, 0, 5, Math.PI * 2, 0.3, 0.15, 0xffd070);
+        break;
+      case 'propGone':
+        this.debris.burst(8, X, 0.6, Z, 1, 0, 4, Math.PI * 2, 1, 0.16, 0x8a7a68);
+        break;
+      case 'bossDown': {
+        this.sfx.bossDown();
+        this.cam.shake(1);
+        this.hitStop = Math.max(this.hitStop, 0.15);
+        this.sparks.burst(60, X, 1.5, Z, 1, 0, 16, Math.PI * 2, 0.6, 0.35, 0xffb050);
+        this.debris.burst(20, X, 1.5, Z, 1, 0, 9, Math.PI * 2, 1.8, 0.25, 0xe8b020);
+        this.flashLight.position.x = X;
+        this.flashLight.position.z = Z;
+        this.flashT = 0.3;
+        break;
+      }
       case 'spiderJump':
         this.sfx.spiderJump(this.pan(e.x));
         break;

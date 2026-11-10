@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   createGame,
+  buildConfig,
   step,
   spawnEnemy,
   botInput,
@@ -32,7 +33,7 @@ import { FxDirector } from './render/fx';
 import { Sfx } from './audio/sfx';
 import { PostFx } from './render/post';
 import { AbilityRenderer } from './render/abilities';
-import { RocketRenderer } from './render/hazards';
+import { PropRenderer, RocketRenderer } from './render/hazards';
 import { models } from './render/models';
 import { Hud } from './ui/hud';
 import { showResults } from './ui/results';
@@ -183,6 +184,7 @@ interface Match {
   fx: FxDirector;
   abilityR: AbilityRenderer;
   rocketR: RocketRenderer;
+  propR: PropRenderer;
   hud: Hud;
   camPoints: { x: number; z: number }[];
   results: HTMLDivElement | null;
@@ -201,7 +203,7 @@ function startMatch(): void {
   );
   if (order.length === 0) return;
   const game = createGame(
-    undefined,
+    buildConfig(lobbyView.settings),
     seed++,
     order.map((s) => ({ classId: s.classId! })),
   );
@@ -229,6 +231,7 @@ function startMatch(): void {
     pickupR: new PickupRenderer(scene, game.state.pickups.length),
     fx,
     rocketR: new RocketRenderer(scene, game.state.rockets.length),
+    propR: new PropRenderer(scene, game.state.props.length),
     abilityR: new AbilityRenderer(
       scene,
       fx.sparks,
@@ -342,6 +345,13 @@ window.addEventListener('keydown', (e) => {
     }
     case 'Enter':
       if (lobby.canStart() && countdown === null) countdown = 3;
+      break;
+    case 'KeyD':
+      lobbyView.cyclePreset();
+      break;
+    case 'Minus':
+    case 'Equal':
+      lobbyView.stepWaves(e.code === 'Equal' ? 1 : -1);
       break;
   }
 });
@@ -492,6 +502,7 @@ function frameMatch(m: Match, now: number, dt: number): void {
   m.fx.update(g, dt);
   m.abilityR.update(g, dt, time);
   m.rocketR.update(g.state.rockets, time);
+  m.propR.update(g.state.props, dt);
   cam.update(m.camPoints, live, dt, time);
   m.enemyR.updateBars(g.state.enemies, alpha, cam.camera);
   m.hud.update(g, cam.camera, dt);

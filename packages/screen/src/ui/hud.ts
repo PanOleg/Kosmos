@@ -21,6 +21,9 @@ const css = `
 .hud-top .wv { font-size: 14px; font-weight: 700; text-transform: uppercase; opacity: .9; }
 .hud-top .pb { height: 6px; margin: 6px 0 4px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; }
 .hud-top .pb > i { display: block; height: 100%; background: #e8323a; box-shadow: 0 0 8px #e8323a; transition: width .2s; }
+.hud-top .boss { margin: 4px 0 2px; font-size: 12px; font-weight: 800; letter-spacing: .2em; color: #ffcc40; }
+.hud-top .boss .pb { height: 9px; border: 1px solid rgba(255,204,64,.5); }
+.hud-top .boss .pb > i { background: linear-gradient(90deg, #ffb020, #ffdc60); box-shadow: 0 0 10px #ffb020; }
 .hud-top .big { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .hud-top .big small { font-size: 12px; font-weight: 600; opacity: .6; margin-left: 6px; letter-spacing: .06em; }
 .hud-card { position: absolute; width: 250px; padding: 8px 10px 8px 64px; min-height: 58px; background: rgba(8,10,16,.72); border-radius: 10px; border-left: 4px solid; font-size: 13px; }
@@ -232,6 +235,12 @@ export class Hud {
           ? `${Math.ceil(w.timer / TICKS_PER_SEC)} с<small>${t.untilWave}</small>`
           : `${left}<small>${t.enemiesWord}</small>`;
       topText = `<div class="wv">${def.name}</div><div class="pb"><i style="width:${Math.round(prog * 100)}%"></i></div><div class="big">${big}</div>`;
+      // Міні-бос: окрема жовта смуга здоров'я під лічильником.
+      if (def.boss && w.phase === 'active') {
+        const b = s.enemies.find((e) => e.alive && e.type === def.boss);
+        if (b)
+          topText += `<div class="boss"><div class="pb"><i style="width:${Math.ceil((b.hp / b.maxHp) * 100)}%"></i></div></div>`;
+      }
     }
     if (topText !== this.lastTop) {
       this.top.innerHTML = topText;

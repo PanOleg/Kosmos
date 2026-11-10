@@ -16,6 +16,11 @@ import {
   REPAIRER,
   WASP_WINDUP,
   SCOUT_WINDUP,
+  FOREMAN,
+  FOREMAN_STRIKE,
+  TURRET,
+  TURRET_WINDUP,
+  TURRET_BURST,
   TICKS_PER_SEC,
   type Enemy,
   type EnemyType,
@@ -59,6 +64,8 @@ const VISUAL_SCALE: Record<EnemyType, number> = {
   shell: 1.1,
   spider: 1.2,
   repairer: 1.3,
+  foreman: 1.15,
+  turret: 1.2,
 };
 const AIR = new Set<EnemyType>(['wasp', 'kamikaze', 'sniper', 'swarm']);
 
@@ -297,7 +304,80 @@ function repairerParts(): { hull: THREE.BufferGeometry; glow: THREE.BufferGeomet
   return { hull: merge(hull), glow: merge(glow) };
 }
 
-const GROUND_GEO = { shell: shellParts(), spider: spiderParts(), repairer: repairerParts() };
+// Прораб (міні-бос): будівельний мех, дві жовті стріли-крани з гаками, кабіна з помаранчевим вікном.
+function foremanParts(): { hull: THREE.BufferGeometry; glow: THREE.BufferGeometry } {
+  const yellow = 0xe8b020;
+  const stripe = 0x2a2420;
+  const hull: Part[] = [];
+  const glow: Part[] = [];
+  for (const sx of [1, -1]) {
+    hull.push(
+      // Гусениці.
+      part(BOX, P.enemyDark, [0.6 * sx, 0.28, 0], [0.45, 0.55, 1.6]),
+      part(BOX, stripe, [0.85 * sx, 0.28, 0], [0.05, 0.4, 1.4]),
+      // Стріла крана: від плеча вгору-вперед, далі вниз — гак.
+      seg(BOX, yellow, [0.75 * sx, 1.9, -0.1], [0.95 * sx, 2.9, 0.9], 0.22),
+      seg(BOX, yellow, [0.95 * sx, 2.9, 0.9], [0.95 * sx, 2.6, 1.9], 0.18),
+      seg(BOX, stripe, [0.95 * sx, 2.6, 1.9], [0.95 * sx, 1.4, 1.95], 0.04),
+      part(BOX, P.enemyDark, [0.95 * sx, 1.25, 1.95], [0.3, 0.25, 0.2]),
+    );
+    // Чорно-жовті смуги на стрілі.
+    for (let k = 0; k < 3; k++)
+      hull.push(
+        part(
+          BOX,
+          stripe,
+          [0.85 * sx + 0.1 * k * sx * 0.66, 2.05 + k * 0.3, 0.05 + k * 0.3],
+          [0.24, 0.06, 0.24],
+        ),
+      );
+    glow.push(part(BOX, 0xffffff, [0.95 * sx, 2.95, 0.9], [0.1, 0.06, 0.1]));
+  }
+  hull.push(
+    part(BOX, P.enemy, [0, 0.95, 0], [1.4, 0.7, 1.5]),
+    part(BOX, yellow, [0, 1.55, -0.1], [1.3, 0.6, 1.2]),
+    part(BOX, P.enemyMid, [0, 2.05, 0.2], [0.9, 0.55, 0.75]),
+    part(BOX, stripe, [0, 1.3, 0.76], [1.3, 0.12, 0.04]),
+    // Противага ззаду.
+    part(BOX, P.enemyDark, [0, 1.5, -0.85], [1.1, 0.6, 0.35]),
+  );
+  glow.push(
+    part(BOX, 0xffffff, [0, 2.1, 0.58], [0.6, 0.18, 0.02]),
+    part(SPHERE, 0xffffff, [0, 2.45, 0], [0.16, 0.16, 0.16]),
+  );
+  return { hull: merge(hull), glow: merge(glow) };
+}
+
+// Турель: тринога, круглий корпус і довгий ствол; ззаду світиться блок живлення — слабке місце.
+function turretParts(): { hull: THREE.BufferGeometry; glow: THREE.BufferGeometry } {
+  const hull: Part[] = [];
+  for (let k = 0; k < 3; k++) {
+    const a = (k / 3) * Math.PI * 2 + Math.PI / 2;
+    hull.push(
+      seg(BOX, P.enemyDark, [0, 0.6, 0], [Math.sin(a) * 0.65, 0, Math.cos(a) * 0.65], 0.08),
+    );
+  }
+  hull.push(
+    part(CYL, P.enemyMid, [0, 0.65, 0], [0.35, 0.2, 0.35]),
+    part(BOX, P.enemy, [0, 0.95, 0], [0.62, 0.42, 0.7]),
+    part(CYL, P.enemyDark, [0, 1.0, 0.65], [0.13, 0.7, 0.13], [Math.PI / 2, 0, 0]),
+    part(BOX, P.enemyDark, [0, 1.0, 1.0], [0.2, 0.2, 0.08]),
+    part(BOX, 0xe8b020, [0, 1.2, 0], [0.64, 0.05, 0.72]),
+  );
+  const glow = [
+    part(BOX, 0xffffff, [0, 0.98, -0.37], [0.36, 0.22, 0.04]),
+    part(BOX, 0xffffff, [0, 1.06, 0.36], [0.12, 0.06, 0.02]),
+  ];
+  return { hull: merge(hull), glow: merge(glow) };
+}
+
+const GROUND_GEO = {
+  shell: shellParts(),
+  spider: spiderParts(),
+  repairer: repairerParts(),
+  foreman: foremanParts(),
+  turret: turretParts(),
+};
 
 const DRONE_GEO = {
   wasp: droneParts('wasp'),
@@ -309,8 +389,9 @@ const DRONE_GEO = {
 function geometryOf(type: EnemyType): { hull: THREE.BufferGeometry; glow: THREE.BufferGeometry } {
   if (type === 'scout') return scoutGeo;
   if (type === 'gunner') return gunnerGeo;
-  if (type === 'shell' || type === 'spider' || type === 'repairer') return GROUND_GEO[type];
-  return DRONE_GEO[type];
+  if (type === 'wasp' || type === 'kamikaze' || type === 'sniper' || type === 'swarm')
+    return DRONE_GEO[type];
+  return GROUND_GEO[type];
 }
 
 const shadowGeo = new THREE.CircleGeometry(0.45, 20).rotateX(-Math.PI / 2);
@@ -428,6 +509,8 @@ const peekTicks = Math.round(GUNNER.peek * TICKS_PER_SEC);
 const aimTicks = Math.round(GUNNER.aim * TICKS_PER_SEC);
 const kamiWindupTicks = Math.round(KAMIKAZE.windup * TICKS_PER_SEC);
 const sniperAimTicks = Math.round(SNIPER.aim * TICKS_PER_SEC);
+const craneWarnTicks = Math.round(FOREMAN.strikeWarn * TICKS_PER_SEC);
+const turretWindupTicks = Math.round(TURRET.windup * TICKS_PER_SEC);
 
 export class EnemyRenderer {
   private readonly views: (EnemyVisual | null)[] = [];
@@ -487,7 +570,7 @@ export class EnemyRenderer {
       const y = e.py + (e.y - e.py) * alpha;
       const h = e.air
         ? e.alt + 0.9
-        : e.type === 'shell'
+        : e.type === 'shell' || e.type === 'foreman'
           ? 3.6
           : e.type === 'scout'
             ? 2.0
@@ -577,6 +660,43 @@ export class EnemyRenderer {
           (v.ring.material as THREE.MeshBasicMaterial).opacity = 0.5 + Math.sin(time * 30) * 0.3;
         } else v.ring.position.set(0, 0.03, 0);
         v.glowMat.emissiveIntensity = e.ai === SPIDER_WINDUP ? 5 : EYE_GLOW;
+      }
+      if (e.type === 'foreman') {
+        // Зона удару кранами: велике кільце, що наливається червоним до удару; стріли піднімаються.
+        const strike = e.ai === FOREMAN_STRIKE;
+        v.ring.visible = strike;
+        if (strike) {
+          const kp = Math.min(1, e.aiT / craneWarnTicks);
+          v.ring.position.set(toX(e.tx) - v.root.position.x, 0.03, toZ(e.ty) - v.root.position.z);
+          const rs = FOREMAN.strikeRadius * (1.25 - kp * 0.25);
+          v.ring.scale.set(rs, 1, rs);
+          (v.ring.material as THREE.MeshBasicMaterial).opacity =
+            0.35 + kp * 0.55 * (0.7 + 0.3 * Math.sin(time * (10 + kp * 30)));
+          v.body.rotation.x = -kp * 0.12;
+        } else {
+          v.ring.position.set(0, 0.03, 0);
+          v.body.rotation.x = 0;
+        }
+        v.glowMat.emissiveIntensity = strike ? 3 + Math.sin(time * 30) * 1.5 : EYE_GLOW;
+        continue_flash(v, e, dt, speed, strike);
+        continue;
+      }
+      if (e.type === 'turret') {
+        // Лазер уздовж ствола під час замаху; черга — спалах «ока».
+        const wind = e.ai === TURRET_WINDUP;
+        v.laser.visible = wind;
+        v.ring.visible = false;
+        if (wind) {
+          const kp = e.aiT / turretWindupTicks;
+          v.laser.position.set(0, 1.2, 0);
+          v.laser.rotation.set(0, Math.atan2(toX(e.fx), toZ(e.fy)), 0);
+          v.laser.scale.set(1, 1, TURRET.range);
+          (v.laser.material as THREE.MeshBasicMaterial).opacity =
+            0.25 + 0.6 * kp * (0.6 + 0.4 * Math.sin(time * 40));
+        }
+        v.glowMat.emissiveIntensity = wind ? 3 : e.ai === TURRET_BURST ? 6 : EYE_GLOW;
+        continue_flash(v, e, dt, speed, wind);
+        continue;
       }
       if (e.type === 'repairer') {
         const a = e.ally >= 0 ? enemies[e.ally] : undefined;
