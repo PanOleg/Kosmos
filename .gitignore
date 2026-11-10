@@ -5,3 +5,5 @@ coverage
 *.log
 .idea/workspace.xml
 .playwright-mcp
+.vercel
+.env*
