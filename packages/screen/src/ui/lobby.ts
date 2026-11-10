@@ -26,11 +26,16 @@ const css = `
 .lobby .slots { display: grid; grid-template-columns: repeat(2, 230px); gap: 14px; }
 .lobby .slot { height: 120px; border-radius: 12px; background: rgba(255,255,255,.05); border: 2px dashed rgba(255,255,255,.15);
   display: flex; flex-direction: column; justify-content: center; padding: 14px 16px; gap: 6px; }
-.lobby .slot.on { border-style: solid; background: rgba(10,12,18,.75); }
+.lobby .slot.on { border-style: solid; background: rgba(10,12,18,.75); flex-direction: row; align-items: center; gap: 10px;
+  padding: 6px 14px 6px 4px; }
+.lobby .slot .pt { width: 96px; height: 108px; object-fit: contain; flex: none; filter: drop-shadow(0 6px 10px rgba(0,0,0,.5));
+  transform: scale(1.55); transform-origin: 50% 45%; }
+.lobby .slot .tx { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .lobby .slot .n { font-size: 12px; opacity: .55; letter-spacing: .1em; text-transform: uppercase; }
-.lobby .slot .c { font-size: 22px; font-weight: 800; }
+.lobby .slot .c { font-size: 20px; font-weight: 800; }
 .lobby .slot .s { font-size: 13px; opacity: .8; }
-.lobby .hint { position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; opacity: .55; font-size: 13px; }
+.lobby .hint { position: absolute; bottom: 18px; left: 0; right: 0; padding: 0 24px; text-align: center; opacity: .55; font-size: 13px;
+  line-height: 1.5; }
 .lobby .settings { margin-top: 18px; width: 474px; padding: 12px 14px; border-radius: 12px; background: rgba(10,12,18,.7);
   display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
 .lobby .settings .row { display: flex; align-items: center; gap: 8px; }
@@ -103,6 +108,7 @@ export class LobbyView {
   private readonly qr = document.createElement('canvas');
   private readonly settingsEl = document.createElement('div');
   private readonly crewEl = document.createElement('div');
+  private slotsHtml = '';
   settings: SessionSettings = loadSettings();
 
   constructor(private readonly lobby: LobbyHost) {
@@ -196,10 +202,15 @@ export class LobbyView {
       const ping = s.kind === 'phone' && !Number.isNaN(s.rtt) ? ` · ${Math.round(s.rtt)} мс` : '';
       const skin = s.skin !== 'standard' ? ` · ${t.skinName[s.skin] ?? s.skin}` : '';
       parts.push(
-        `<div class="slot on" style="border-color:${color}"><div class="n">P${i + 1} ${kind}</div><div class="c" style="color:${color}">${s.classId ? t.className[s.classId] : '—'}</div><div class="s">${conn}${ping}${skin}</div></div>`,
+        `<div class="slot on" style="border-color:${color}">${s.classId ? `<img class="pt" src="${import.meta.env.BASE_URL}classes/${s.classId}.png" alt="">` : ''}<div class="tx"><div class="n">P${i + 1} ${kind}</div><div class="c" style="color:${color}">${s.classId ? t.className[s.classId] : '—'}</div><div class="s">${conn}${ping}${skin}</div></div></div>`,
       );
     }
-    this.slotsEl.innerHTML = parts.join('');
+    // Перемальовуємо лише зміни: інакше портрети блимали б щоразу (рендер — кожні 200 мс).
+    const html = parts.join('');
+    if (html !== this.slotsHtml) {
+      this.slotsHtml = html;
+      this.slotsEl.innerHTML = html;
+    }
     this.startEl.textContent =
       countdown !== null
         ? t.startingIn(Math.ceil(countdown))

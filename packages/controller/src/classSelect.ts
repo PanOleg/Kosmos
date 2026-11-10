@@ -21,7 +21,8 @@ export class ClassSelect {
       const b = document.createElement('button');
       b.className = 'cls';
       b.style.color = hexCss(CLASS_COLOR[id]);
-      b.innerHTML = `<span class="ic">${m.icon}</span><span class="nm">${m.name}</span><span class="rl" style="color:var(--fg)">${m.role}</span>`;
+      // Портрет класу — рендер тієї самої моделі, що в грі (docs/models/portraits.py).
+      b.innerHTML = `<img class="pt" src="${import.meta.env.BASE_URL}classes/${id}.png" alt="" draggable="false"><span class="nm"><span class="ic">${m.icon}</span> ${m.name}</span><span class="rl" style="color:var(--fg)">${m.role}</span>`;
       b.addEventListener('click', () => onPick(id));
       root.appendChild(b);
       this.cards.set(id, b);
