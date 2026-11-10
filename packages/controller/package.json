@@ -1,0 +1,11 @@
+{
+  "name": "@horizon/controller",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}
