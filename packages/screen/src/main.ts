@@ -124,9 +124,9 @@ function makeArena(settings: SessionSettings): ArenaView {
   renderer.toneMappingExposure = a.sky.exposure;
   post.setBloom(...a.sky.bloom);
   envBase = a.sky.env;
-  // Звук за картою (п. 50): пустеля — музика, вітер, ріг; станція — лише звуки подій.
+  // Звук за картою (п. 50–51): своя музика й фон; у пустелі ще ріг і піщані пориви.
   sfx.theme = map.id === 'desert' ? 'desert' : 'station';
-  music.setEnabled(map.id === 'desert');
+  music.setTheme(map.id === 'desert' ? 'desert' : 'station');
   scene.environmentIntensity = envBase;
   scene.add(a.group);
   return a;
