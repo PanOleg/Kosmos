@@ -148,6 +148,16 @@ function buildClass(classId: ClassId): {
 /** Візуально більший за хітбокс (0.5 м): з дивана на телевізорі інакше губиться. */
 const VISUAL_SCALE = 1.35;
 
+/** Косметичні забарвлення (DECISIONS.md, п. 48): множник кольору, металевість, шорсткість. */
+const SKIN_LOOK: Record<string, { tint: [number, number, number]; metal: number; rough: number }> =
+  {
+    graphite: { tint: [0.55, 0.55, 0.6], metal: 0.2, rough: 0.85 },
+    desert: { tint: [1.55, 1.3, 0.95], metal: 0.25, rough: 0.7 },
+    arctic: { tint: [2.0, 2.05, 2.2], metal: 0.2, rough: 0.6 },
+    chrome: { tint: [1.35, 1.4, 1.5], metal: 0.95, rough: 0.18 },
+    gold: { tint: [1.7, 1.35, 0.65], metal: 0.85, rough: 0.25 },
+  };
+
 const modelCache = new Map<ClassId, ReturnType<typeof buildClass>>();
 
 export class PlayerView {
@@ -172,6 +182,7 @@ export class PlayerView {
   constructor(
     readonly slot: number,
     readonly classId: ClassId,
+    skin = 'standard',
   ) {
     const color = classColor(classId);
     this.ringColor = color;
@@ -186,6 +197,13 @@ export class PlayerView {
       metalness: 0.35,
       flatShading: true,
     });
+    // Забарвлення (мета-прогрес): множник кольору вершин і блиск — відтінок класу лишається.
+    const sk = SKIN_LOOK[skin];
+    if (sk) {
+      this.suitMat.color.setRGB(...sk.tint);
+      this.suitMat.metalness = sk.metal;
+      this.suitMat.roughness = sk.rough;
+    }
     this.visorMat = new THREE.MeshStandardMaterial({
       color,
       emissive: color,

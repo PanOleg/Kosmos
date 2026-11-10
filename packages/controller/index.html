@@ -414,6 +414,11 @@
         border-radius: 99px;
         background: rgba(255, 255, 255, 0.18);
       }
+      .skin {
+        font-size: 16px;
+        padding: 14px 18px;
+        background: rgba(255, 255, 255, 0.12);
+      }
       .conn-hint {
         margin-top: 14px;
         max-width: 34em;
@@ -619,7 +624,10 @@
       <div class="center" style="justify-content: space-evenly; padding: 12px 0">
         <div class="muted" id="lobby-title">Оберіть клас</div>
         <div class="classes" id="classes"></div>
-        <div class="lobbybar"><button id="ready" class="btn ready">Готовий</button></div>
+        <div class="lobbybar">
+          <button id="skin" class="btn skin" hidden>Стандарт ▸</button>
+          <button id="ready" class="btn ready">Готовий</button>
+        </div>
       </div>
     </div>
     <div id="v-match" class="view">

@@ -1,6 +1,7 @@
 import type { MatchSummary, PlayerSummary } from '@horizon/sim/protocol';
 import { classColor, hexCss } from '../render/palette';
 import { t } from './i18n';
+import { ACHIEVEMENTS, type MatchOutcome } from '../meta/progress';
 
 /** Екран після матчу (DECISIONS.md, п. 46): картка на гравця, відзнаки, підсумок команди. */
 export interface ResultsView {
@@ -37,6 +38,10 @@ const css = `
   background: color-mix(in srgb, var(--c) 22%, transparent); border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); }
 .res .team { display: flex; gap: 30px; font-size: 15px; opacity: .8; letter-spacing: .04em; }
 .res .team b { font-size: 20px; color: #fff; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.res .meta { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.res .meta div { font-size: 16px; padding: 6px 14px; border-radius: 99px; background: rgba(255,170,34,.14);
+  border: 1px solid rgba(255,170,34,.45); }
+.res .meta b { color: #ffcf6a; }
 .res .foot { font-size: 15px; opacity: .65; letter-spacing: .04em; }
 `;
 let styleInstalled = false;
@@ -54,7 +59,33 @@ function card(p: PlayerSummary, i: number): string {
     <div class="aw">${aw}</div></div>`;
 }
 
-export function showResults(sum: MatchSummary, presetName: string): ResultsView {
+function metaBlock(o: MatchOutcome | undefined): string {
+  if (!o) return '';
+  const lines: string[] = [];
+  for (const id of o.newAchievements) {
+    const [name] = t.achievement[id] ?? [id];
+    const skin = ACHIEVEMENTS.find((a) => a.id === id)?.skin;
+    lines.push(
+      `${t.newAchievement}: <b>${name}</b>${skin ? ` · ${t.skinUnlocked(t.skinName[skin] ?? skin)}` : ''}`,
+    );
+  }
+  const recName: Record<string, string> = {
+    bestWave: t.recBestWave,
+    fastestWin: t.recFastest,
+    bestKills: t.recBestKills,
+  };
+  for (const r of o.newRecords) lines.push(`${t.newRecord}: <b>${recName[r] ?? r}</b>`);
+  if (o.contractDone) lines.push(`<b>${t.contractCompleted(o.streak)}</b>`);
+  return lines.length
+    ? `<div class="meta">${lines.map((l) => `<div>${l}</div>`).join('')}</div>`
+    : '';
+}
+
+export function showResults(
+  sum: MatchSummary,
+  presetName: string,
+  outcome?: MatchOutcome,
+): ResultsView {
   if (!styleInstalled) {
     const st = document.createElement('style');
     st.textContent = css;
@@ -75,6 +106,7 @@ export function showResults(sum: MatchSummary, presetName: string): ResultsView 
         ? `<div class="team"><span>${t.teamKills}<b data-n="${total((p) => p.kills)}">0</b></span><span>${t.teamParts}<b data-n="${total((p) => p.parts)}">0</b></span><span>${t.teamRevives}<b data-n="${total((p) => p.revives)}">0</b></span></div>`
         : ''
     }
+    ${metaBlock(outcome)}
     <div class="foot"></div>`;
   document.body.appendChild(el);
   const foot = el.querySelector<HTMLElement>('.foot')!;

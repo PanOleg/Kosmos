@@ -218,4 +218,20 @@ describe('lobby', () => {
     a.onReliable({ t: 'again' });
     expect(again).toBe(1);
   });
+
+  test('skins cycle through unlocked ones only and fall back when locked', () => {
+    const { host, join } = setup();
+    const a = join('a');
+    expect(host.slots[0]!.skin).toBe('standard');
+    a.onReliable({ t: 'skin' });
+    expect(host.slots[0]!.skin).toBe('standard');
+    host.setSkins(['standard', 'desert', 'gold']);
+    a.onReliable({ t: 'skin' });
+    a.onReliable({ t: 'skin' });
+    expect(host.slots[0]!.skin).toBe('gold');
+    host.update();
+    expect(a.last('lobby')?.skins).toEqual(['standard', 'desert', 'gold']);
+    host.setSkins(['standard']);
+    expect(host.slots[0]!.skin).toBe('standard');
+  });
 });

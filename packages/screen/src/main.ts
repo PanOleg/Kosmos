@@ -39,6 +39,7 @@ import { BossRenderer } from './render/boss';
 import { models } from './render/models';
 import { Hud } from './ui/hud';
 import { showResults, type ResultsView } from './ui/results';
+import { dayNumber, loadProgress, recordMatch, saveProgress, unlockedSkins } from './meta/progress';
 import { LobbyView } from './ui/lobby';
 import { t } from './ui/i18n';
 import { LobbyHost, PAUSE_BY_SCREEN, type Slot } from './net/lobby';
@@ -108,6 +109,18 @@ const lobby = new LobbyHost(
   () => Array.from(crypto.getRandomValues(new Uint32Array(4)), (n) => n.toString(36)).join(''),
 );
 const lobbyView = new LobbyView(lobby);
+
+// Мета-прогрес екіпажу (DECISIONS.md, п. 48): рекорди, досягнення, щоденний контракт.
+const store = (() => {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+})();
+const progress = loadProgress(store);
+lobby.setSkins(unlockedSkins(progress));
+lobbyView.setProgress(progress, dayNumber(new Date()));
 const keyboardLayout = new Map<Slot, KeyLayout>();
 const ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
@@ -225,7 +238,7 @@ function startMatch(): void {
     return new PhoneSource(s);
   });
   const playerViews = game.state.players.map((p) => {
-    const v = new PlayerView(p.slot, p.classId);
+    const v = new PlayerView(p.slot, p.classId, order[p.slot]?.skin);
     scene.add(v.root);
     return v;
   });
@@ -348,6 +361,9 @@ window.addEventListener('keydown', (e) => {
     }
     case 'KeyB':
       lobby.addLocal('bot');
+      break;
+    case 'KeyC':
+      if (kb) lobby.cycleSkin(kb);
       break;
     case 'KeyQ':
     case 'KeyE':
@@ -516,7 +532,16 @@ function frameMatch(m: Match, now: number, dt: number): void {
     const won = g.state.phase === 'won';
     sfx.fanfare(won);
     const summary = matchSummary(g);
-    m.results = showResults(summary, t.preset[lobbyView.settings.preset] ?? '');
+    const day = dayNumber(new Date());
+    const outcome = recordMatch(progress, summary, {
+      preset: lobbyView.settings.preset,
+      foremanWave: g.config.waves.findIndex((w) => w.boss === 'foreman') + 1,
+      day,
+    });
+    saveProgress(store, progress);
+    lobby.setSkins(unlockedSkins(progress));
+    lobbyView.setProgress(progress, day);
+    m.results = showResults(summary, t.preset[lobbyView.settings.preset] ?? '', outcome);
     m.resultsAt = now;
     lobby.endMatch(summary);
   }

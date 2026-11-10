@@ -47,6 +47,8 @@ export interface LobbySlotInfo {
   ready: boolean;
   connected: boolean;
   kind: 'phone' | 'keyboard' | 'bot';
+  /** Забарвлення броні (мета-прогрес, косметика). */
+  skin: string;
 }
 
 /** Пульт → екран. */
@@ -54,6 +56,8 @@ export type ControllerMessage =
   | { t: 'hello'; v: number; token: string }
   | { t: 'class'; classId: ClassId }
   | { t: 'ready'; ready: boolean }
+  /** Наступне відкрите забарвлення броні. */
+  | { t: 'skin' }
   /** on: true — пауза (пульт утримав кнопку 0.5 с); false — продовжити, відсутніх веде бот. */
   | { t: 'pause'; on: boolean }
   /** Не віддавати відключеного гравця боту, а чекати його на паузі. */
@@ -65,7 +69,13 @@ export type ControllerMessage =
 export type ScreenMessage =
   | { t: 'welcome'; slot: number; token: string }
   | { t: 'full'; reason: 'full' | 'inMatch' | 'version' }
-  | { t: 'lobby'; phase: ScreenPhase; slots: LobbySlotInfo[] }
+  | {
+      t: 'lobby';
+      phase: ScreenPhase;
+      slots: LobbySlotInfo[];
+      /** Відкриті на цьому екрані забарвлення (перше — стандартне). */
+      skins: string[];
+    }
   | {
       t: 'status';
       phase: ScreenPhase;

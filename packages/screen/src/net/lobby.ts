@@ -51,6 +51,8 @@ export interface Slot {
   lostAt: number | null;
   /** Гравці вирішили продовжити без нього: бот веде одразу, без 5 с очікування. */
   forceBot: boolean;
+  /** Забарвлення броні — косметика з мета-прогресу. */
+  skin: string;
 }
 
 const PING_EVERY = 1000;
@@ -84,6 +86,8 @@ export class LobbyHost {
   private dirty = true;
   /** Викликається при будь-якій зміні лобі (для перемальовки UI). */
   onChange: () => void = () => {};
+  /** Відкриті забарвлення (мета-прогрес); перше — стандартне. */
+  skins: string[] = ['standard'];
   /** Пульт на екрані результатів натиснув «Ще раз». */
   onAgain: () => void = () => {};
   /** Підсумок останнього матчу: пульт, що перепідключився на екрані результатів, теж його отримає. */
@@ -166,7 +170,8 @@ export class LobbyHost {
       return;
     }
     if (this.phase !== 'lobby') return;
-    if (m.t === 'class') this.pickClass(s, m.classId);
+    if (m.t === 'skin') this.cycleSkin(s);
+    else if (m.t === 'class') this.pickClass(s, m.classId);
     else if (m.t === 'ready') {
       s.ready = m.ready && s.classId !== null;
       this.markDirty();
@@ -209,6 +214,7 @@ export class LobbyHost {
       rtt: NaN,
       lostAt: null,
       forceBot: false,
+      skin: 'standard',
     };
     this.slots[index] = s;
     // Перший вільний клас одразу, щоб можна було просто натиснути «готовий».
@@ -241,6 +247,20 @@ export class LobbyHost {
     if (!s) return;
     s.link?.close();
     this.slots[index] = null;
+    this.markDirty();
+  }
+
+  /** Наступне відкрите забарвлення по колу. */
+  cycleSkin(s: Slot): void {
+    const i = this.skins.indexOf(s.skin);
+    s.skin = this.skins[(i + 1) % this.skins.length] ?? 'standard';
+    this.markDirty();
+  }
+
+  /** Нові відкриття після матчу: розсилка лобі з оновленим списком. */
+  setSkins(skins: string[]): void {
+    this.skins = skins;
+    for (const s of this.slots) if (s && !skins.includes(s.skin)) s.skin = 'standard';
     this.markDirty();
   }
 
@@ -302,6 +322,7 @@ export class LobbyHost {
         ready: s.ready,
         connected: s.kind !== 'phone' || s.link !== null,
         kind: s.kind,
+        skin: s.skin,
       }));
   }
 
@@ -427,7 +448,12 @@ export class LobbyHost {
           this.remove(s.index);
     if (this.dirty) {
       this.dirty = false;
-      const msg = { t: 'lobby' as const, phase: this.phase, slots: this.lobbyInfo() };
+      const msg = {
+        t: 'lobby' as const,
+        phase: this.phase,
+        slots: this.lobbyInfo(),
+        skins: this.skins,
+      };
       for (const s of this.slots) s?.link?.sendReliable(msg);
     }
     if (t - this.lastPing >= PING_EVERY) {

@@ -24,6 +24,14 @@ import { blip, hurt, lockPage, onUserGesture, setPlayerColor } from './feedback'
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const SEND_HZ = 30;
+const SKIN_NAME: Record<string, string> = {
+  standard: 'Стандарт',
+  graphite: 'Графіт',
+  desert: 'Пустеля',
+  arctic: 'Арктика',
+  chrome: 'Хром',
+  gold: 'Золото',
+};
 const AWARD: Record<string, string> = {
   kills: 'Винищувач',
   revives: 'Рятівник',
@@ -79,6 +87,11 @@ function run(room: string): void {
   const classSelect = new ClassSelect($('classes'), (c) => {
     blip(660, 0.06);
     net.send({ t: 'class', classId: c });
+  });
+  // Забарвлення броні — косметика, відкрита досягненнями екіпажу на цьому екрані.
+  $('skin').addEventListener('click', () => {
+    blip(560, 0.06);
+    net.send({ t: 'skin' });
   });
   $('again').addEventListener('click', () => {
     blip(880, 0.08);
@@ -274,6 +287,9 @@ function run(room: string): void {
           ready = me.ready;
           $('ready').classList.toggle('on', ready);
           $('ready').textContent = ready ? 'Готовий ✓' : 'Готовий';
+          const skinBtn = $<HTMLButtonElement>('skin');
+          skinBtn.hidden = m.skins.length < 2;
+          skinBtn.textContent = `${SKIN_NAME[me.skin] ?? me.skin} ▸`;
         }
         classSelect.render(slot, m.slots);
         $('lobby-title').textContent = `Гравець ${slot + 1} · оберіть клас`;

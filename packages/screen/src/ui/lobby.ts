@@ -11,9 +11,10 @@ import {
 import type { LobbyHost } from '../net/lobby';
 import { classColor, hexCss } from '../render/palette';
 import { t } from './i18n';
+import { ACHIEVEMENTS, contractOf, liveStreak, type Progress } from '../meta/progress';
 
 const css = `
-.lobby { position: fixed; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; gap: 6vw;
+.lobby { position: fixed; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; gap: 3vw; padding: 0 2vw;
   background: radial-gradient(ellipse at center, rgba(5,6,10,.35), rgba(5,6,10,.85)); color: #e8ecf4; font-family: 'Inter', system-ui, sans-serif; }
 .lobby .join { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .lobby .title { font-size: 44px; font-weight: 800; letter-spacing: .22em; color: #ffaa22; text-shadow: 0 0 30px rgba(255,90,20,.5); }
@@ -40,6 +41,20 @@ const css = `
 .lobby .settings input[type=range] { flex: 1; accent-color: #ffaa22; }
 .lobby .settings .adv { display: none; flex-direction: column; gap: 6px; }
 .lobby .settings.open .adv { display: flex; }
+.lobby .crew { width: 300px; padding: 14px 16px; border-radius: 12px; background: rgba(10,12,18,.7); display: flex;
+  flex-direction: column; gap: 12px; font-size: 14px; }
+.lobby .crew h3 { margin: 0; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; opacity: .6; }
+.lobby .crew .ct { padding: 10px 12px; border-radius: 10px; background: rgba(255,170,34,.1); border: 1px solid rgba(255,170,34,.35); }
+.lobby .crew .ct.done { background: rgba(125,255,176,.1); border-color: rgba(125,255,176,.45); }
+.lobby .crew .ct b { display: block; font-size: 15px; margin-top: 3px; }
+.lobby .crew .ct span { font-size: 12px; opacity: .7; }
+.lobby .crew .rec { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; }
+.lobby .crew .rec span { opacity: .65; }
+.lobby .crew .rec b { font-variant-numeric: tabular-nums; text-align: right; }
+.lobby .crew .ach { display: flex; flex-wrap: wrap; gap: 5px; }
+.lobby .crew .ach i { font-style: normal; font-size: 11px; padding: 3px 7px; border-radius: 99px; background: rgba(255,255,255,.06);
+  opacity: .4; }
+.lobby .crew .ach i.on { opacity: 1; background: rgba(255,170,34,.2); border: 1px solid rgba(255,170,34,.5); }
 .lobby .start { font-size: 18px; font-weight: 700; color: #7dffb0; min-height: 24px; text-align: center; }
 `;
 
@@ -84,6 +99,7 @@ export class LobbyView {
   private readonly urlEl = document.createElement('div');
   private readonly qr = document.createElement('canvas');
   private readonly settingsEl = document.createElement('div');
+  private readonly crewEl = document.createElement('div');
   settings: SessionSettings = loadSettings();
 
   constructor(private readonly lobby: LobbyHost) {
@@ -111,8 +127,37 @@ export class LobbyView {
     const hint = document.createElement('div');
     hint.className = 'hint';
     hint.textContent = t.lobbyKeysHint;
-    this.root.append(join, right, hint);
+    this.crewEl.className = 'crew';
+    this.root.append(join, right, this.crewEl, hint);
     document.body.appendChild(this.root);
+  }
+
+  /** Панель «Екіпаж»: контракт дня й серія, рекорди, досягнення (DECISIONS.md, п. 48). */
+  setProgress(p: Progress, day: number): void {
+    const c = contractOf(day);
+    const done = p.contractDay === day;
+    const streak = liveStreak(p, day);
+    const r = p.records;
+    const mm = (sec: number) =>
+      sec ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : '—';
+    const got = ACHIEVEMENTS.filter((a) => p.achievements[a.id] !== undefined).length;
+    const chips = ACHIEVEMENTS.map((a) => {
+      const [name, desc] = t.achievement[a.id] ?? [a.id, ''];
+      const on = p.achievements[a.id] !== undefined;
+      const skin = a.skin ? ` · ${t.skinName[a.skin]}` : '';
+      return `<i class="${on ? 'on' : ''}" title="${desc}${skin}">${on ? '' : '🔒 '}${name}</i>`;
+    }).join('');
+    this.crewEl.innerHTML = `<h3>${t.crew}</h3>
+      <div class="ct ${done ? 'done' : ''}"><span>${t.contract}${done ? ` · ${t.contractDone}` : ''}${streak ? ` · ${t.streak(streak)}` : ''}</span><b>${t.contractText[c.id] ?? c.id}</b></div>
+      <div class="rec">
+        <span>${t.recMatches}</span><b>${r.matches}</b>
+        <span>${t.recWins}</span><b>${r.wins}</b>
+        <span>${t.recBestWave}</span><b>${r.bestWave || '—'}</b>
+        <span>${t.recFastest}</span><b>${mm(r.fastestWin)}</b>
+        <span>${t.recBestKills}</span><b>${r.bestKills || '—'}</b>
+      </div>
+      <h3>${t.achievementsOf(got, ACHIEVEMENTS.length)}</h3>
+      <div class="ach">${chips}</div>`;
   }
 
   setRoom(query: string, code: string | null, controllerUrl: string, error = ''): void {
@@ -146,8 +191,9 @@ export class LobbyView {
       const conn =
         s.kind === 'phone' && !s.link ? t.slotLost : s.ready ? t.slotReady : t.slotChoosing;
       const ping = s.kind === 'phone' && !Number.isNaN(s.rtt) ? ` · ${Math.round(s.rtt)} мс` : '';
+      const skin = s.skin !== 'standard' ? ` · ${t.skinName[s.skin] ?? s.skin}` : '';
       parts.push(
-        `<div class="slot on" style="border-color:${color}"><div class="n">P${i + 1} ${kind}</div><div class="c" style="color:${color}">${s.classId ? t.className[s.classId] : '—'}</div><div class="s">${conn}${ping}</div></div>`,
+        `<div class="slot on" style="border-color:${color}"><div class="n">P${i + 1} ${kind}</div><div class="c" style="color:${color}">${s.classId ? t.className[s.classId] : '—'}</div><div class="s">${conn}${ping}${skin}</div></div>`,
       );
     }
     this.slotsEl.innerHTML = parts.join('');
