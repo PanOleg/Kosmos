@@ -349,6 +349,26 @@ function handleMatchEvents(m: Match): void {
 
 let last = performance.now();
 let acc = 0;
+// Автоякість: перші ~2 с міряємо кадр; якщо повільніше за ~45 fps — без bloom/MSAA і з меншою
+// роздільністю. Перші кадри пропускаємо: там компіляція шейдерів.
+let qFrames = 0;
+let qTime = 0;
+function autoQuality(dt: number): void {
+  // ?hifx — завжди повна якість (запис відео, вкладка в фоні на старті).
+  if (qFrames < 0 || params.has('hifx')) return;
+  qFrames++;
+  if (qFrames <= 30) return;
+  qTime += dt;
+  if (qFrames < 150) return;
+  const avg = qTime / (qFrames - 30);
+  qFrames = -1;
+  if (avg > 1 / 45 && post.enabled) {
+    post.disable();
+    renderer.setPixelRatio(1);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    console.info(`[quality] кадр ${(avg * 1000).toFixed(1)} мс — постобробку вимкнено`);
+  }
+}
 let lobbyRenderAt = 0;
 
 function frameLobby(now: number, dt: number): void {
@@ -442,6 +462,7 @@ function frame(now: number): void {
   // Обмеження кадру: після вкладки у фоні не наздоганяємо сотні кроків.
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
+  if (document.visibilityState === 'visible') autoQuality(dt);
   lobby.update();
   if (match) frameMatch(match, now, dt);
   else frameLobby(now, dt);

@@ -42,7 +42,7 @@ const GradeShader = {
 };
 
 export class PostFx {
-  private readonly composer: EffectComposer | null;
+  private composer: EffectComposer | null;
   private readonly bloom: UnrealBloomPass | null = null;
 
   constructor(
@@ -68,6 +68,16 @@ export class PostFx {
     composer.addPass(new OutputPass());
     composer.addPass(new ShaderPass(GradeShader));
     this.composer = composer;
+  }
+
+  /** Вимикає постобробку назавжди (автоякість на слабкій графіці). */
+  disable(): void {
+    this.composer?.dispose();
+    this.composer = null;
+  }
+
+  get enabled(): boolean {
+    return this.composer !== null;
   }
 
   render(): void {
