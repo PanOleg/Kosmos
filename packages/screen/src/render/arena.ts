@@ -256,10 +256,12 @@ export function buildArena(map: MapDef): ArenaView {
   for (let s = 0; s < 4; s++) {
     const a = Math.PI / 2 - (s * Math.PI) / 2;
     const color = sectorLight[s]!;
-    const l = new THREE.PointLight(color, 70, 30, 1.5);
-    l.position.set(Math.cos(a) * (R - 9), 5, -Math.sin(a) * (R - 9));
+    // На висоті 8 м: нижче верхівки кущів і контейнерів підходять надто близько й пересвічуються.
+    const base = s === 2 ? 45 : 70;
+    const l = new THREE.PointLight(color, base, 34, 1.4);
+    l.position.set(Math.cos(a) * (R - 9), 8, -Math.sin(a) * (R - 9));
     g.add(l);
-    flick.push({ light: l, base: 70, phase: s * 1.7 + 0.3 });
+    flick.push({ light: l, base, phase: s * 1.7 + 0.3 });
   }
 
   // Червоні аварійні лампи по периметру стіни (лише емісив, без джерел світла) і жовті
@@ -321,7 +323,8 @@ export function buildArena(map: MapDef): ArenaView {
 
   // Сотні деталей реквізиту → десятки draw call. Мерехтливі лампи лишаються окремими:
   // їхні матеріали спільні, тож злиття не заважає анімації емісиву.
-  batchStatic(g);
+  // ?nobatch — без злиття, для налагодження вигляду окремих деталей.
+  if (!new URLSearchParams(location.search).has('nobatch')) batchStatic(g);
 
   return {
     group: g,
@@ -548,7 +551,9 @@ const leafGeo = new THREE.IcosahedronGeometry(1, 0);
 function plant(size: number, seed: number): THREE.Object3D {
   const g = new THREE.Group();
   for (let k = 0; k < 3; k++) {
-    const m = new THREE.Mesh(leafGeo, plantMats[(seed + k) % plantMats.length]!);
+    // Сід буває від'ємним (південь арени), а остача в JS — теж: нормалізуємо індекс.
+    const n = plantMats.length;
+    const m = new THREE.Mesh(leafGeo, plantMats[(((seed + k) % n) + n) % n]!);
     const a = seed * 2.4 + k * 2.1;
     m.position.set(Math.cos(a) * size * 0.4, size * (0.5 + k * 0.25), Math.sin(a) * size * 0.4);
     m.scale.set(size * 0.6, size * 0.8, size * 0.6);
