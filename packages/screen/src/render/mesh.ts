@@ -78,3 +78,60 @@ export function seg(
   );
   return { geo, color, m };
 }
+
+/**
+ * Статичне пакетування: усі непрозорі нерухомі меші групи з однаковим матеріалом зливаються
+ * в один (світові матриці запікаються в геометрію). Сотні дрібних деталей реквізиту → десятки
+ * draw call. Прозорі, анімовані (userData.dynamic) й багатоматеріальні меші лишаються як є.
+ */
+export function batchStatic(root: THREE.Object3D): void {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  const groups = new Map<
+    THREE.Material,
+    { geos: THREE.BufferGeometry[]; cast: boolean; recv: boolean }
+  >();
+  const remove: THREE.Mesh[] = [];
+  root.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (
+      !m.isMesh ||
+      Array.isArray(m.material) ||
+      (m as unknown as THREE.InstancedMesh).isInstancedMesh
+    )
+      return;
+    const mat = m.material;
+    if (mat.transparent || m.userData.dynamic) return;
+    let skip = false;
+    for (let p = m.parent; p && p !== root; p = p.parent) if (p.userData.dynamic) skip = true;
+    if (skip) return;
+    let g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+    g = g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld));
+    // Набір атрибутів має збігатися для злиття: лишаємо позицію, нормаль і UV.
+    for (const name of Object.keys(g.attributes))
+      if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
+    if (!g.getAttribute('uv'))
+      g.setAttribute(
+        'uv',
+        new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').count * 2), 2),
+      );
+    let entry = groups.get(mat);
+    if (!entry) {
+      entry = { geos: [], cast: false, recv: false };
+      groups.set(mat, entry);
+    }
+    entry.geos.push(g);
+    entry.cast ||= m.castShadow;
+    entry.recv ||= m.receiveShadow;
+    remove.push(m);
+  });
+  for (const m of remove) m.parent?.remove(m);
+  for (const [mat, e] of groups) {
+    const merged = mergeGeometries(e.geos);
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, mat);
+    mesh.castShadow = e.cast;
+    mesh.receiveShadow = e.recv;
+    root.add(mesh);
+  }
+}

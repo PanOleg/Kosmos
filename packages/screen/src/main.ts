@@ -6,6 +6,7 @@ import {
   spawnEnemy,
   botInput,
   DT,
+  type ClassId,
   type Game,
   type PlayerInput,
 } from '@horizon/sim';
@@ -61,6 +62,8 @@ container.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(PALETTE.bg);
+// Легкий серпанок: далеке темнішає, як у задимленій станції на макеті.
+scene.fog = new THREE.FogExp2(0x0a0507, 0.007);
 // Слабке оточення для металу: без нього металеві плити й броня виходять майже чорними.
 // Генерується раз (PMREM), у кадрі нічого не коштує.
 {
@@ -174,6 +177,7 @@ interface Match {
   camPoints: { x: number; z: number }[];
   results: HTMLDivElement | null;
   botAnnounced: boolean[];
+  classes: ClassId[];
 }
 
 let match: Match | null = null;
@@ -217,6 +221,7 @@ function startMatch(): void {
     camPoints: game.state.players.map(() => ({ x: 0, z: 0 })),
     results: null,
     botAnnounced: order.map(() => false),
+    classes: game.state.players.map((p) => p.classId),
   };
   lobbyView.show(false);
   if (DEBUG) (window as unknown as { game: Game }).game = game;
@@ -414,7 +419,7 @@ function frameMatch(m: Match, now: number, dt: number): void {
     }
   }
   m.enemyR.update(g.state.enemies, ps, alpha, dt, time);
-  m.bulletR.update(g.state.projectiles, alpha);
+  m.bulletR.update(g.state.projectiles, alpha, m.classes);
   m.pickupR.update(g.state.pickups, alpha, time);
   m.fx.update(g, dt);
   cam.update(m.camPoints, live, dt, time);

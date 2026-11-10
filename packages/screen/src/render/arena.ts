@@ -2,6 +2,17 @@ import * as THREE from 'three';
 import type { MapDef, Obstacle } from '@horizon/sim';
 import { PALETTE } from './palette';
 import { toX, toZ } from './coords';
+import { batchStatic } from './mesh';
+import {
+  airlockDoor,
+  containerSide,
+  floorTiles,
+  floorWetness,
+  hazardStripe,
+  reactorBands,
+  screenTexture,
+  wallPanels,
+} from './textures';
 
 export interface ArenaView {
   group: THREE.Group;
@@ -24,7 +35,11 @@ export function buildArena(map: MapDef): ArenaView {
   const flick: FlickerLight[] = [];
 
   // Підлога: металеві плити 2×2 м з швами (як на концепті hud.jpg), чотири сектори різного відтінку.
-  const tiles = floorTiles(R);
+  const tiles = floorTiles();
+  // UV кола покривають діаметр: R повторів = плита 2 м.
+  tiles.repeat.set(R, R);
+  // Калюжі на всю арену: темне в карті = гладке, там відбиваються лампи.
+  const wet = floorWetness();
   const sectorColors = [PALETTE.floor, PALETTE.floorLab, PALETTE.floorGreen, PALETTE.floorDeck];
   for (let s = 0; s < 4; s++) {
     // Сектор s центрований на куті π/2 − s·π/2 (північ, схід, південь, захід).
@@ -36,8 +51,9 @@ export function buildArena(map: MapDef): ArenaView {
       new THREE.MeshStandardMaterial({
         color: sectorColors[s],
         map: tiles,
-        roughness: 0.45,
-        metalness: 0.45,
+        roughnessMap: wet,
+        roughness: 1,
+        metalness: 0.5,
       }),
     );
     m.receiveShadow = true;
@@ -48,8 +64,9 @@ export function buildArena(map: MapDef): ArenaView {
     new THREE.MeshStandardMaterial({
       color: PALETTE.floorCenter,
       map: tiles,
-      roughness: 0.38,
-      metalness: 0.5,
+      roughnessMap: wet,
+      roughness: 0.9,
+      metalness: 0.55,
     }),
   );
   center.position.y = 0.005;
@@ -75,7 +92,7 @@ export function buildArena(map: MapDef): ArenaView {
     new THREE.MeshBasicMaterial({
       color: PALETTE.emergencyAmber,
       transparent: true,
-      opacity: 0.18,
+      opacity: 0.1,
     }),
   );
   hazard.position.y = 0.012;
@@ -99,9 +116,10 @@ export function buildArena(map: MapDef): ArenaView {
   // Зовнішня стіна сегментами; на заході — низька рама ілюмінатора.
   const segs = 48;
   const wallMat = new THREE.MeshStandardMaterial({
-    color: PALETTE.wall,
-    roughness: 0.8,
-    metalness: 0.3,
+    color: 0x6a6e78,
+    map: wallPanels(),
+    roughness: 0.6,
+    metalness: 0.45,
   });
   const frameMat = new THREE.MeshStandardMaterial({
     color: 0x5a6070,
@@ -145,40 +163,56 @@ export function buildArena(map: MapDef): ArenaView {
   const stars = makeStars();
   g.add(stars);
   const planet = makePlanet();
+  planet.userData.dynamic = true;
   planet.position.set(-R - 55, -70, 0);
   g.add(planet);
 
   // Перешкоди.
   for (const o of map.obstacles) g.add(makeObstacle(o));
 
-  // Шлюзи й вентиляційні люки.
+  // Шлюзи: двері з маркуванням і написом, червоні лампи обабіч, смуга небезпеки на підлозі.
+  const lockNames = ['ШЛЮЗ ПН', 'ШЛЮЗ СХ', 'ШЛЮЗ ПД', 'ШЛЮЗ ЗХ'];
+  const stripeTex = hazardStripe();
+  const lockLampMat = new THREE.MeshStandardMaterial({
+    color: PALETTE.emergencyRed,
+    emissive: PALETTE.emergencyRed,
+    emissiveIntensity: 2.4,
+  });
   for (const a of map.airlocks) {
-    const door = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 2.4, 0.4),
-      new THREE.MeshStandardMaterial({
-        color: 0x2c2f36,
-        emissive: PALETTE.emergencyAmber,
-        emissiveIntensity: 0.08,
-        metalness: 0.6,
-        roughness: 0.4,
-      }),
-    );
     const ang = Math.atan2(a.y, a.x);
-    door.position.set(toX(a.x) * 1.05, 1.2, toZ(a.y) * 1.05);
-    door.rotation.y = ang + Math.PI / 2;
-    g.add(door);
+    const grp = new THREE.Group();
+    const doorMat = new THREE.MeshStandardMaterial({
+      map: airlockDoor(lockNames[a.sector] ?? 'ШЛЮЗ'),
+      metalness: 0.5,
+      roughness: 0.5,
+    });
+    const door = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.6, 0.3), [
+      wallMat,
+      wallMat,
+      wallMat,
+      wallMat,
+      doorMat,
+      wallMat,
+    ]);
+    door.position.y = 1.3;
+    grp.add(door);
+    for (const side of [-1, 1]) {
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.4, 0.2), lockLampMat);
+      lamp.position.set(side * 2.5, 1.4, 0.12);
+      grp.add(lamp);
+    }
     const stripe = new THREE.Mesh(
-      new THREE.PlaneGeometry(4, 0.8).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({
-        color: PALETTE.emergencyAmber,
-        transparent: true,
-        opacity: 0.35,
-      }),
+      new THREE.PlaneGeometry(4.4, 0.9).rotateX(-Math.PI / 2),
+      new THREE.MeshStandardMaterial({ map: stripeTex, roughness: 0.7 }),
     );
-    stripe.position.set(toX(a.x) * 0.98, 0.015, toZ(a.y) * 0.98);
-    stripe.rotation.y = ang + Math.PI / 2;
-    g.add(stripe);
+    stripe.position.set(0, 0.015, 0.9);
+    grp.add(stripe);
+    // Двері на стіні, лицем до центру арени.
+    grp.position.set(toX(Math.cos(ang) * (R + 0.05)), 0, toZ(Math.sin(ang) * (R + 0.05)));
+    grp.rotation.y = Math.atan2(-toX(Math.cos(ang)), -toZ(Math.sin(ang)));
+    g.add(grp);
   }
+  flick.push({ base: 0, phase: 4.1, emissive: lockLampMat });
   for (const v of map.vents) {
     const vent = new THREE.Mesh(
       new THREE.RingGeometry(0.9, 1.3, 6).rotateX(-Math.PI / 2),
@@ -214,7 +248,7 @@ export function buildArena(map: MapDef): ArenaView {
   // Світло секторів за картою-концептом: вантажний — червоне аварійне, лабораторія — холодне
   // блакитне, оранжерея — тепле жовте, палуба — червоне аварійне. По одному джерелу на сектор.
   const sectorLight = [
-    PALETTE.emergencyAmber,
+    PALETTE.emergencyRed,
     PALETTE.labLight,
     PALETTE.workLight,
     PALETTE.emergencyRed,
@@ -285,6 +319,10 @@ export function buildArena(map: MapDef): ArenaView {
     g.add(grp);
   }
 
+  // Сотні деталей реквізиту → десятки draw call. Мерехтливі лампи лишаються окремими:
+  // їхні матеріали спільні, тож злиття не заважає анімації емісиву.
+  batchStatic(g);
+
   return {
     group: g,
     update(time: number) {
@@ -307,91 +345,241 @@ function angleIn(a: number, start: number, length: number): boolean {
 }
 
 const containerGeo = new THREE.BoxGeometry(1, 1, 1);
+const containerTex = new Map<string, THREE.Texture>();
+let containerSeq = 0;
+const screenRed = screenTexture('#ff5a3a');
+const screenBlue = screenTexture('#7cc8ff');
+const darkMetal = new THREE.MeshStandardMaterial({
+  color: 0x2a2d33,
+  metalness: 0.6,
+  roughness: 0.45,
+});
+const trimMat = new THREE.MeshStandardMaterial({ color: 0xd0a020, metalness: 0.4, roughness: 0.5 });
+const tableTop = new THREE.MeshStandardMaterial({
+  color: 0x8a909c,
+  metalness: 0.7,
+  roughness: 0.3,
+});
+const planterMat = new THREE.MeshStandardMaterial({ color: PALETTE.planter, roughness: 0.9 });
+const dividerMat = new THREE.MeshStandardMaterial({
+  color: 0x5a5e68,
+  map: wallPanels(),
+  roughness: 0.6,
+  metalness: 0.45,
+});
+const dividerLight = new THREE.MeshStandardMaterial({
+  color: PALETTE.emergencyRed,
+  emissive: PALETTE.emergencyRed,
+  emissiveIntensity: 1.8,
+});
 
-function makeObstacle(o: Obstacle): THREE.Object3D {
-  if (o.kind === 'circle') {
-    if (o.tag === 'core') return makeCore(o.r, o.height);
-    // Клумба: бетонна чаша + кущ (кущ вищий за укриття — частково ховає ворогів).
-    const grp = new THREE.Group();
-    const pot = new THREE.Mesh(
-      new THREE.CylinderGeometry(o.r, o.r * 1.05, o.height * 0.6, 20),
-      new THREE.MeshStandardMaterial({ color: PALETTE.planter, roughness: 0.9 }),
-    );
-    pot.position.y = o.height * 0.3;
-    pot.castShadow = pot.receiveShadow = true;
-    grp.add(pot);
-    const bush = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(o.r * 1.25, 0),
-      new THREE.MeshStandardMaterial({ color: PALETTE.plant, roughness: 0.8, flatShading: true }),
-    );
-    bush.position.y = o.height * 0.6 + o.r * 0.5;
-    bush.scale.y = 0.75;
-    bush.castShadow = true;
-    grp.add(bush);
-    grp.position.set(toX(o.x), 0, toZ(o.y));
-    return grp;
-  }
-
-  let mat: THREE.Material;
-  switch (o.tag) {
-    case 'container': {
-      const idx = Math.abs(Math.round(o.x * 7 + o.y * 3)) % PALETTE.container.length;
-      mat = new THREE.MeshStandardMaterial({
-        color: PALETTE.container[idx],
-        roughness: 0.7,
-        metalness: 0.4,
-      });
-      break;
-    }
-    case 'glass':
-      mat = new THREE.MeshStandardMaterial({
-        color: PALETTE.glass,
-        transparent: true,
-        opacity: 0.25,
-        roughness: 0.1,
-        metalness: 0.1,
-        emissive: PALETTE.glass,
-        emissiveIntensity: 0.15,
-      });
-      break;
-    case 'table':
-      mat = new THREE.MeshStandardMaterial({
-        color: PALETTE.table,
-        roughness: 0.5,
-        metalness: 0.6,
-      });
-      break;
-    case 'planter':
-      mat = new THREE.MeshStandardMaterial({ color: PALETTE.planter, roughness: 0.9 });
-      break;
-    case 'divider':
-      mat = new THREE.MeshStandardMaterial({ color: PALETTE.wall, roughness: 0.8, metalness: 0.3 });
-      break;
-    default:
-      mat = new THREE.MeshStandardMaterial({
-        color: PALETTE.console,
-        emissive: 0x3366aa,
-        emissiveIntensity: 0.25,
-      });
-  }
-  const m = new THREE.Mesh(containerGeo, mat);
-  m.scale.set(o.hw * 2, o.height, o.hh * 2);
-  m.position.set(toX(o.x), o.height / 2, toZ(o.y));
-  m.rotation.y = o.rot;
-  m.castShadow = o.tag !== 'glass';
-  m.receiveShadow = true;
-  if (o.tag === 'container') {
-    // Ребра контейнера — силует читається без текстур.
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(containerGeo),
-      new THREE.LineBasicMaterial({ color: 0x1a1d22 }),
-    );
-    m.add(edges);
+const screenMats = new Map<THREE.Texture, THREE.MeshStandardMaterial>();
+/** Матеріал екрана кешується за текстурою: однакові матеріали зливаються в один draw call. */
+function screenMat(tex: THREE.Texture): THREE.MeshStandardMaterial {
+  let m = screenMats.get(tex);
+  if (!m) {
+    m = new THREE.MeshStandardMaterial({
+      color: 0x000000,
+      emissive: 0xffffff,
+      emissiveMap: tex,
+      emissiveIntensity: 1.3,
+    });
+    screenMats.set(tex, m);
   }
   return m;
 }
 
+function makeObstacle(o: Obstacle): THREE.Object3D {
+  if (o.kind === 'circle') {
+    if (o.tag === 'core') return makeCore(o.r, o.height);
+    return makePlanter(o.x, o.y, o.r, o.height);
+  }
+  const grp = new THREE.Group();
+  grp.position.set(toX(o.x), 0, toZ(o.y));
+  grp.rotation.y = o.rot;
+  const w = o.hw * 2;
+  const d = o.hh * 2;
+  const box = (
+    mat: THREE.Material,
+    sx: number,
+    sy: number,
+    sz: number,
+    x = 0,
+    y = sy / 2,
+    z = 0,
+  ) => {
+    const m = new THREE.Mesh(containerGeo, mat);
+    m.scale.set(sx, sy, sz);
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    grp.add(m);
+    return m;
+  };
+
+  switch (o.tag) {
+    case 'container': {
+      // Гофрований контейнер із номером і жовтими кутниками (концепти map.jpg і hud.jpg).
+      const label = `B-${String(++containerSeq).padStart(2, '0')}`;
+      let tex = containerTex.get(label);
+      if (!tex) {
+        tex = containerSide(label);
+        containerTex.set(label, tex);
+      }
+      const idx = Math.abs(Math.round(o.x * 7 + o.y * 3)) % PALETTE.container.length;
+      box(
+        new THREE.MeshStandardMaterial({
+          color: PALETTE.container[idx],
+          map: tex,
+          roughness: 0.6,
+          metalness: 0.45,
+        }),
+        w,
+        o.height,
+        d,
+      );
+      for (const sx of [-1, 1])
+        for (const sz of [-1, 1])
+          box(
+            trimMat,
+            0.12,
+            o.height + 0.02,
+            0.12,
+            (sx * w) / 2,
+            (o.height + 0.02) / 2,
+            (sz * d) / 2,
+          );
+      break;
+    }
+    case 'glass': {
+      box(
+        new THREE.MeshStandardMaterial({
+          color: PALETTE.glass,
+          transparent: true,
+          opacity: 0.18,
+          roughness: 0.05,
+          metalness: 0.2,
+          emissive: PALETTE.glass,
+          emissiveIntensity: 0.12,
+          depthWrite: false,
+        }),
+        w,
+        o.height,
+        d,
+      ).castShadow = false;
+      // Металева рама скла: зверху й по краях.
+      const long = w > d;
+      box(darkMetal, long ? w : 0.12, 0.1, long ? 0.12 : d, 0, o.height, 0);
+      for (const e of [-1, 1])
+        box(
+          darkMetal,
+          0.12,
+          o.height,
+          0.12,
+          long ? (e * w) / 2 : 0,
+          o.height / 2,
+          long ? 0 : (e * d) / 2,
+        );
+      break;
+    }
+    case 'table': {
+      // Лабораторний стіл: стільниця на тумбі й монітори з холодним світлом.
+      box(darkMetal, w * 0.9, o.height - 0.08, d * 0.8);
+      box(tableTop, w, 0.08, d, 0, o.height - 0.04, 0);
+      const n = Math.max(1, Math.round(Math.max(w, d) / 1.2));
+      for (let i = 0; i < n; i++) {
+        const t = (i + 0.5) / n - 0.5;
+        const scr = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.36, 0.04), [
+          darkMetal,
+          darkMetal,
+          darkMetal,
+          darkMetal,
+          screenMat(screenBlue),
+          darkMetal,
+        ]);
+        scr.position.set(w > d ? t * w : 0, o.height + 0.22, w > d ? -d * 0.25 : t * d);
+        if (w <= d) scr.rotation.y = Math.PI / 2;
+        grp.add(scr);
+      }
+      break;
+    }
+    case 'planter': {
+      // Довга грядка з рядом рослин.
+      box(planterMat, w, o.height * 0.7, d);
+      const n = Math.max(2, Math.round(Math.max(w, d) / 0.7));
+      for (let i = 0; i < n; i++) {
+        const t = (i + 0.5) / n - 0.5;
+        const p = plant(0.35 + (i % 3) * 0.06, i);
+        p.position.set(w > d ? t * w : 0, o.height * 0.7, w > d ? 0 : t * d);
+        grp.add(p);
+      }
+      break;
+    }
+    case 'divider': {
+      box(dividerMat, w, o.height, d);
+      // Червона світна смуга по верху перегородки — ритм аварійного світла.
+      box(dividerLight, w * 0.9, 0.06, d + 0.04, 0, o.height + 0.03, 0);
+      break;
+    }
+    default: {
+      // Пульт реакторної зали: корпус і нахилений екран аварійного кольору.
+      box(darkMetal, w, o.height * 0.8, d);
+      const scr = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, 0.04, d * 0.7), [
+        darkMetal,
+        darkMetal,
+        screenMat(screenRed),
+        darkMetal,
+        darkMetal,
+        darkMetal,
+      ]);
+      scr.position.set(0, o.height * 0.85, 0);
+      scr.rotation.x = -0.5;
+      grp.add(scr);
+    }
+  }
+  return grp;
+}
+
+const plantMats = [0x3f8a3c, 0x4f9a4a, 0x2f7034, 0x5aa850].map(
+  (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8, flatShading: true }),
+);
+const leafGeo = new THREE.IcosahedronGeometry(1, 0);
+
+function plant(size: number, seed: number): THREE.Object3D {
+  const g = new THREE.Group();
+  for (let k = 0; k < 3; k++) {
+    const m = new THREE.Mesh(leafGeo, plantMats[(seed + k) % plantMats.length]!);
+    const a = seed * 2.4 + k * 2.1;
+    m.position.set(Math.cos(a) * size * 0.4, size * (0.5 + k * 0.25), Math.sin(a) * size * 0.4);
+    m.scale.set(size * 0.6, size * 0.8, size * 0.6);
+    m.rotation.set(a, a * 0.7, 0);
+    m.castShadow = true;
+    g.add(m);
+  }
+  return g;
+}
+
+function makePlanter(x: number, y: number, r: number, h: number): THREE.Object3D {
+  // Клумба: бетонна чаша й густий кущ із кількох куп листя різних відтінків.
+  const grp = new THREE.Group();
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.05, h * 0.6, 20), planterMat);
+  pot.position.y = h * 0.3;
+  pot.castShadow = pot.receiveShadow = true;
+  grp.add(pot);
+  const n = 5 + Math.round(r * 3);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + x;
+    const rr = i === 0 ? 0 : r * 0.55;
+    const p = plant(r * (i === 0 ? 1.1 : 0.7), i + Math.round(y));
+    p.position.set(Math.cos(a) * rr, h * 0.6, Math.sin(a) * rr);
+    grp.add(p);
+  }
+  grp.position.set(toX(x), 0, toZ(y));
+  return grp;
+}
+
 function makeCore(r: number, h: number): THREE.Object3D {
+  // Реактор: колона зі смугами енергії (не суцільна пляма під bloom), клітка зі стійок і кілець.
   const g = new THREE.Group();
   const base = new THREE.Mesh(
     new THREE.CylinderGeometry(r, r * 1.15, 0.8, 32),
@@ -400,25 +588,48 @@ function makeCore(r: number, h: number): THREE.Object3D {
   base.position.y = 0.4;
   base.receiveShadow = base.castShadow = true;
   g.add(base);
+  const bands = reactorBands();
+  bands.repeat.set(1, 2);
   const column = new THREE.Mesh(
-    new THREE.CylinderGeometry(r * 0.55, r * 0.55, h, 24),
+    new THREE.CylinderGeometry(r * 0.55, r * 0.55, h, 24, 1, true),
     new THREE.MeshStandardMaterial({
-      color: PALETTE.core,
-      emissive: PALETTE.core,
-      emissiveIntensity: 0.9,
+      color: 0x200404,
+      emissive: 0xffffff,
+      emissiveMap: bands,
+      emissiveIntensity: 1.6,
     }),
   );
   column.position.y = h / 2;
   g.add(column);
+  const metal = new THREE.MeshStandardMaterial({ color: 0x6a6e78, metalness: 0.8, roughness: 0.3 });
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.18, h + 0.6, 0.18), metal);
+    strut.position.set(Math.cos(a) * r * 0.72, (h + 0.6) / 2, Math.sin(a) * r * 0.72);
+    strut.castShadow = true;
+    g.add(strut);
+  }
   for (let i = 0; i < 3; i++) {
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(r * 0.8, 0.12, 8, 32),
-      new THREE.MeshStandardMaterial({ color: 0x6a6e78, metalness: 0.8, roughness: 0.3 }),
-    );
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(r * 0.75, 0.1, 8, 32), metal);
     ring.rotation.x = Math.PI / 2;
-    ring.position.y = 1.2 + i * 1.1;
+    ring.position.y = 1.2 + i * 1.2;
     g.add(ring);
   }
+  // Верхнє кільце замість суцільної кришки: згори видно світло колони.
+  const cap = new THREE.Mesh(new THREE.TorusGeometry(r * 0.72, 0.16, 8, 32), metal);
+  cap.rotation.x = Math.PI / 2;
+  cap.position.y = h + 0.6;
+  g.add(cap);
+  // Смуга небезпеки навколо основи.
+  const stripeTex = hazardStripe();
+  stripeTex.wrapS = THREE.RepeatWrapping;
+  stripeTex.repeat.set(8, 1);
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(r * 1.2, r * 1.45, 48).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({ map: stripeTex, roughness: 0.7 }),
+  );
+  ring.position.y = 0.02;
+  g.add(ring);
   return g;
 }
 
@@ -485,42 +696,4 @@ function makePlanet(): THREE.Object3D {
   );
   g.add(atmo);
   return g;
-}
-
-/** Процедурна текстура плит: шви, болти й легкі плями — підлога читається як метал без ассетів. */
-function floorTiles(radius: number): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = c.height = 256;
-  const x = c.getContext('2d')!;
-  x.fillStyle = '#b8b8b8';
-  x.fillRect(0, 0, 256, 256);
-  // Легка неоднорідність всередині плити.
-  for (let i = 0; i < 60; i++) {
-    x.fillStyle = `rgba(${i % 2 ? 255 : 0},${i % 2 ? 255 : 0},${i % 2 ? 255 : 0},0.035)`;
-    x.fillRect((i * 97) % 256, (i * 53) % 256, 40 + (i % 5) * 12, 30 + (i % 7) * 10);
-  }
-  x.strokeStyle = '#5a5a5a';
-  x.lineWidth = 6;
-  x.strokeRect(0, 0, 256, 256);
-  x.strokeStyle = '#d8d8d8';
-  x.lineWidth = 2;
-  x.strokeRect(5, 5, 246, 246);
-  x.fillStyle = '#6a6a6a';
-  for (const [bx, by] of [
-    [18, 18],
-    [238, 18],
-    [18, 238],
-    [238, 238],
-  ] as const) {
-    x.beginPath();
-    x.arc(bx, by, 5, 0, Math.PI * 2);
-    x.fill();
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  // UV кола покривають діаметр: плита 2 м.
-  tex.repeat.set(radius, radius);
-  tex.anisotropy = 4;
-  return tex;
 }
