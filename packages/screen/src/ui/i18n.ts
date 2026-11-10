@@ -18,6 +18,13 @@ const uk = {
   waveStartsIn: (s: number) => `до хвилі ${s} с`,
   enemiesLeft: (n: number) => `ворогів: ${n}`,
   untilWave: 'до хвилі',
+  shopTitle: (s: number) => `Покращення · ${s} с до хвилі`,
+  shopHint: 'Телефон — кнопки праворуч · клавіатура — 1–4',
+  medkit: 'Аптечка',
+  upgradeName: { weapon: 'Зброя', armor: 'Броня', ability: 'Здібність' } as Record<
+    'weapon' | 'armor' | 'ability',
+    string
+  >,
   enemiesWord: 'ворогів',
   stationSignal: 'Сигнал станції',
   waveCleared: 'Хвилю відбито',

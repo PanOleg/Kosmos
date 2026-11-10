@@ -28,3 +28,4 @@ export * from './difficulty';
 export * from './enemies';
 export * from './map';
 export * from './waves';
+export * from './upgrades';

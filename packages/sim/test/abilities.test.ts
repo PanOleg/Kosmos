@@ -11,8 +11,8 @@ import {
 } from '../src/index';
 import { spawnProjectile } from '../src/systems/combat';
 
-const idle = (): PlayerInput => ({ move: { x: 0, y: 0 }, ability: false, dash: false });
-const press = (): PlayerInput => ({ move: { x: 0, y: 0 }, ability: true, dash: false });
+const idle = (): PlayerInput => ({ move: { x: 0, y: 0 }, ability: false, dash: false, buy: 0 });
+const press = (): PlayerInput => ({ move: { x: 0, y: 0 }, ability: true, dash: false, buy: 0 });
 
 /** Матч без хвиль: лише те, що ставить тест. */
 function setup(classId: ClassId, x = -18, y = 0): Game {

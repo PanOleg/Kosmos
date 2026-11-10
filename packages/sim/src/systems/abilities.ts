@@ -6,6 +6,8 @@ import { emit } from '../events';
 import { TICKS_PER_SEC, secToTicks } from '../math';
 import type { Game } from '../state';
 import { SCOUT_CHASE, SCOUT_WINDUP } from '../ai/scout';
+import { UPGRADES } from '../config/upgrades';
+import { abilityBoosted, abilityCooldownTicks } from './upgrades';
 
 /** Індекс класу в подіях: рендер вибирає ефект за ним. */
 export const ABILITY_CLASS_INDEX = { assault: 0, engineer: 1, medic: 2, tech: 3 } as const;
@@ -13,8 +15,8 @@ export const ABILITY_CLASS_INDEX = { assault: 0, engineer: 1, medic: 2, tech: 3 
 /** 0..1: частка готовності здібності; 1 — можна тиснути. Для кільця на пульті й у HUD. */
 export function abilityReadiness(game: Game, p: Player): number {
   if (p.abilityT > 0 || p.overheatT > 0) return 0;
-  const total = secToTicks(game.config.classes[p.classId].abilityCooldown);
-  return total > 0 ? 1 - p.abilityCd / total : 1;
+  const total = abilityCooldownTicks(game, p);
+  return total > 0 ? Math.max(0, 1 - p.abilityCd / total) : 1;
 }
 
 export function updateAbilities(game: Game): void {
@@ -31,7 +33,7 @@ export function updateAbilities(game: Game): void {
       continue;
     // Перезарядка рахується від натискання; для тривалих здібностей — включно з дією,
     // як у BALANCE (15 с у Штурмовика охоплюють 5 с перевантаження й 2 с перегріву).
-    p.abilityCd = secToTicks(game.config.classes[p.classId].abilityCooldown);
+    p.abilityCd = abilityCooldownTicks(game, p);
     activate(game, p);
   }
   updateBarriers(game);
@@ -39,10 +41,32 @@ export function updateAbilities(game: Game): void {
 
 function activate(game: Game, p: Player): void {
   const s = game.state;
-  emit(game.events, 'ability', p.x, p.y, p.fx, p.fy, p.slot, ABILITY_CLASS_INDEX[p.classId]);
+  const boost = abilityBoosted(p);
+  // value — ефективний радіус/довжина для рендеру (з урахуванням посилення).
+  const fxSize =
+    p.classId === 'tech'
+      ? boost
+        ? UPGRADES.abilityBoost.empRadius
+        : ABILITIES.emp.radius
+      : p.classId === 'engineer' && boost
+        ? UPGRADES.abilityBoost.barrierLength
+        : 0;
+  emit(
+    game.events,
+    'ability',
+    p.x,
+    p.y,
+    p.fx,
+    p.fy,
+    p.slot,
+    ABILITY_CLASS_INDEX[p.classId],
+    fxSize,
+  );
   switch (p.classId) {
     case 'assault':
-      p.abilityT = secToTicks(ABILITIES.overload.duration);
+      p.abilityT = secToTicks(
+        boost ? UPGRADES.abilityBoost.overloadDuration : ABILITIES.overload.duration,
+      );
       break;
     case 'medic':
       p.abilityT = secToTicks(ABILITIES.healField.duration);
@@ -62,15 +86,16 @@ function activate(game: Game, p: Player): void {
       b.y = cy;
       b.ux = -p.fy;
       b.uy = p.fx;
-      b.halfLen = cfg.length / 2;
+      b.halfLen = (boost ? UPGRADES.abilityBoost.barrierLength : cfg.length) / 2;
       b.halfThick = cfg.thickness / 2;
-      b.hp = b.maxHp = cfg.hp;
+      b.hp = b.maxHp = boost ? UPGRADES.abilityBoost.barrierHp : cfg.hp;
       b.life = secToTicks(cfg.duration);
       break;
     }
     case 'tech': {
       const cfg = ABILITIES.emp;
-      const r2 = cfg.radius * cfg.radius;
+      const radius = boost ? UPGRADES.abilityBoost.empRadius : cfg.radius;
+      const r2 = radius * radius;
       const stun = secToTicks(cfg.stun);
       for (const e of s.enemies) {
         if (!e.alive) continue;
@@ -88,7 +113,8 @@ function tickActive(game: Game, p: Player): void {
   if (p.classId !== 'medic' || p.down) return;
   const cfg = ABILITIES.healField;
   const r2 = cfg.radius * cfg.radius;
-  const amount = cfg.perSecond / TICKS_PER_SEC;
+  const amount =
+    (abilityBoosted(p) ? UPGRADES.abilityBoost.healPerSecond : cfg.perSecond) / TICKS_PER_SEC;
   // Поле рухається разом із Медиком і лікує всіх живих поруч, включно з ним самим.
   for (const o of game.state.players) {
     if (o.down || o.hp >= o.maxHp) continue;

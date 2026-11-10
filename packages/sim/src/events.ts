@@ -14,6 +14,8 @@ export type GameEventType =
   | 'impact'
   | 'playerHit'
   | 'pickup'
+  | 'purchase'
+  | 'purchaseFail'
   | 'ability'
   | 'abilityEnd'
   | 'arc'

@@ -344,6 +344,93 @@
       #ring {
         stroke: var(--accent);
       }
+      /* Магазин між хвилями: права половина — три великі кнопки (PROMPT, «Інтерфейс»). */
+      .shop {
+        width: 100%;
+        height: 100%;
+        padding: 56px 18px 18px 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .shop[hidden] {
+        display: none;
+      }
+      .shop-head {
+        font-size: 13px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        opacity: 0.75;
+      }
+      .buy {
+        flex: 1;
+        display: grid;
+        grid-template-columns: auto 1fr auto auto;
+        align-items: center;
+        gap: 12px;
+        padding: 0 18px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.14);
+        font-size: 19px;
+        font-weight: 700;
+        text-align: left;
+        transition:
+          transform 0.08s,
+          background 0.15s;
+      }
+      .buy .bi {
+        font-size: 26px;
+        color: var(--accent);
+      }
+      .buy .bp {
+        font-variant-numeric: tabular-nums;
+        color: #9ff4ff;
+      }
+      .buy .pips {
+        display: flex;
+        gap: 5px;
+      }
+      .buy .pips i {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        border: 2px solid var(--accent);
+      }
+      .buy .pips i.on {
+        background: var(--accent);
+      }
+      .buy:disabled {
+        opacity: 0.35;
+      }
+      .buy.press,
+      .medkit.press {
+        transform: scale(0.96);
+        background: rgba(255, 255, 255, 0.3);
+      }
+      .buy.flash {
+        animation: bought 0.4s ease-out;
+      }
+      @keyframes bought {
+        0% {
+          background: var(--accent);
+        }
+        100% {
+          background: rgba(255, 255, 255, 0.14);
+        }
+      }
+      .medkit {
+        padding: 6px 14px;
+        border-radius: 10px;
+        background: rgba(63, 212, 90, 0.25);
+        font-weight: 800;
+        font-size: 15px;
+      }
+      .medkit[hidden] {
+        display: none;
+      }
+      .medkit:disabled {
+        opacity: 0.35;
+      }
     </style>
   </head>
   <body>
@@ -383,7 +470,9 @@
       <div class="top">
         <span>❤</span>
         <div class="hp"><i id="hp"></i></div>
-        <span class="sp"></span> <span>⚙ <span id="parts">0</span></span
+        <span class="sp"></span>
+        <button id="medkit" class="medkit" hidden>✚ <span id="medkit-price">8</span></button>
+        <span>⚙ <span id="parts">0</span></span
         ><span class="sep">|</span><span id="cls"></span>
       </div>
       <div id="left" class="zone left">
@@ -416,6 +505,21 @@
             />
           </svg>
           <span id="ability-icon">⚡</span>
+        </div>
+        <div id="shop" class="shop" hidden>
+          <div class="shop-head">Покращення · <span id="shop-time">10</span> с</div>
+          <button class="buy" data-item="1">
+            <span class="bi">⦿</span><span class="bn">Зброя</span><span class="pips"></span
+            ><span class="bp"></span>
+          </button>
+          <button class="buy" data-item="2">
+            <span class="bi">⛨</span><span class="bn">Броня</span><span class="pips"></span
+            ><span class="bp"></span>
+          </button>
+          <button class="buy" data-item="3">
+            <span class="bi">✦</span><span class="bn">Здібність</span><span class="pips"></span
+            ><span class="bp"></span>
+          </button>
         </div>
       </div>
       <div id="down" class="down">Ви впали</div>

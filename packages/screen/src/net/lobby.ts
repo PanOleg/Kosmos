@@ -1,4 +1,13 @@
-import { abilityReadiness, type ClassId, type Game, type PlayerInput } from '@horizon/sim';
+import {
+  abilityReadiness,
+  shopOpen,
+  upgradePrice,
+  TICKS_PER_SEC,
+  UPGRADES,
+  type ClassId,
+  type Game,
+  type PlayerInput,
+} from '@horizon/sim';
 import {
   PING_PACKET_SIZE,
   PKT_INPUT,
@@ -246,6 +255,13 @@ export class LobbyHost {
       }));
   }
 
+  /** Результат покупки — пульт відповідає вібрацією й звуком. */
+  bought(slot: number, item: number, ok: boolean): void {
+    this.slots[slot]?.link?.sendReliable({ t: 'bought', item, ok });
+    // Статус одразу, щоб кнопки оновили ціни без очікування наступного циклу.
+    this.lastStatus = 0;
+  }
+
   /** Гравцю в цьому слоті боляче: пульт вібрує й блимає. */
   hurt(slot: number, amount: number): void {
     this.slots[slot]?.link?.sendReliable({ t: 'hurt', amount });
@@ -288,6 +304,19 @@ export class LobbyHost {
           down: p ? p.down : false,
           ability: p && g ? abilityReadiness(g, p) : 1,
           wave: g ? g.state.wave.index : 0,
+          shop:
+            p && g && shopOpen(g)
+              ? {
+                  secondsLeft: Math.ceil(g.state.wave.timer / TICKS_PER_SEC),
+                  levels: [p.upg.weapon, p.upg.armor, p.upg.ability],
+                  prices: [
+                    upgradePrice(p, 'weapon'),
+                    upgradePrice(p, 'armor'),
+                    upgradePrice(p, 'ability'),
+                  ],
+                  medkit: p.medkitBought ? null : UPGRADES.medkit.price,
+                }
+              : null,
         });
       }
     }

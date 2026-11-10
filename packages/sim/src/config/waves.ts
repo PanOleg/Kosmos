@@ -30,14 +30,40 @@ export interface WaveDef {
 export const PLAYER_COUNT_MUL = [1, 1, 1.6, 2.3, 3];
 
 /**
- * Вертикальний зріз: одна хвиля, Стрільці — розумний ворог, Скаути — масовка (DECISIONS.md, п. 17).
- * Повна таблиця з BALANCE.md з'явиться разом з рештою ворогів.
+ * Тимчасова таблиця до етапу хвиль (DECISIONS.md, п. 27): 1–2 точно з BALANCE.md
+ * (лише Скаути й Стрільці), 3 — хвиля зрізу. Між ними — паузи з магазином.
  */
 export const SLICE_WAVES: WaveDef[] = [
   {
     name: 'Хвиля 1',
-    pause: 5,
+    pause: 10,
     speedMul: 0.75,
+    partsMul: 1,
+    pressureBelow: 2,
+    groups: [
+      { type: 'scout', count: 4, at: 0, airlock: 0 },
+      { type: 'scout', count: 4, at: 8, airlock: 0 },
+    ],
+  },
+  {
+    name: 'Хвиля 2',
+    pause: 12,
+    speedMul: 0.75,
+    partsMul: 1,
+    pressureBelow: 3,
+    groups: [
+      { type: 'scout', count: 4, at: 0, airlock: 0 },
+      { type: 'gunner', count: 1, at: 3, airlock: 0 },
+      { type: 'scout', count: 4, at: 9, airlock: 0 },
+      { type: 'gunner', count: 1, at: 13, airlock: 0 },
+      { type: 'scout', count: 4, at: 18, airlock: 0 },
+      { type: 'gunner', count: 1, at: 22, airlock: 0 },
+    ],
+  },
+  {
+    name: 'Хвиля 3',
+    pause: 12,
+    speedMul: 1,
     partsMul: 1,
     pressureBelow: 3,
     groups: [

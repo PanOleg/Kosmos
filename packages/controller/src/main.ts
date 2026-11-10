@@ -11,6 +11,8 @@ import {
   type PlayerInput,
   type ScreenMessage,
   type ScreenPhase,
+  type ShopInfo,
+  BUY_MEDKIT,
 } from '@horizon/sim/protocol';
 import { ControllerNet } from './net';
 import { LocalNet } from './localNet';
@@ -75,10 +77,52 @@ function run(room: string): void {
     net.send({ t: 'ready', ready: !ready });
   });
 
+  // Магазин: кнопка «тримається» 200 мс — кілька пакетів ненадійного каналу, симуляція бере фронт.
+  let buyItem = 0;
+  let buyUntil = 0;
+  const shopEl = $('shop');
+  const medkitBtn = $<HTMLButtonElement>('medkit');
+  const pressBuy = (item: number, el: HTMLElement) => {
+    if ((el as HTMLButtonElement).disabled) return;
+    buyItem = item;
+    buyUntil = performance.now() + 200;
+    el.classList.add('press');
+    setTimeout(() => el.classList.remove('press'), 120);
+  };
+  for (const b of document.querySelectorAll<HTMLButtonElement>('.buy'))
+    b.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      pressBuy(Number(b.dataset.item), b);
+    });
+  medkitBtn.addEventListener('pointerdown', () => pressBuy(BUY_MEDKIT, medkitBtn));
+
+  const renderShop = (shop: ShopInfo | null, parts: number, fullHp: boolean) => {
+    const open = shop !== null;
+    shopEl.hidden = !open;
+    ability.style.display = open ? 'none' : '';
+    medkitBtn.hidden = !open;
+    if (!shop) return;
+    $('shop-time').textContent = String(shop.secondsLeft);
+    document.querySelectorAll<HTMLButtonElement>('.buy').forEach((b, i) => {
+      const lvl = shop.levels[i]!;
+      const price = shop.prices[i] ?? null;
+      b.querySelector('.pips')!.innerHTML = [0, 1, 2]
+        .map((k) => `<i class="${k < lvl ? 'on' : ''}"></i>`)
+        .join('');
+      b.querySelector('.bp')!.textContent = price === null ? 'макс.' : `⚙ ${price}`;
+      b.disabled = price === null || parts < price;
+    });
+    // Аптечка при повному здоров'ї не потрібна — симуляція її однаково відхилить.
+    medkitBtn.disabled = shop.medkit === null || parts < shop.medkit || fullHp;
+    $('medkit-price').textContent = shop.medkit === null ? '✓' : String(shop.medkit);
+  };
+
   const stick = new Joystick($('left'), $('base'), $('knob'), () => blip(520, 0.05, 0.08));
   const ability = $('ability');
   const right = $('right');
   right.addEventListener('pointerdown', () => {
+    // У паузі права половина — магазин, здібність не тиснеться.
+    if (!shopEl.hidden) return;
     abilityPressed = true;
     ability.classList.add('press');
     blip(330, 0.08);
@@ -148,11 +192,29 @@ function run(room: string): void {
         $('down').style.display = m.down ? 'block' : 'none';
         ability.classList.toggle('ready', m.ability >= 1);
         $('ring').setAttribute('stroke-dasharray', `${Math.round(m.ability * 100)} 100`);
+        renderShop(m.shop, m.parts, m.hp >= m.maxHp);
         break;
       }
       case 'hurt':
         hurt(m.amount);
         break;
+      case 'bought': {
+        const btn =
+          m.item === BUY_MEDKIT
+            ? $('medkit')
+            : document.querySelector<HTMLElement>(`.buy[data-item="${m.item}"]`);
+        if (m.ok) {
+          navigator.vibrate?.(40);
+          blip(880, 0.1, 0.12);
+          btn?.classList.remove('flash');
+          void btn?.offsetWidth;
+          btn?.classList.add('flash');
+        } else {
+          navigator.vibrate?.([30, 40, 30]);
+          blip(160, 0.15, 0.12);
+        }
+        break;
+      }
     }
   };
 
@@ -172,7 +234,7 @@ function run(room: string): void {
   }));
 
   // Ввід — повний стан пульта з фіксованою частотою, ненадійним каналом.
-  const inp: PlayerInput = { move: { x: 0, y: 0 }, ability: false, dash: false };
+  const inp: PlayerInput = { move: { x: 0, y: 0 }, ability: false, dash: false, buy: 0 };
   const packet = new DataView(new ArrayBuffer(INPUT_PACKET_SIZE));
   let seq = 0;
   window.setInterval(() => {
@@ -181,6 +243,7 @@ function run(room: string): void {
     inp.move.y = stick.y;
     inp.ability = abilityPressed;
     inp.dash = performance.now() < stick.dashUntil;
+    inp.buy = performance.now() < buyUntil ? buyItem : 0;
     encodeInput(packet, seq++, inp);
     net.sendPacket(packet.buffer.slice(0) as ArrayBuffer);
   }, 1000 / SEND_HZ);

@@ -2,6 +2,8 @@ import { SCOUT_WINDUP } from './scout';
 import { TEAM_ENEMY } from '../entities/projectile';
 import type { PlayerInput } from '../protocol';
 import type { Game } from '../state';
+import { shopOpen, upgradePrice, wholeParts } from '../systems/upgrades';
+import { UPGRADE_ORDER } from '../config/upgrades';
 
 /**
  * Простий бот-гравець для розробки, тестів і підміни гравця, що відключився.
@@ -13,6 +15,7 @@ export function botInput(game: Game, slot: number, out: PlayerInput): void {
   const p = s.players[slot];
   out.ability = false;
   out.dash = false;
+  out.buy = 0;
   out.move.x = 0;
   out.move.y = 0;
   if (!p || p.down) return;
@@ -81,6 +84,20 @@ export function botInput(game: Game, slot: number, out: PlayerInput): void {
     out.move.y = ay / l;
   }
   out.dash = danger && p.dashCd === 0;
+
+  // Між хвилями — найдешевше доступне покращення (чергуємо натискання, щоб був фронт).
+  if (shopOpen(game) && s.tick % 2 === 0) {
+    let best = 0;
+    let bestPrice = Infinity;
+    UPGRADE_ORDER.forEach((id, i) => {
+      const price = upgradePrice(p, id);
+      if (price !== null && price <= wholeParts(p) && price < bestPrice) {
+        bestPrice = price;
+        best = i + 1;
+      }
+    });
+    out.buy = best;
+  }
 
   // Здібність: коли поруч тиснуть вороги (або, для Медика, хтось поранений).
   // Ввід — стан кнопки, тож чергуємо true/false, щоб був передній фронт.

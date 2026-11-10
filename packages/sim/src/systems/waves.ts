@@ -52,6 +52,8 @@ export function startWave(game: Game, index: number): void {
   w.plannedTotal = def.groups.reduce((a, g) => a + groupCount(game, g.count), 0);
   w.partsMul = def.partsMul;
   w.speedMul = def.speedMul;
+  // Нова пауза — нова аптечка в магазині.
+  for (const p of game.state.players) p.medkitBought = false;
   emit(game.events, 'wavePause', 0, 0, 0, 0, index, 0, def.pause);
 }
 

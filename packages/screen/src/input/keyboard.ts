@@ -12,6 +12,8 @@ export interface KeyLayout {
   right: string[];
   dash: string[];
   ability: string[];
+  /** Покупки між хвилями: зброя, броня, здібність, аптечка. */
+  buy: [string, string, string, string];
 }
 
 export const LAYOUT_WASD: KeyLayout = {
@@ -21,6 +23,7 @@ export const LAYOUT_WASD: KeyLayout = {
   right: ['KeyD'],
   dash: ['Space'],
   ability: ['ShiftLeft', 'KeyE'],
+  buy: ['Digit1', 'Digit2', 'Digit3', 'Digit4'],
 };
 
 export const LAYOUT_ARROWS: KeyLayout = {
@@ -30,6 +33,7 @@ export const LAYOUT_ARROWS: KeyLayout = {
   right: ['ArrowRight'],
   dash: ['Enter', 'Numpad0'],
   ability: ['ShiftRight', 'Slash'],
+  buy: ['Numpad1', 'Numpad2', 'Numpad3', 'Numpad4'],
 };
 
 const pressed = new Set<string>();
@@ -60,6 +64,8 @@ export class KeyboardInput implements InputSource {
     out.move.y = (any(l.up) ? 1 : 0) - (any(l.down) ? 1 : 0);
     out.dash = any(l.dash);
     out.ability = any(l.ability);
+    out.buy = 0;
+    for (let i = 0; i < 4; i++) if (pressed.has(l.buy[i]!)) out.buy = i + 1;
   }
 }
 

@@ -46,7 +46,7 @@ import { RoomTakenError } from './net/transport';
  *   ?quick    — без лобі: клавіатура (WASD) + ?bots=N, одразу матч
  *   ?bots=N   — разом з ?quick: N ботів
  *   ?seed=N   — сід першого матчу
- *   ?debug    — fps/draw calls/затримки, window.game, клавіші 1/2 спавнять ворогів
+ *   ?debug    — fps/draw calls/затримки, window.game, F1/F2 спавнять ворогів
  */
 const params = new URLSearchParams(location.search);
 const DEBUG = params.has('debug');
@@ -165,6 +165,7 @@ class PhoneSource implements InputSource {
     out.move.y = this.s.input.move.y;
     out.ability = this.s.input.ability;
     out.dash = this.s.input.dash;
+    out.buy = this.s.input.buy;
   }
 }
 
@@ -277,10 +278,11 @@ function firstLocal(kind: Slot['kind']): Slot | undefined {
 window.addEventListener('keydown', (e) => {
   if (match) {
     if (e.code === 'Enter' && match.results) endMatch();
-    if (DEBUG && (e.code === 'Digit1' || e.code === 'Digit2')) {
+    if (DEBUG && (e.code === 'F1' || e.code === 'F2')) {
+      e.preventDefault();
       const g = match.game;
       const a = g.config.map.airlocks[g.state.tick % 4]!;
-      if (e.code === 'Digit1')
+      if (e.code === 'F1')
         for (let k = 0; k < 4; k++)
           spawnEnemy(g, 'scout', a.x * 0.9 + (k % 2), a.y * 0.9 + (k >> 1));
       else for (let k = 0; k < 2; k++) spawnEnemy(g, 'gunner', a.x * 0.9 + k * 1.2, a.y * 0.9);
@@ -353,6 +355,13 @@ function handleMatchEvents(m: Match): void {
     m.fx.handle(e);
     m.abilityR.handle(e);
     if (e.type === 'playerHit') lobby.hurt(e.a, e.value);
+    else if (e.type === 'purchase' || e.type === 'purchaseFail') {
+      lobby.bought(e.a, e.b, e.type === 'purchase');
+      if (e.type === 'purchase') {
+        m.hud.purchased(e.a);
+        sfx.purchase(true);
+      } else sfx.purchase(false);
+    }
     const def = g.config.waves[e.a];
     if (e.type === 'wavePause' && def) {
       m.hud.announce(def.name, t.stationSignal, 2.5);

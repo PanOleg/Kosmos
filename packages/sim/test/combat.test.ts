@@ -11,7 +11,7 @@ import {
 import { updateAutoaim } from '../src/systems/autoaim';
 import { clearHash, insertHash } from '../src/collision/spatial';
 
-const idle = (): PlayerInput => ({ move: { x: 0, y: 0 }, ability: false, dash: false });
+const idle = (): PlayerInput => ({ move: { x: 0, y: 0 }, ability: false, dash: false, buy: 0 });
 
 function place(g: Game, x: number, y: number) {
   const p = g.state.players[0]!;
@@ -101,10 +101,11 @@ describe('combat', () => {
       const e = g.state.enemies[idx]!;
       const dash = !dashed && e.ai === SCOUT_WINDUP;
       if (dash) dashed = true;
-      step(g, [{ move: { x: 0, y: dash ? 1 : 0 }, ability: false, dash }]);
+      step(g, [{ move: { x: 0, y: dash ? 1 : 0 }, ability: false, dash, buy: 0 }]);
       if (dashed) break;
     }
-    for (let i = 0; i < 25; i++) step(g, [{ move: { x: 0, y: 1 }, ability: false, dash: false }]);
+    for (let i = 0; i < 25; i++)
+      step(g, [{ move: { x: 0, y: 1 }, ability: false, dash: false, buy: 0 }]);
     expect(dashed).toBe(true);
     expect(p.stats.damageTaken).toBe(0);
   });

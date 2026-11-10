@@ -33,6 +33,13 @@ export interface Player {
   abilityT: number;
   /** Тики перегріву Штурмовика після перевантаження: стріляти не можна. */
   overheatT: number;
+  /** Рівні покращень 0..3. */
+  upg: { weapon: number; armor: number; ability: number };
+  /** Номер товару, натиснутий цього тику (передній фронт), 0 — нічого. */
+  buyPressed: number;
+  prevBuy: number;
+  /** Аптечку вже куплено в цій паузі. */
+  medkitBought: boolean;
   fireCd: number;
   /** Ід ворога-цілі, -1 якщо немає. */
   target: number;
@@ -40,6 +47,7 @@ export interface Player {
   stats: {
     kills: number;
     partsCollected: number;
+    partsSpent: number;
     revives: number;
     damageDealt: number;
     damageTaken: number;
@@ -78,9 +86,20 @@ export function createPlayer(
     abilityCd: 0,
     abilityT: 0,
     overheatT: 0,
+    upg: { weapon: 0, armor: 0, ability: 0 },
+    buyPressed: 0,
+    prevBuy: 0,
+    medkitBought: false,
     fireCd: 0,
     target: -1,
     parts: 0,
-    stats: { kills: 0, partsCollected: 0, revives: 0, damageDealt: 0, damageTaken: 0 },
+    stats: {
+      kills: 0,
+      partsCollected: 0,
+      partsSpent: 0,
+      revives: 0,
+      damageDealt: 0,
+      damageTaken: 0,
+    },
   };
 }

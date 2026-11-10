@@ -1,5 +1,13 @@
 import * as THREE from 'three';
-import { TICKS_PER_SEC, abilityReadiness, type Game } from '@horizon/sim';
+import {
+  TICKS_PER_SEC,
+  UPGRADES,
+  abilityReadiness,
+  shopOpen,
+  upgradePrice,
+  wholeParts,
+  type Game,
+} from '@horizon/sim';
 import { classColor, hexCss } from '../render/palette';
 import { toX, toZ } from '../render/coords';
 import { t } from './i18n';
@@ -28,6 +36,21 @@ const css = `
 .hud-card .ab > i { display: block; height: 100%; opacity: .55; }
 .hud-card .ab.ready > i { opacity: 1; animation: abpulse 1s ease-in-out infinite; }
 @keyframes abpulse { 50% { opacity: .5; } }
+.shop { position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); display: none; gap: 12px; padding: 12px 14px 10px;
+  background: rgba(8,10,16,.82); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; }
+.shop.on { display: flex; flex-direction: column; }
+.shop .ttl { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; opacity: .7; text-align: center; }
+.shop .cols { display: flex; gap: 12px; }
+.shop .col { width: 170px; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); border-top: 3px solid; font-size: 13px; display: grid; gap: 4px; }
+.shop .col.flash { animation: shopflash .5s ease-out; }
+@keyframes shopflash { 0% { background: rgba(255,255,255,.35); } 100% { background: rgba(255,255,255,.05); } }
+.shop .nm { display: flex; justify-content: space-between; font-weight: 700; }
+.shop .ln { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; opacity: .9; }
+.shop .pp { display: inline-flex; gap: 3px; }
+.shop .pp i { width: 8px; height: 8px; border-radius: 2px; border: 1.5px solid currentColor; }
+.shop .pp i.on { background: currentColor; }
+.shop .pr { font-variant-numeric: tabular-nums; color: #9ff4ff; min-width: 32px; text-align: right; }
+.shop .hint { font-size: 11px; opacity: .5; text-align: center; }
 .over { position: absolute; width: 46px; height: 5px; margin-left: -23px; background: rgba(0,0,0,.55); border-radius: 3px; overflow: hidden; }
 .over > i { display: block; height: 100%; }
 .announce { position: absolute; top: 22%; left: 0; right: 0; text-align: center; font-size: 46px; font-weight: 800; letter-spacing: .12em;
@@ -66,6 +89,8 @@ export class Hud {
   private readonly overs: { el: HTMLDivElement; fill: HTMLElement }[] = [];
   private readonly arrows: HTMLDivElement[] = [];
   private announceT = 0;
+  private readonly shop = document.createElement('div');
+  private shopSig = '';
   private readonly v = new THREE.Vector3();
   private lastTop = '';
 
@@ -81,7 +106,8 @@ export class Hud {
     this.announceEl.className = 'announce';
     this.hint.className = 'hint';
     this.hint.textContent = t.controlsHint;
-    this.root.append(this.top, this.announceEl, this.hint);
+    this.shop.className = 'shop';
+    this.root.append(this.top, this.announceEl, this.hint, this.shop);
     for (const p of game.state.players) {
       const color = hexCss(classColor(p.classId));
       const el = document.createElement('div');
@@ -111,6 +137,57 @@ export class Hud {
       this.arrows.push(a);
     }
     document.body.appendChild(this.root);
+  }
+
+  /** Гравець щось купив — його колонка в панелі коротко блимає. */
+  purchased(slot: number): void {
+    const col = this.shop.querySelector<HTMLElement>(`.col[data-slot="${slot}"]`);
+    if (!col) return;
+    col.classList.remove('flash');
+    void col.offsetWidth;
+    col.classList.add('flash');
+  }
+
+  private renderShop(game: Game): void {
+    const open = shopOpen(game);
+    this.shop.classList.toggle('on', open);
+    // Підказка керування внизу заважала б панелі.
+    if (open) this.hint.style.opacity = '0';
+    if (!open) {
+      this.shopSig = '';
+      return;
+    }
+    const s = game.state;
+    // Перемальовуємо лише при зміні рівнів, деталей чи секунд.
+    const sig =
+      s.players
+        .map(
+          (p) => `${p.upg.weapon}${p.upg.armor}${p.upg.ability}${wholeParts(p)}${p.medkitBought}`,
+        )
+        .join('|') + Math.ceil(s.wave.timer / TICKS_PER_SEC);
+    if (sig === this.shopSig) return;
+    this.shopSig = sig;
+    const pips = (n: number) =>
+      `<span class="pp">${[0, 1, 2].map((k) => `<i class="${k < n ? 'on' : ''}"></i>`).join('')}</span>`;
+    const price = (v: number | null) => (v === null ? 'макс.' : `⚙${v}`);
+    const cols = s.players
+      .map((p) => {
+        const color = hexCss(classColor(p.classId));
+        const rows = (['weapon', 'armor', 'ability'] as const)
+          .map(
+            (id, i) =>
+              `<div class="ln"><span>${i + 1} · ${t.upgradeName[id]}</span>${pips(p.upg[id])}<span class="pr">${price(upgradePrice(p, id))}</span></div>`,
+          )
+          .join('');
+        return `<div class="col" data-slot="${p.slot}" style="border-color:${color}"><div class="nm"><span style="color:${color}">P${p.slot + 1} ${t.className[p.classId]}</span><span class="pr">⚙ ${wholeParts(p)}</span></div>${rows}<div class="ln"><span>4 · ${t.medkit}</span><span></span><span class="pr">${p.medkitBought ? '✓' : price(UPGRADES.medkit.price)}</span></div></div>`;
+      })
+      .join('');
+    const flashing = [...this.shop.querySelectorAll('.col.flash')].map(
+      (c) => (c as HTMLElement).dataset.slot,
+    );
+    this.shop.innerHTML = `<div class="ttl">${t.shopTitle(Math.ceil(s.wave.timer / TICKS_PER_SEC))}</div><div class="cols">${cols}</div><div class="hint">${t.shopHint}</div>`;
+    for (const slot of flashing)
+      this.shop.querySelector(`.col[data-slot="${slot}"]`)?.classList.add('flash');
   }
 
   announce(title: string, sub = '', seconds = 2.2): void {
@@ -201,6 +278,7 @@ export class Hud {
       this.announceEl.style.opacity = this.announceT > 0 ? '1' : '0';
     }
     if (s.tick > 8 * TICKS_PER_SEC) this.hint.style.opacity = '0';
+    this.renderShop(game);
   }
 
   destroy(): void {

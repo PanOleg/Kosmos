@@ -4,7 +4,7 @@ import { decodeInput, emptyInput, encodeInput, INPUT_PACKET_SIZE, seqNewer } fro
 describe('protocol', () => {
   test('input packet round-trips', () => {
     const v = new DataView(new ArrayBuffer(INPUT_PACKET_SIZE));
-    encodeInput(v, 65535, { move: { x: 0.5, y: -1 }, ability: true, dash: false });
+    encodeInput(v, 65535, { move: { x: 0.5, y: -1 }, ability: true, dash: false, buy: 0 });
     const out = emptyInput();
     expect(decodeInput(v, out)).toBe(65535);
     expect(out.move.x).toBeCloseTo(0.5, 1);

@@ -18,9 +18,14 @@ export function updatePlayers(game: Game, inputs: readonly PlayerInput[]): void 
       p.vx = 0;
       p.vy = 0;
       p.abilityPressed = false;
+      p.buyPressed = 0;
       if (inp) {
         p.prevDash = inp.dash;
         p.prevAbility = inp.ability;
+        // Упалий теж може купувати між хвилями — зручно, поки чекає на підйом.
+        const buy = inp.buy | 0;
+        p.buyPressed = buy !== 0 && buy !== p.prevBuy ? buy : 0;
+        p.prevBuy = buy;
       }
       continue;
     }
@@ -58,6 +63,9 @@ export function updatePlayers(game: Game, inputs: readonly PlayerInput[]): void 
     p.prevDash = inp.dash;
     p.abilityPressed = inp.ability && !p.prevAbility;
     p.prevAbility = inp.ability;
+    const buy = inp.buy | 0;
+    p.buyPressed = buy !== 0 && buy !== p.prevBuy ? buy : 0;
+    p.prevBuy = buy;
 
     if (p.dashT > 0) {
       p.dashT--;

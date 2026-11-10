@@ -166,6 +166,14 @@ export class Sfx {
     }
   }
 
+  purchase(ok: boolean): void {
+    if (ok)
+      [660, 990].forEach((f, i) =>
+        setTimeout(() => this.tone('triangle', f, f, 0.12, 0.15), i * 60),
+      );
+    else this.tone('square', 180, 140, 0.12, 0.08);
+  }
+
   overheat(): void {
     this.burst('highpass', 3000, 6000, 0.5, 0.6, 0.12);
   }

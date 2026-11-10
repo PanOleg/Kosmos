@@ -7,10 +7,18 @@ export interface PlayerInput {
   move: { x: number; y: number };
   ability: boolean;
   dash: boolean;
+  /** Товар, який тримають натиснутим (1 зброя, 2 броня, 3 здібність, 4 аптечка; 0 — нічого). */
+  buy: number;
 }
 
+/** Номер товару в PlayerInput.buy: 0 — нічого. */
+export const BUY_WEAPON = 1;
+export const BUY_ARMOR = 2;
+export const BUY_ABILITY = 3;
+export const BUY_MEDKIT = 4;
+
 export function emptyInput(): PlayerInput {
-  return { move: { x: 0, y: 0 }, ability: false, dash: false };
+  return { move: { x: 0, y: 0 }, ability: false, dash: false, buy: 0 };
 }
 
 /*
@@ -61,8 +69,21 @@ export type ScreenMessage =
       /** 0..1 — готовність здібності; 1 = готова. */
       ability: number;
       wave: number;
+      /** Магазин між хвилями; null — закритий. */
+      shop: ShopInfo | null;
     }
-  | { t: 'hurt'; amount: number };
+  | { t: 'hurt'; amount: number }
+  | { t: 'bought'; item: number; ok: boolean };
+
+/** Стан магазину для пульта: рівні й ціни наступного рівня (null — максимум). */
+export interface ShopInfo {
+  /** Секунди до кінця паузи. */
+  secondsLeft: number;
+  levels: [number, number, number];
+  prices: [number | null, number | null, number | null];
+  /** Ціна аптечки; null — уже куплена в цій паузі. */
+  medkit: number | null;
+}
 
 // Бінарні пакети ненадійного каналу.
 export const PKT_INPUT = 1;
@@ -73,6 +94,9 @@ export const PING_PACKET_SIZE = 5;
 
 const BTN_ABILITY = 1;
 const BTN_DASH = 2;
+/** Біти 2–4 байта кнопок — номер товару 0..7. */
+const BUY_SHIFT = 2;
+const BUY_MASK = 7;
 
 /** [тип u8][seq u16][x i8][y i8][кнопки u8] — 6 байт; стан, а не подія, тож втрата пакета не страшна. */
 export function encodeInput(view: DataView, seq: number, inp: PlayerInput): void {
@@ -80,7 +104,12 @@ export function encodeInput(view: DataView, seq: number, inp: PlayerInput): void
   view.setUint16(1, seq & 0xffff);
   view.setInt8(3, Math.round(Math.max(-1, Math.min(1, inp.move.x)) * 127));
   view.setInt8(4, Math.round(Math.max(-1, Math.min(1, inp.move.y)) * 127));
-  view.setUint8(5, (inp.ability ? BTN_ABILITY : 0) | (inp.dash ? BTN_DASH : 0));
+  view.setUint8(
+    5,
+    (inp.ability ? BTN_ABILITY : 0) |
+      (inp.dash ? BTN_DASH : 0) |
+      ((inp.buy & BUY_MASK) << BUY_SHIFT),
+  );
 }
 
 /** Повертає seq пакета; ввід пишеться в out. */
@@ -90,6 +119,7 @@ export function decodeInput(view: DataView, out: PlayerInput): number {
   const b = view.getUint8(5);
   out.ability = (b & BTN_ABILITY) !== 0;
   out.dash = (b & BTN_DASH) !== 0;
+  out.buy = (b >> BUY_SHIFT) & BUY_MASK;
   return view.getUint16(1);
 }
 

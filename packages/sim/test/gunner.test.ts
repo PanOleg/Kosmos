@@ -10,7 +10,7 @@ import {
   type PlayerInput,
 } from '../src/index';
 
-const idle = (): PlayerInput => ({ move: { x: 0, y: 0 }, ability: false, dash: false });
+const idle = (): PlayerInput => ({ move: { x: 0, y: 0 }, ability: false, dash: false, buy: 0 });
 
 /** Гравець без зброї: перевіряємо лише поведінку ворога. */
 function unarmed(g: Game) {
@@ -72,7 +72,7 @@ describe('gunner', () => {
       );
       const dash = incoming && p.dashCd === 0;
       if (dash) dodged++;
-      step(g, [{ move: { x: dash ? 1 : 0, y: 0 }, ability: false, dash }]);
+      step(g, [{ move: { x: dash ? 1 : 0, y: 0 }, ability: false, dash, buy: 0 }]);
       prevShots = dodged;
     }
     expect(prevShots).toBeGreaterThan(0);

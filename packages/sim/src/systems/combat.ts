@@ -8,6 +8,7 @@ import { damageEnemy, damagePlayer } from './damage';
 import { ABILITIES, type ArcDef } from '../config/classes';
 import { hasLineOfSight } from '../collision/world';
 import { damageBarrier, segBarrier } from './abilities';
+import { weaponDamageMul } from './upgrades';
 
 const arcHit = new Int32Array(8);
 
@@ -130,7 +131,7 @@ export function updatePlayerFire(game: Game): void {
     p.fireCd += TICKS_PER_SEC / (w.rate * overload);
     const arc = game.config.classes[p.classId].arc;
     if (arc) {
-      fireArc(game, p.slot, p.target, w.damage, w.knockback, arc);
+      fireArc(game, p.slot, p.target, w.damage * weaponDamageMul(p), w.knockback, arc);
       continue;
     }
     const muzzle = 0.7;
@@ -153,7 +154,7 @@ export function updatePlayerFire(game: Game): void {
         dx * sn + dy * c,
         w.projectileSpeed,
         w.range * 1.1,
-        w.damage,
+        w.damage * weaponDamageMul(p),
         w.knockback,
         0.12,
       );
