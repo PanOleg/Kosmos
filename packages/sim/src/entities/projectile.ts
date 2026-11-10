@@ -16,6 +16,8 @@ export interface Projectile {
   damage: number;
   knockback: number;
   radius: number;
+  /** Летить на висоті дронів: низькі перешкоди не зупиняють, наземних ворогів не зачіпає. */
+  air: boolean;
 }
 
 export function createProjectilePool(capacity: number): Projectile[] {
@@ -35,6 +37,7 @@ export function createProjectilePool(capacity: number): Projectile[] {
       damage: 0,
       knockback: 0,
       radius: 0.1,
+      air: false,
     });
   return pool;
 }

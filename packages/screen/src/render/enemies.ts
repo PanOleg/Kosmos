@@ -4,7 +4,13 @@ import {
   GUNNER_PEEK,
   GUNNER_HIDE,
   GUNNER_OPEN,
+  KAMI_DIVE,
+  KAMI_WINDUP,
+  KAMIKAZE,
   SCOUT,
+  SNIPER,
+  SNIPER_AIM,
+  WASP_WINDUP,
   SCOUT_WINDUP,
   TICKS_PER_SEC,
   type Enemy,
@@ -28,6 +34,7 @@ export interface EnemyVisual {
   glowMat: THREE.MeshStandardMaterial;
   ring: THREE.Mesh;
   laser: THREE.Mesh;
+  shadow: THREE.Mesh;
   type: EnemyType;
   flash: number;
   spawnT: number;
@@ -36,7 +43,15 @@ export interface EnemyVisual {
 }
 
 /** Візуально більші за хітбокс, як і гравці: на телевізорі здалеку інакше губляться. */
-const VISUAL_SCALE: Record<EnemyType, number> = { scout: 1.35, gunner: 1.45 };
+const VISUAL_SCALE: Record<EnemyType, number> = {
+  scout: 1.35,
+  gunner: 1.45,
+  wasp: 1.3,
+  kamikaze: 1.3,
+  sniper: 1.25,
+  swarm: 1.1,
+};
+const AIR = new Set<EnemyType>(['wasp', 'kamikaze', 'sniper', 'swarm']);
 
 const P = PALETTE;
 
@@ -116,10 +131,95 @@ function gunnerParts(): { hull: THREE.BufferGeometry; glow: THREE.BufferGeometry
 type V3 = [number, number, number];
 const scoutGeo = scoutParts();
 const gunnerGeo = gunnerParts();
-const scoutHull = scoutGeo.hull;
-const scoutGlow = scoutGeo.glow;
-const gunnerHull = gunnerGeo.hull;
-const gunnerGlow = gunnerGeo.glow;
+
+// Дрони (concept enemies.jpg). Початок координат — центр корпусу; висоту дає рендер.
+function droneParts(type: 'wasp' | 'kamikaze' | 'sniper' | 'swarm'): {
+  hull: THREE.BufferGeometry;
+  glow: THREE.BufferGeometry;
+} {
+  const hull: Part[] = [];
+  const glow: Part[] = [];
+  switch (type) {
+    case 'wasp':
+      // Гострий корпус, дві пари крил-лопатей, гармата знизу.
+      hull.push(
+        part(CONE4, P.enemy, [0, 0, 0.1], [0.32, 0.8, 0.3], [Math.PI / 2, Math.PI / 4, 0]),
+        part(BOX, P.enemyDark, [0, 0, -0.32], [0.22, 0.2, 0.3]),
+        part(BOX, P.enemyDark, [0, -0.17, 0.2], [0.06, 0.06, 0.45]),
+      );
+      for (const sx of [1, -1])
+        for (const z of [0.05, -0.25])
+          hull.push(
+            part(
+              BOX,
+              P.enemyMid,
+              [0.38 * sx, 0.08, z],
+              [0.6, 0.02, 0.16],
+              [0, sx * 0.35, sx * 0.25],
+            ),
+          );
+      glow.push(part(BOX, 0xffffff, [0, 0.04, 0.45], [0.1, 0.05, 0.04]));
+      break;
+    case 'kamikaze':
+      // Броньована «крапля»: світлий лобовий щит, червоне світло спереду, короткі крильця.
+      hull.push(
+        part(SPHERE, P.enemyMid, [0, 0, -0.08], [0.48, 0.42, 0.75]),
+        part(CONE4, P.enemy, [0, 0, 0.28], [0.55, 0.42, 0.5], [Math.PI / 2, Math.PI / 4, 0]),
+        part(BOX, P.enemyDark, [0.32, 0, -0.1], [0.3, 0.04, 0.18], [0, 0, -0.3]),
+        part(BOX, P.enemyDark, [-0.32, 0, -0.1], [0.3, 0.04, 0.18], [0, 0, 0.3]),
+      );
+      glow.push(
+        part(BOX, 0xffffff, [0, -0.02, 0.36], [0.26, 0.08, 0.06]),
+        part(SPHERE, 0xffffff, [0, 0, -0.45], [0.14, 0.14, 0.08]),
+      );
+      break;
+    case 'sniper':
+      // Тонкий корпус і дуже довгий ствол.
+      hull.push(
+        part(BOX, P.enemyDark, [0, 0, 0], [0.26, 0.18, 0.55]),
+        part(BOX, P.enemy, [0, 0.06, -0.05], [0.22, 0.08, 0.4]),
+        part(BOX, P.enemyMid, [0, -0.02, 0.85], [0.05, 0.05, 1.3]),
+        part(BOX, P.enemyMid, [0.3, 0.05, -0.12], [0.4, 0.02, 0.12], [0, 0.4, 0]),
+        part(BOX, P.enemyMid, [-0.3, 0.05, -0.12], [0.4, 0.02, 0.12], [0, -0.4, 0]),
+      );
+      glow.push(
+        part(BOX, 0xffffff, [0, 0.02, 0.29], [0.08, 0.06, 0.03]),
+        part(BOX, 0xffffff, [0, -0.02, 1.5], [0.06, 0.06, 0.03]),
+      );
+      break;
+    case 'swarm':
+      // Крихітний колючий дрон.
+      hull.push(
+        part(CONE4, P.enemyDark, [0, 0, 0], [0.22, 0.32, 0.22], [Math.PI / 2, 0, 0]),
+        part(CONE4, P.enemyMid, [0, 0.08, -0.04], [0.08, 0.2, 0.08], [-0.4, 0, 0]),
+        part(BOX, P.enemyMid, [0, 0, 0], [0.42, 0.02, 0.06]),
+      );
+      glow.push(part(BOX, 0xffffff, [0, 0.02, 0.15], [0.07, 0.05, 0.03]));
+      break;
+  }
+  return { hull: merge(hull), glow: merge(glow) };
+}
+
+const DRONE_GEO = {
+  wasp: droneParts('wasp'),
+  kamikaze: droneParts('kamikaze'),
+  sniper: droneParts('sniper'),
+  swarm: droneParts('swarm'),
+};
+
+function geometryOf(type: EnemyType): { hull: THREE.BufferGeometry; glow: THREE.BufferGeometry } {
+  if (type === 'scout') return scoutGeo;
+  if (type === 'gunner') return gunnerGeo;
+  return DRONE_GEO[type];
+}
+
+const shadowGeo = new THREE.CircleGeometry(0.45, 20).rotateX(-Math.PI / 2);
+const shadowMat = new THREE.MeshBasicMaterial({
+  color: 0x000000,
+  transparent: true,
+  opacity: 0.45,
+  depthWrite: false,
+});
 
 // Одинична довжина вздовж +Z від початку координат, масштабується на відстань до цілі.
 const laserGeo = new THREE.BoxGeometry(0.09, 0.09, 1).translate(0, 0, 0.5);
@@ -145,8 +245,9 @@ export function buildEnemyVisual(type: EnemyType): EnemyVisual {
     model.root.scale.setScalar(1 / VISUAL_SCALE[type]);
     body.add(model.root);
   } else {
-    const hull = new THREE.Mesh(type === 'scout' ? scoutHull : gunnerHull, hullMat);
-    const glow = new THREE.Mesh(type === 'scout' ? scoutGlow : gunnerGlow, glowMat);
+    const geo = geometryOf(type);
+    const hull = new THREE.Mesh(geo.hull, hullMat);
+    const glow = new THREE.Mesh(geo.glow, glowMat);
     hull.castShadow = true;
     body.add(hull, glow);
   }
@@ -177,8 +278,13 @@ export function buildEnemyVisual(type: EnemyType): EnemyVisual {
   );
   laser.visible = false;
   root.add(laser);
+  // Тінь під дроном: без неї висоту й позицію в повітрі не прочитати згори.
+  const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+  shadow.position.y = 0.025;
+  shadow.visible = AIR.has(type);
+  root.add(shadow);
   body.scale.setScalar(VISUAL_SCALE[type]);
-  return { root, body, hullMat, glowMat, ring, laser, type, flash: 0, spawnT: 0, model };
+  return { root, body, hullMat, glowMat, ring, laser, shadow, type, flash: 0, spawnT: 0, model };
 }
 
 /** Око світиться помірно: з bloom сильніше світіння розпливається в кулю й ховає голову. */
@@ -186,6 +292,8 @@ const EYE_GLOW = 1.4;
 const windupTicks = SCOUT.windup * TICKS_PER_SEC;
 const peekTicks = Math.round(GUNNER.peek * TICKS_PER_SEC);
 const aimTicks = Math.round(GUNNER.aim * TICKS_PER_SEC);
+const kamiWindupTicks = Math.round(KAMIKAZE.windup * TICKS_PER_SEC);
+const sniperAimTicks = Math.round(SNIPER.aim * TICKS_PER_SEC);
 
 export class EnemyRenderer {
   private readonly views: (EnemyVisual | null)[] = [];
@@ -196,6 +304,8 @@ export class EnemyRenderer {
   private readonly m4 = new THREE.Matrix4();
   private readonly pos = new THREE.Vector3();
   private readonly scl = new THREE.Vector3();
+  private readonly tmp = new THREE.Vector3();
+  private readonly tmp2 = new THREE.Vector3();
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -241,7 +351,7 @@ export class EnemyRenderer {
       if (!e.alive || e.hp >= e.maxHp) continue;
       const x = e.px + (e.x - e.px) * alpha;
       const y = e.py + (e.y - e.py) * alpha;
-      const h = e.type === 'scout' ? 2.0 : 2.4;
+      const h = e.air ? e.alt + 0.9 : e.type === 'scout' ? 2.0 : 2.4;
       this.pos.set(toX(x), h, toZ(y));
       this.m4.compose(this.pos, q, this.scl.set(W + 0.06, 0.16, 1));
       this.barBg.setMatrixAt(n, this.m4);
@@ -303,13 +413,60 @@ export class EnemyRenderer {
       const bob = Math.abs(Math.sin(time * 18 + i)) * 0.05 * Math.min(1, speed / 3);
       const bs = VISUAL_SCALE[v.type];
       v.body.scale.set(bs, bs * crouch * v.spawnT, bs);
-      v.body.position.y = bob;
+      if (e.air) {
+        // Дрон висить на своїй висоті й злегка погойдується; заглушений лежить і смикається.
+        const hover =
+          e.stun > 0 ? Math.sin(time * 40 + i) * 0.03 : Math.sin(time * 3 + i * 1.7) * 0.08;
+        v.body.position.y = e.alt + hover;
+        v.body.rotation.z = e.stun > 0 ? 0.6 : Math.sin(time * 2 + i) * 0.08;
+        const sh = Math.max(0.35, 1 - e.alt * 0.12);
+        v.shadow.scale.set(sh * bs, 1, sh * bs);
+      } else v.body.position.y = bob;
       v.glowMat.emissiveIntensity = windup ? 2.5 + prog * 5 : EYE_GLOW;
       v.ring.visible = windup;
       if (windup) {
         const s = 2.2 - prog * 0.9;
         v.ring.scale.set(s, 1, s);
         (v.ring.material as THREE.MeshBasicMaterial).opacity = 0.35 + prog * 0.6;
+      }
+
+      if (e.type === 'wasp')
+        v.glowMat.emissiveIntensity =
+          e.ai === WASP_WINDUP ? 4 + Math.sin(time * 50) * 1.5 : EYE_GLOW;
+      if (e.type === 'kamikaze') {
+        // Телеграф: точка удару на підлозі — кільце стискається до пікірування.
+        const marking = e.ai === KAMI_WINDUP || e.ai === KAMI_DIVE;
+        v.ring.visible = marking;
+        if (marking) {
+          v.ring.position.set(toX(e.tx) - v.root.position.x, 0.03, toZ(e.ty) - v.root.position.z);
+          const kp = e.ai === KAMI_WINDUP ? e.aiT / kamiWindupTicks : 1;
+          const rs = KAMIKAZE.blastRadius * (1.6 - kp * 0.6);
+          v.ring.scale.set(rs, 1, rs);
+          (v.ring.material as THREE.MeshBasicMaterial).opacity = 0.4 + kp * 0.5;
+        } else v.ring.position.set(0, 0.03, 0);
+        v.glowMat.emissiveIntensity = marking ? 5 + Math.sin(time * 45) * 2 : 2.2;
+      }
+      if (e.type === 'sniper') {
+        // Лазер снайпера до точки на підлозі: видно, куди прилетить, і коли зафіксувався.
+        const aim = e.ai === SNIPER_AIM;
+        v.laser.visible = aim;
+        if (aim) {
+          v.root.updateMatrixWorld();
+          v.laser.position.set(0, e.alt, 0);
+          this.tmp.set(toX(e.tx), 0.9, toZ(e.ty));
+          v.laser.lookAt(this.tmp);
+          v.laser.scale.set(
+            0.8,
+            0.8,
+            this.tmp.distanceTo(v.root.localToWorld(this.tmp2.set(0, e.alt, 0))),
+          );
+          const sp = e.aiT / sniperAimTicks;
+          (v.laser.material as THREE.MeshBasicMaterial).opacity =
+            0.3 + 0.6 * sp * (0.6 + 0.4 * Math.sin(time * (15 + sp * 50)));
+          v.glowMat.emissiveIntensity = 2 + sp * 6;
+        }
+        continue_flash(v, e, dt, speed);
+        continue;
       }
 
       // Стрілець цілиться: від початку визирання до пострілу (або перед пострілом у відкритому бою).
@@ -319,6 +476,7 @@ export class EnemyRenderer {
           (e.ai === GUNNER_OPEN && e.aiT <= aimTicks));
       const tp = aiming && e.target >= 0 ? players[e.target] : undefined;
       v.laser.visible = !!tp;
+      v.laser.rotation.set(0, 0, 0);
       if (tp) {
         const dx = toX(tp.x) - v.root.position.x;
         const dz = toZ(tp.y) - v.root.position.z;
@@ -333,14 +491,21 @@ export class EnemyRenderer {
         v.glowMat.emissiveIntensity = 2 + prog * 5;
       }
 
-      v.flash = Math.max(0, v.flash - dt * 12);
-      // Влучання: броня спалахує червоно-білим (на блідій броні білий спалах губиться).
-      v.hullMat.emissive.setRGB(0.06 + v.flash * 1.2, 0.04 + v.flash * 0.35, 0.04 + v.flash * 0.25);
-      if (v.model) {
-        v.model.flash(v.flash * 1.2, 1, 0.3, 0.2);
-        v.model.play(windup ? 'attack' : speed > 0.5 ? 'run' : 'idle');
-        v.model.update(dt);
-      }
+      continue_flash(v, e, dt, speed, windup);
     }
+  }
+}
+
+/** Спалах влучання й анімація моделі — спільний хвіст оновлення для всіх типів. */
+function continue_flash(v: EnemyVisual, e: Enemy, dt: number, speed: number, windup = false): void {
+  v.flash = Math.max(0, v.flash - dt * 12);
+  // Влучання: броня спалахує червоно-білим (на блідій броні білий спалах губиться).
+  v.hullMat.emissive.setRGB(0.06 + v.flash * 1.2, 0.04 + v.flash * 0.35, 0.04 + v.flash * 0.25);
+  if (v.model) {
+    v.model.flash(v.flash * 1.2, 1, 0.3, 0.2);
+    v.model.play(
+      e.air ? (windup ? 'attack' : 'hover') : windup ? 'attack' : speed > 0.5 ? 'run' : 'idle',
+    );
+    v.model.update(dt);
   }
 }

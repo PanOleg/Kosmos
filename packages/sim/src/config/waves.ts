@@ -30,8 +30,9 @@ export interface WaveDef {
 export const PLAYER_COUNT_MUL = [1, 1, 1.6, 2.3, 3];
 
 /**
- * Тимчасова таблиця до етапу хвиль (DECISIONS.md, п. 27): 1–2 точно з BALANCE.md
- * (лише Скаути й Стрільці), 3 — хвиля зрізу. Між ними — паузи з магазином.
+ * Тимчасова таблиця до етапу хвиль (DECISIONS.md, п. 30): 1–3 точно з BALANCE.md,
+ * 4-та — склад хвилі 8 з BALANCE.md (Камікадзе, Снайпери, Рій). Між ними — паузи з магазином.
+ * Для дронів airlock — номер вентиляційного люка.
  */
 export const SLICE_WAVES: WaveDef[] = [
   {
@@ -47,7 +48,7 @@ export const SLICE_WAVES: WaveDef[] = [
   },
   {
     name: 'Хвиля 2',
-    pause: 12,
+    pause: 8,
     speedMul: 0.75,
     partsMul: 1,
     pressureBelow: 3,
@@ -62,20 +63,34 @@ export const SLICE_WAVES: WaveDef[] = [
   },
   {
     name: 'Хвиля 3',
-    pause: 12,
+    pause: 8,
     speedMul: 1,
     partsMul: 1,
     pressureBelow: 3,
     groups: [
       { type: 'scout', count: 4, at: 0, airlock: 0 },
-      { type: 'gunner', count: 1, at: 3, airlock: 0 },
-      { type: 'scout', count: 3, at: 9, airlock: 1 },
-      { type: 'gunner', count: 1, at: 13, airlock: 2 },
-      { type: 'scout', count: 4, at: 18, airlock: 2 },
-      { type: 'gunner', count: 1, at: 22, airlock: 1 },
-      { type: 'scout', count: 4, at: 26, airlock: 'any' },
-      { type: 'gunner', count: 1, at: 30, airlock: 3 },
-      { type: 'scout', count: 5, at: 33, airlock: 'any' },
+      { type: 'gunner', count: 1, at: 2, airlock: 1 },
+      { type: 'wasp', count: 2, at: 6, airlock: 3 },
+      { type: 'scout', count: 4, at: 12, airlock: 1 },
+      { type: 'gunner', count: 2, at: 16, airlock: 0 },
+      { type: 'wasp', count: 2, at: 20, airlock: 1 },
+    ],
+  },
+  {
+    name: 'Хвиля 4',
+    pause: 8,
+    speedMul: 1,
+    partsMul: 1,
+    pressureBelow: 4,
+    groups: [
+      { type: 'scout', count: 4, at: 0, airlock: 0 },
+      { type: 'kamikaze', count: 2, at: 4, airlock: 0 },
+      { type: 'sniper', count: 1, at: 8, airlock: 3 },
+      { type: 'kamikaze', count: 2, at: 12, airlock: 2 },
+      { type: 'swarm', count: 1, at: 16, airlock: 1 },
+      { type: 'scout', count: 4, at: 20, airlock: 2 },
+      { type: 'sniper', count: 1, at: 24, airlock: 1 },
+      { type: 'kamikaze', count: 2, at: 28, airlock: 'any' },
     ],
   },
 ];

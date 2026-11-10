@@ -1,6 +1,6 @@
 import { clearHash, insertHash } from '../collision/spatial';
 import { raycast, resolveCircle } from '../collision/world';
-import { CROWD, ENEMIES, type EnemyType } from '../config/enemies';
+import { AIR_TYPES, CROWD, ENEMIES, type EnemyType } from '../config/enemies';
 import type { Enemy } from '../entities/enemy';
 import { emit } from '../events';
 import { DT } from '../math';
@@ -9,13 +9,24 @@ import type { Game } from '../state';
 import { updateScout } from '../ai/scout';
 import { sampleNav, navDir, updateNav } from './navigation';
 import { updateGunner } from '../ai/gunner';
+import { updateWasp } from '../ai/wasp';
+import { updateKamikaze } from '../ai/kamikaze';
+import { updateSniper } from '../ai/sniper';
+import { updateSwarm, SWARM_GROUPS, swarmCenters } from '../ai/swarm';
+
+/** Висота, з якої дрон вилітає з вентиляційного люка й знижується до своєї. */
+const DRONE_SPAWN_ALT = 6;
+/** Швидкість зміни висоти дрона, м/с: спуск із люка, падіння від ЕМІ, підйом після. */
+const DRONE_CLIMB = 4;
+/** Висота заглушеного дрона: лежить на підлозі. */
+const DRONE_GROUNDED_ALT = 0.4;
 
 /** Бажаний напрям руху від AI (одиничний або нуль), множиться на швидкість ворога. */
 export const steer = { x: 0, y: 0 };
 
 const NAV_EVERY = 10;
 
-export function spawnEnemy(game: Game, type: EnemyType, x: number, y: number): number {
+export function spawnEnemy(game: Game, type: EnemyType, x: number, y: number, group = -1): number {
   const s = game.state;
   for (let i = 0; i < s.enemies.length; i++) {
     const e = s.enemies[i]!;
@@ -45,6 +56,12 @@ export function spawnEnemy(game: Game, type: EnemyType, x: number, y: number): n
     e.stagger = 0;
     e.exposed = false;
     e.stun = 0;
+    e.air = AIR_TYPES.has(type);
+    e.alt = e.air ? DRONE_SPAWN_ALT : 0;
+    e.group = group;
+    e.shots = 0;
+    e.tx = x;
+    e.ty = y;
     s.enemiesAlive++;
     emit(game.events, 'spawn', x, y, 0, 0, i);
     return i;
@@ -127,6 +144,8 @@ export function updateEnemies(game: Game): void {
     if (e.alive) insertHash(h, i, e.x, e.y);
   }
 
+  swarmCenters(game);
+
   for (let i = 0; i < s.enemies.length; i++) {
     const e = s.enemies[i]!;
     if (!e.alive) continue;
@@ -142,7 +161,14 @@ export function updateEnemies(game: Game): void {
     if (e.stun > 0) {
       e.stun--;
       e.exposed = true;
-    } else
+      // Заглушений дрон падає на підлогу (DECISIONS.md, п. 29).
+      if (e.air) e.alt = Math.max(DRONE_GROUNDED_ALT, e.alt - DRONE_CLIMB * 2 * DT);
+    } else {
+      if (e.air) {
+        const cruise = (ENEMIES[e.type] as { altitude?: number }).altitude ?? 2;
+        const d = cruise - e.alt;
+        e.alt += Math.sign(d) * Math.min(Math.abs(d), DRONE_CLIMB * DT);
+      }
       switch (e.type) {
         case 'scout':
           updateScout(game, e, i);
@@ -150,7 +176,21 @@ export function updateEnemies(game: Game): void {
         case 'gunner':
           updateGunner(game, e, i);
           break;
+        case 'wasp':
+          updateWasp(game, e, i);
+          break;
+        case 'kamikaze':
+          updateKamikaze(game, e, i);
+          break;
+        case 'sniper':
+          updateSniper(game, e, i);
+          break;
+        case 'swarm':
+          updateSwarm(game, e, i);
+          break;
       }
+      if (!e.alive) continue;
+    }
 
     let wx = steer.x * e.speed;
     let wy = steer.y * e.speed;
@@ -173,6 +213,8 @@ export function updateEnemies(game: Game): void {
         for (let j = h.head[gy * h.n + gx]!; j >= 0; j = h.next[j]!) {
           if (j === i) continue;
           const o = s.enemies[j]!;
+          // Дрони розштовхуються лише з дронами, наземні — з наземними.
+          if (o.air !== e.air) continue;
           const dx = e.x - o.x;
           const dy = e.y - o.y;
           const min = (e.radius + o.radius) * CROWD.separation;
@@ -199,8 +241,39 @@ export function updateEnemies(game: Game): void {
       e.vy += (wy - e.vy) * k;
     }
 
-    const r = resolveCircle(game.world, e.x + e.vx * DT, e.y + e.vy * DT, e.radius);
-    e.x = r.x;
-    e.y = r.y;
+    if (e.air) {
+      // Дрони пролітають над перешкодами; тримаються лише в межах арени.
+      e.x += e.vx * DT;
+      e.y += e.vy * DT;
+      const maxR = game.world.radius - e.radius - 0.5;
+      const d2 = e.x * e.x + e.y * e.y;
+      if (d2 > maxR * maxR) {
+        const k = maxR / Math.sqrt(d2);
+        e.x *= k;
+        e.y *= k;
+      }
+    } else {
+      const r = resolveCircle(game.world, e.x + e.vx * DT, e.y + e.vy * DT, e.radius);
+      e.x = r.x;
+      e.y = r.y;
+    }
   }
 }
+
+/** Напрям до точки для дрона: по прямій, перешкоди не заважають. */
+export function flyTo(e: Enemy, tx: number, ty: number, k = 1): void {
+  const dx = tx - e.x;
+  const dy = ty - e.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d < 0.05) {
+    steer.x = 0;
+    steer.y = 0;
+    return;
+  }
+  // Сповільнення біля точки, щоб не тремтіти навколо неї.
+  const m = k * Math.min(1, d / 1.5);
+  steer.x = (dx / d) * m;
+  steer.y = (dy / d) * m;
+}
+
+export { SWARM_GROUPS };

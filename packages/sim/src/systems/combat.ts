@@ -9,6 +9,17 @@ import { ABILITIES, type ArcDef } from '../config/classes';
 import { hasLineOfSight } from '../collision/world';
 import { damageBarrier, segBarrier } from './abilities';
 import { weaponDamageMul } from './upgrades';
+import { isHigh, type Enemy } from '../entities/enemy';
+import { AIR_COVER_HEIGHT, KAMIKAZE } from '../config/enemies';
+
+/**
+ * Лобова броня Камікадзе (DECISIONS.md, п. 29): удар назустріч носу не шкодить.
+ * kx, ky — напрям руху кулі/дуги. На землі після ЕМІ броня не працює.
+ */
+export function armorBlocks(e: Enemy, kx: number, ky: number): boolean {
+  if (e.type !== 'kamikaze' || e.stun > 0) return false;
+  return kx * e.fx + ky * e.fy < -KAMIKAZE.frontCos;
+}
 
 const arcHit = new Int32Array(8);
 
@@ -42,7 +53,8 @@ function fireArc(
     const l = Math.sqrt(dx * dx + dy * dy) || 1;
     const ex = e.x;
     const ey = e.y;
-    damageEnemy(game, e, cur, dmg, dx / l, dy / l, knock, slot);
+    if (armorBlocks(e, dx / l, dy / l)) emit(game.events, 'armor', e.x, e.y, -dx / l, -dy / l, cur);
+    else damageEnemy(game, e, cur, dmg, dx / l, dy / l, knock, slot);
     fromX = ex;
     fromY = ey;
     dmg *= arc.falloff;
@@ -85,6 +97,7 @@ export function spawnProjectile(
   damage: number,
   knockback: number,
   radius: number,
+  air = false,
 ): Projectile | null {
   const pool = game.state.projectiles;
   for (let i = 0; i < pool.length; i++) {
@@ -101,6 +114,7 @@ export function spawnProjectile(
     b.damage = damage;
     b.knockback = knockback;
     b.radius = radius;
+    b.air = air;
     return b;
   }
   return null;
@@ -157,6 +171,7 @@ export function updatePlayerFire(game: Game): void {
         w.damage * weaponDamageMul(p),
         w.knockback,
         0.12,
+        isHigh(e),
       );
     }
     emit(game.events, 'shot', ox, oy, dx, dy, p.slot, 0, w.pellets);
@@ -198,7 +213,7 @@ export function updateProjectiles(game: Game): void {
     b.py = b.y;
     const nx = b.x + b.vx * DT;
     const ny = b.y + b.vy * DT;
-    const wallT = raycast(game.world, b.x, b.y, nx, ny, true);
+    const wallT = raycast(game.world, b.x, b.y, nx, ny, true, b.air ? AIR_COVER_HEIGHT : 0);
     let hitT = wallT;
     let hitIdx = -1;
 
@@ -211,7 +226,8 @@ export function updateProjectiles(game: Game): void {
         for (let gx = x0; gx <= x1; gx++)
           for (let j = h.head[gy * h.n + gx]!; j >= 0; j = h.next[j]!) {
             const e = s.enemies[j]!;
-            if (!e.alive) continue;
+            // Куля по дрону летить над наземними, куля по наземному — під дронами.
+            if (!e.alive || isHigh(e) !== b.air) continue;
             const t = segCircle(b.x, b.y, nx, ny, e.x, e.y, e.radius + b.radius);
             if (t < hitT) {
               hitT = t;
@@ -249,7 +265,9 @@ export function updateProjectiles(game: Game): void {
       if (hitIdx <= -2) {
         damageBarrier(game, s.barriers[-2 - hitIdx]!, b.damage, b.x, b.y);
       } else if (hitIdx >= 0 && b.team === TEAM_PLAYER) {
-        damageEnemy(game, s.enemies[hitIdx]!, hitIdx, b.damage, kx, ky, b.knockback, b.owner);
+        const e = s.enemies[hitIdx]!;
+        if (armorBlocks(e, kx, ky)) emit(game.events, 'armor', b.x, b.y, -kx, -ky, hitIdx);
+        else damageEnemy(game, e, hitIdx, b.damage, kx, ky, b.knockback, b.owner);
       } else if (hitIdx >= 0 && b.team === TEAM_ENEMY) {
         const p = s.players[hitIdx]!;
         // Ривок «пропускає» кулю крізь себе — невразливість, а не промах.

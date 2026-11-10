@@ -166,6 +166,29 @@ export class Sfx {
     }
   }
 
+  explosion(pan: number): void {
+    this.tone('sine', 120, 30, 0.6, 0.7, pan);
+    this.burst('lowpass', 3000, 80, 0.7, 0.7, 0.7, pan);
+  }
+
+  ricochet(pan: number): void {
+    this.tone('triangle', 2400, 1800, 0.08, 0.1, pan);
+  }
+
+  /** Камікадзе зводиться: висхідний вереск — «зараз пікірую». */
+  kamikazeArm(pan: number): void {
+    this.tone('sawtooth', 500, 1600, 0.55, 0.1, pan);
+  }
+
+  sniperCharge(pan: number): void {
+    this.tone('sine', 300, 1200, 1.9, 0.06, pan);
+  }
+
+  sniperShot(pan: number): void {
+    this.tone('square', 1400, 200, 0.2, 0.2, pan);
+    this.burst('highpass', 5000, 2000, 1, 0.15, 0.3, pan);
+  }
+
   purchase(ok: boolean): void {
     if (ok)
       [660, 990].forEach((f, i) =>

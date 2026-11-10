@@ -56,7 +56,8 @@ export class ProjectileRenderer {
       if (!b.alive) continue;
       const x = b.px + (b.x - b.px) * alpha;
       const y = b.py + (b.y - b.py) * alpha;
-      this.p.set(x, 0.9, -y);
+      // Кулі дронів і по дронах летять вище — на висоті польоту.
+      this.p.set(x, b.air ? 2.2 : 0.9, -y);
       this.dir.set(b.vx, 0, -b.vy).normalize();
       this.q.setFromUnitVectors(this.up, this.dir);
       if (b.team === TEAM_PLAYER) {

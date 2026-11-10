@@ -1,5 +1,6 @@
-import { SCOUT } from '../config/enemies';
-import { ENEMIES } from '../config/enemies';
+import { AIR_COVER_HEIGHT, ENEMIES, KAMIKAZE, SCOUT, SNIPER } from '../config/enemies';
+import { isHigh } from '../entities/enemy';
+import { SNIPER_AIM } from '../ai/sniper';
 import { hasLineOfSight } from '../collision/world';
 import { SCOUT_WINDUP } from '../ai/scout';
 import type { Enemy } from '../entities/enemy';
@@ -13,8 +14,26 @@ import type { Game } from '../state';
 export function threatOf(e: Enemy): number {
   let t = ENEMIES[e.type].threat;
   if (e.type === 'scout' && e.ai === SCOUT_WINDUP) t += SCOUT.windupThreat;
+  if (e.type === 'sniper' && e.ai === SNIPER_AIM) t += SNIPER.aimThreat;
   if (e.exposed) t += 10;
   return t;
+}
+
+/**
+ * Камікадзе в лоб невразливий (DECISIONS.md, п. 29): автоприціл не марнує на нього постріли,
+ * поки гравець перед його носом. Збоку, ззаду чи на землі після ЕМІ — найвища загроза.
+ */
+function kamikazeHittable(e: Enemy, px: number, py: number): boolean {
+  if (e.stun > 0) return true;
+  const dx = px - e.x;
+  const dy = py - e.y;
+  const l = Math.sqrt(dx * dx + dy * dy) || 1;
+  return (dx / l) * e.fx + (dy / l) * e.fy < KAMIKAZE.frontCos;
+}
+
+/** Пряма видимість з урахуванням висоти: до дрона в повітрі низькі перешкоди не заважають. */
+function canSee(game: Game, px: number, py: number, e: Enemy): boolean {
+  return hasLineOfSight(game.world, px, py, e.x, e.y, isHigh(e) ? AIR_COVER_HEIGHT : 0);
 }
 
 function valid(game: Game, p: Player, idx: number, range: number): boolean {
@@ -24,7 +43,8 @@ function valid(game: Game, p: Player, idx: number, range: number): boolean {
   const dy = e.y - p.y;
   const r = range + e.radius;
   if (dx * dx + dy * dy > r * r) return false;
-  return hasLineOfSight(game.world, p.x, p.y, e.x, e.y);
+  if (e.type === 'kamikaze' && !kamikazeHittable(e, p.x, p.y)) return false;
+  return canSee(game, p.x, p.y, e);
 }
 
 export function updateAutoaim(game: Game): void {
@@ -58,12 +78,13 @@ export function updateAutoaim(game: Game): void {
           const d2 = dx * dx + dy * dy;
           const r = range + e.radius;
           if (d2 > r * r) continue;
+          if (e.type === 'kamikaze' && !kamikazeHittable(e, p.x, p.y)) continue;
           const d = Math.sqrt(d2);
           let score = threatOf(e) + (1 - d / r) * cfg.proximity;
           if (j === current) score += cfg.stickiness;
           // LOS дорожчий за все інше — перевіряємо лише кандидатів, що можуть перемогти.
           if (score <= bestScore) continue;
-          if (!hasLineOfSight(game.world, p.x, p.y, e.x, e.y)) continue;
+          if (!canSee(game, p.x, p.y, e)) continue;
           bestScore = score;
           best = j;
         }

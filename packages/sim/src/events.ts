@@ -12,6 +12,8 @@ export type GameEventType =
   | 'enemyAttack'
   | 'enemyShot'
   | 'impact'
+  | 'armor'
+  | 'explosion'
   | 'playerHit'
   | 'pickup'
   | 'purchase'

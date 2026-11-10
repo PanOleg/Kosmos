@@ -140,10 +140,31 @@ export class FxDirector {
         break;
       }
       case 'enemyWindup':
-        this.sfx.windup(this.pan(e.x));
+        // b: 0 Скаут, 2 Стрілець, 3 Камікадзе, 4 Оса, 5 Снайпер.
+        if (e.b === 3) this.sfx.kamikazeArm(this.pan(e.x));
+        else if (e.b === 5) this.sfx.sniperCharge(this.pan(e.x));
+        else this.sfx.windup(this.pan(e.x));
+        break;
+      case 'explosion': {
+        this.sfx.explosion(this.pan(e.x));
+        this.cam.shake(0.55);
+        this.hitStop = Math.max(this.hitStop, 0.05);
+        this.sparks.burst(40, X, 1, Z, 1, 0, 14, Math.PI * 2, 0.45, 0.3, 0xffb050);
+        this.sparks.burst(20, X, 0.6, Z, 1, 0, 6, Math.PI * 2, 0.8, 0.5, 0xff3a1a);
+        this.debris.burst(10, X, 1.2, Z, 1, 0, 8, Math.PI * 2, 1.4, 0.16, PALETTE.enemyDark);
+        this.flashLight.position.x = X;
+        this.flashLight.position.z = Z;
+        this.flashT = 0.2;
+        break;
+      }
+      case 'armor':
+        // Куля відскочила від лобової броні: біла іскра й дзвін — «стріляй збоку».
+        this.sparks.burst(5, X, 1.8, Z, e.x2, -e.y2, 8, 1.2, 0.15, 0.12, 0xffffff);
+        this.sfx.ricochet(this.pan(e.x));
         break;
       case 'enemyShot':
-        this.sfx.enemyShot(this.pan(e.x));
+        if (e.b === 2) this.sfx.sniperShot(this.pan(e.x));
+        else this.sfx.enemyShot(this.pan(e.x));
         this.sparks.burst(
           6,
           X + e.x2 * 0.7,

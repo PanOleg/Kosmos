@@ -1,4 +1,6 @@
 import { PICKUPS, PLAYER_COUNT_MUL } from '../config/waves';
+import { AIR_TYPES, SWARM } from '../config/enemies';
+import { SWARM_GROUPS } from './enemies';
 import { emit } from '../events';
 import { secToTicks } from '../math';
 import type { Game } from '../state';
@@ -18,6 +20,8 @@ export interface WaveState {
   speedMul: number;
   /** Чергування шлюзів для груп з airlock: 'any'. */
   airlockCursor: number;
+  /** Лічильник номерів роїв. */
+  groupSeq: number;
 }
 
 export function createWaveState(): WaveState {
@@ -31,14 +35,26 @@ export function createWaveState(): WaveState {
     partsMul: 1,
     speedMul: 1,
     airlockCursor: 0,
+    groupSeq: 0,
   };
 }
 
-function groupCount(game: Game, base: number): number {
+function groupCount(game: Game, base: number, air = false): number {
   const n = game.state.players.length;
+  const mods = game.config.mods;
   const mul =
-    PLAYER_COUNT_MUL[Math.min(n, PLAYER_COUNT_MUL.length - 1)]! * game.config.mods.enemyCount;
+    PLAYER_COUNT_MUL[Math.min(n, PLAYER_COUNT_MUL.length - 1)]! *
+    mods.enemyCount *
+    (air ? mods.droneRate : 1);
   return Math.max(1, Math.round(base * mul));
+}
+
+type EnemyTypeArg = Parameters<typeof spawnEnemy>[1];
+
+/** Скільки окремих ворогів дає група (рій — десяток дронів за одиницю). */
+function unitsOf(game: Game, type: EnemyTypeArg, base: number): number {
+  const c = groupCount(game, base, AIR_TYPES.has(type));
+  return type === 'swarm' ? c * SWARM.count : c;
 }
 
 export function startWave(game: Game, index: number): void {
@@ -49,7 +65,7 @@ export function startWave(game: Game, index: number): void {
   w.timer = secToTicks(def.pause);
   w.nextGroup = 0;
   w.spawnedTotal = 0;
-  w.plannedTotal = def.groups.reduce((a, g) => a + groupCount(game, g.count), 0);
+  w.plannedTotal = def.groups.reduce((a, g) => a + unitsOf(game, g.type, g.count), 0);
   w.partsMul = def.partsMul;
   w.speedMul = def.speedMul;
   // Нова пауза — нова аптечка в магазині.
@@ -90,7 +106,7 @@ export function updateWaves(game: Game): void {
     const g = def.groups[w.nextGroup]!;
     const due = w.timer >= secToTicks(g.at) || s.enemiesAlive < def.pressureBelow;
     if (!due) break;
-    spawnGroup(game, g.type, groupCount(game, g.count), g.airlock);
+    spawnGroup(game, g.type, groupCount(game, g.count, AIR_TYPES.has(g.type)), g.airlock);
     w.nextGroup++;
   }
 
@@ -102,31 +118,41 @@ export function updateWaves(game: Game): void {
   }
 }
 
-function spawnGroup(
-  game: Game,
-  type: Parameters<typeof spawnEnemy>[1],
-  count: number,
-  airlock: number | 'any',
-): void {
+function spawnGroup(game: Game, type: EnemyTypeArg, count: number, airlock: number | 'any'): void {
   const w = game.state.wave;
-  const locks = game.config.map.airlocks;
-  const idx = airlock === 'any' ? w.airlockCursor++ % locks.length : airlock;
-  const a = locks[idx]!;
-  // Група виходить зі шлюзу віялом, всередину арени.
-  const inX = -a.x / Math.hypot(a.x, a.y);
-  const inY = -a.y / Math.hypot(a.x, a.y);
+  const air = AIR_TYPES.has(type);
+  // Наземні — зі шлюзів, дрони — з вентиляційних люків у стелі (PROMPT, «Сетинг»).
+  const points = air ? game.config.map.vents : game.config.map.airlocks;
+  const idx = airlock === 'any' ? w.airlockCursor++ % points.length : airlock % points.length;
+  const a = points[idx]!;
+  const add = (x: number, y: number, group = -1) => {
+    const e = spawnEnemy(game, type, x, y, group);
+    if (e >= 0) {
+      game.state.enemies[e]!.speed *= w.speedMul;
+      w.spawnedTotal++;
+    }
+  };
+  if (type === 'swarm') {
+    for (let k = 0; k < count; k++) {
+      const group = w.groupSeq++ % SWARM_GROUPS;
+      for (let i = 0; i < SWARM.count; i++) {
+        const ang = (i / SWARM.count) * Math.PI * 2;
+        add(a.x + Math.cos(ang) * 1.2 + k * 2, a.y + Math.sin(ang) * 1.2, group);
+      }
+    }
+    return;
+  }
+  // Група виходить віялом, усередину арени.
+  const inX = -a.x / (Math.hypot(a.x, a.y) || 1);
+  const inY = -a.y / (Math.hypot(a.x, a.y) || 1);
   const sideX = -inY;
   const sideY = inX;
   for (let k = 0; k < count; k++) {
     const row = Math.floor(k / 3);
     const col = (k % 3) - 1;
-    const x = a.x + inX * (1.5 + row * 1.2) + sideX * col * 1.2;
-    const y = a.y + inY * (1.5 + row * 1.2) + sideY * col * 1.2;
-    const e = spawnEnemy(game, type, x, y);
-    if (e >= 0) {
-      const en = game.state.enemies[e]!;
-      en.speed *= w.speedMul;
-      w.spawnedTotal++;
-    }
+    add(
+      a.x + inX * (1.5 + row * 1.2) + sideX * col * 1.2,
+      a.y + inY * (1.5 + row * 1.2) + sideY * col * 1.2,
+    );
   }
 }

@@ -62,9 +62,14 @@ if (m === 'map') {
   floor.receiveShadow = true;
   scene.add(floor);
   const classes: ClassId[] = ['assault', 'engineer', 'medic', 'tech'];
-  const obj = classes.includes(m as ClassId)
-    ? new PlayerView(0, m as ClassId).root
-    : buildEnemyVisual(m as EnemyType).root;
+  let obj: THREE.Object3D;
+  if (classes.includes(m as ClassId)) obj = new PlayerView(0, m as ClassId).root;
+  else {
+    const v = buildEnemyVisual(m as EnemyType);
+    // Дрони в грі висять у повітрі: піднімаємо, щоб не входили в підлогу.
+    if (['wasp', 'kamikaze', 'sniper', 'swarm'].includes(m)) v.body.position.y = 1.2;
+    obj = v.root;
+  }
   obj.traverse((o) => {
     // Кільце під гравцем у галереї зайве.
     if ((o as THREE.Mesh).geometry?.type === 'RingGeometry') o.visible = false;
@@ -72,7 +77,9 @@ if (m === 'map') {
   obj.rotation.y = 0.45;
   scene.add(obj);
   const box = new THREE.Box3().setFromObject(obj);
-  const h = box.max.y - box.min.y;
+  const size = box.getSize(new THREE.Vector3());
+  // Кадруємо за найбільшим розміром: пласкі дрони інакше вилазять за кадр.
+  const h = Math.max(size.y, size.x * 0.8, size.z * 0.8, 1.2);
   const cam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 100);
   cam.position.set(0, h * 0.75, h * 3.4);
   cam.lookAt(0, h * 0.48, 0);

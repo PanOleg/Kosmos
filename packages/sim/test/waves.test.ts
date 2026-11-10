@@ -13,10 +13,15 @@ function playWithBots(players: number, seed: number, maxSec = 360) {
   let atClear: { onFloor: number; collected: number } | null = null;
   const collected = () => g.state.players.reduce((a, p) => a + p.stats.partsCollected, 0);
   let spawned = 0;
+  let exploded = 0;
   while (g.state.phase === 'playing' && ticks < maxSec * 60) {
     for (let i = 0; i < inputs.length; i++) botInput(g, i, inputs[i]!);
     step(g, inputs);
-    for (let i = 0; i < g.events.count; i++) if (g.events.list[i]!.type === 'spawn') spawned++;
+    for (let i = 0; i < g.events.count; i++) {
+      const t = g.events.list[i]!.type;
+      if (t === 'spawn') spawned++;
+      else if (t === 'explosion') exploded++;
+    }
     for (let i = 0; i < g.events.count; i++)
       if (g.events.list[i]!.type === 'waveCleared' && g.events.list[i]!.b === 1)
         atClear = {
@@ -25,15 +30,16 @@ function playWithBots(players: number, seed: number, maxSec = 360) {
         };
     ticks++;
   }
-  return { g, sec: ticks / 60, atClear, collected: collected(), spawned };
+  return { g, sec: ticks / 60, atClear, collected: collected(), spawned, exploded };
 }
 
 describe('waves', () => {
   test('solo bot clears all waves', () => {
-    const { g, sec, atClear, collected, spawned } = playWithBots(1, 11);
+    const { g, sec, atClear, collected, spawned, exploded } = playWithBots(1, 11);
     expect(g.state.phase).toBe('won');
     const p = g.state.players[0]!;
-    expect(p.stats.kills).toBe(spawned);
+    // Кожен ворог або вбитий гравцем, або підірвався сам (Камікадзе).
+    expect(p.stats.kills + exploded).toBe(spawned);
     // Після зачистки «пилосос» збирає все, що лежало на підлозі: нічого не губиться.
     // (Деталь, що пролежала 25 с недосяжною для бота, згасає ще під час хвилі — так задумано.)
     expect(atClear).not.toBeNull();

@@ -7,6 +7,7 @@ import {
   botInput,
   DT,
   type ClassId,
+  type EnemyType,
   type Game,
   type PlayerInput,
 } from '@horizon/sim';
@@ -240,7 +241,24 @@ function startMatch(): void {
     classes: game.state.players.map((p) => p.classId),
   };
   lobbyView.show(false);
-  if (DEBUG) (window as unknown as { game: Game }).game = game;
+  if (DEBUG) {
+    (window as unknown as { game: Game }).game = game;
+    // window.spawn('kamikaze', 3) — будь-який ворог біля випадкового люка/шлюзу.
+    (window as unknown as { spawn: (t: EnemyType, n?: number) => void }).spawn = (t, n = 1) => {
+      const pts = ['wasp', 'kamikaze', 'sniper', 'swarm'].includes(t)
+        ? game.config.map.vents
+        : game.config.map.airlocks;
+      const a = pts[game.state.tick % pts.length]!;
+      for (let k = 0; k < n; k++)
+        spawnEnemy(
+          game,
+          t,
+          a.x * 0.9 + (k % 3),
+          a.y * 0.9 + Math.floor(k / 3),
+          t === 'swarm' ? 15 : -1,
+        );
+    };
+  }
   const first = game.config.waves[0];
   if (first) {
     match.hud.announce(first.name, t.stationSignal, 2.5);

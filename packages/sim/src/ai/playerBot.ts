@@ -1,4 +1,5 @@
 import { SCOUT_WINDUP } from './scout';
+import { KAMI_DIVE, KAMI_WINDUP } from './kamikaze';
 import { TEAM_ENEMY } from '../entities/projectile';
 import type { PlayerInput } from '../protocol';
 import type { Game } from '../state';
@@ -35,6 +36,32 @@ export function botInput(game: Game, slot: number, out: PlayerInput): void {
     ax += (dx / d) * k * 2;
     ay += (dy / d) * k * 2;
     if (e.type === 'scout' && e.ai === SCOUT_WINDUP && d < 2.5) danger = true;
+    // Камікадзе: пікірування поруч — ривок убік від лінії удару.
+    if (e.type === 'kamikaze' && (e.ai === KAMI_DIVE || e.ai === KAMI_WINDUP) && d < 4) {
+      danger = e.ai === KAMI_DIVE;
+      ax += -e.fy * 2;
+      ay += e.fx * 2;
+    }
+  }
+  // Нікого в прицілі — підходимо до найближчого ворога (снайпер висить поза дальністю).
+  if (p.target < 0) {
+    let nd = Infinity;
+    let nx = 0;
+    let ny = 0;
+    for (const e of s.enemies) {
+      if (!e.alive) continue;
+      const d2 = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;
+      if (d2 < nd) {
+        nd = d2;
+        nx = e.x;
+        ny = e.y;
+      }
+    }
+    if (nd < Infinity && nd > 100) {
+      const d = Math.sqrt(nd);
+      ax += ((nx - p.x) / d) * 1.2;
+      ay += ((ny - p.y) / d) * 1.2;
+    }
   }
   for (const b of s.projectiles) {
     if (!b.alive || b.team !== TEAM_ENEMY) continue;

@@ -224,6 +224,8 @@ export function raycast(
   bx: number,
   by: number,
   shotsOnly = true,
+  /** Перешкоди нижчі за це ігноруються: постріли над столами по дронах і з дронів. */
+  minHeight = 0,
 ): number {
   const dx = bx - ax;
   const dy = by - ay;
@@ -238,7 +240,7 @@ export function raycast(
   for (let qi = 0; qi < count; qi++) {
     const o = w.obstacles[w.query[qi]!]!;
     {
-      if (shotsOnly && !o.blocksShots) continue;
+      if ((shotsOnly && !o.blocksShots) || o.src.height < minHeight) continue;
       let t: number;
       if (o.isCircle) {
         const fx = ax - o.x;
@@ -301,6 +303,7 @@ export function hasLineOfSight(
   ay: number,
   bx: number,
   by: number,
+  minHeight = 0,
 ): boolean {
-  return raycast(w, ax, ay, bx, by, true) >= 1;
+  return raycast(w, ax, ay, bx, by, true, minHeight) >= 1;
 }

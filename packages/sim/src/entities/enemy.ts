@@ -36,6 +36,17 @@ export interface Enemy {
   stagger: number;
   /** Тики глушіння ЕМІ: не рухається й не атакує, вразливий. */
   stun: number;
+  /** Висота над підлогою, м. Дрони літають; заглушений дрон падає до ~0.4. */
+  alt: number;
+  /** Дрон (літає над низькими перешкодами). */
+  air: boolean;
+  /** Номер рою (для Рою) — дрони одного рою тримаються хмарою; −1 — не в рої. */
+  group: number;
+  /** Лічильник для черг і укусів. */
+  shots: number;
+  /** Точка удару (пікірування Камікадзе, ціль снайпера). */
+  tx: number;
+  ty: number;
   /** Ворог «відкритий»: у вікні вразливості (визирає, замахується). */
   exposed: boolean;
 }
@@ -71,8 +82,19 @@ export function createEnemyPool(capacity: number): Enemy[] {
       peekY: 0,
       stagger: 0,
       stun: 0,
+      alt: 0,
+      air: false,
+      group: -1,
+      shots: 0,
+      tx: 0,
+      ty: 0,
       exposed: false,
     });
   }
   return pool;
+}
+
+/** Ворог «у повітрі»: над низькими перешкодами. Рій (1.2 м) і заглушені дрони — ні. */
+export function isHigh(e: Enemy): boolean {
+  return e.air && e.alt > 1.5;
 }
