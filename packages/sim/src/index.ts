@@ -4,6 +4,7 @@ import { buildWorld } from './collision/world';
 import { DEFAULT_CONFIG, type ClassId, type GameConfig } from './config';
 import { createEnemyPool } from './entities/enemy';
 import { createPlayer } from './entities/player';
+import { createPickupPool } from './entities/pickup';
 import { createProjectilePool } from './entities/projectile';
 import { createEventBuffer } from './events';
 import { createRng } from './rng';
@@ -14,6 +15,8 @@ import { updatePlayerFire, updateProjectiles } from './systems/combat';
 import { updateEnemies } from './systems/enemies';
 import { updatePlayers } from './systems/movement';
 import { buildNav, updateNav } from './systems/navigation';
+import { updatePickups } from './systems/pickups';
+import { createWaveState, startWave, updateWaves } from './systems/waves';
 
 export interface PlayerSlotSetup {
   classId: ClassId;
@@ -21,6 +24,7 @@ export interface PlayerSlotSetup {
 
 const ENEMY_CAPACITY = 192;
 const PROJECTILE_CAPACITY = 768;
+const PICKUP_CAPACITY = 256;
 
 export function createGame(
   config: GameConfig = DEFAULT_CONFIG,
@@ -38,7 +42,10 @@ export function createGame(
     }),
     enemies: createEnemyPool(ENEMY_CAPACITY),
     projectiles: createProjectilePool(PROJECTILE_CAPACITY),
+    pickups: createPickupPool(PICKUP_CAPACITY),
     enemiesAlive: 0,
+    wave: createWaveState(),
+    partsCarry: 0,
   };
   const world = buildWorld(config.map);
   const game: Game = {
@@ -51,6 +58,8 @@ export function createGame(
     cover: buildCover(world, 0.6, 0.8),
   };
   updateNav(game.nav, state);
+  if (config.waves.length > 0) startWave(game, 0);
+  else state.wave.phase = 'done';
   return game;
 }
 
@@ -63,10 +72,12 @@ export function step(game: Game, inputs: readonly PlayerInput[]): GameState {
   const s = game.state;
   if (s.phase !== 'playing') return s;
   updatePlayers(game, inputs);
+  updateWaves(game);
   updateEnemies(game);
   updateAutoaim(game);
   updatePlayerFire(game);
   updateProjectiles(game);
+  updatePickups(game);
   if (s.players.every((p) => p.down)) s.phase = 'lost';
   s.tick++;
   return s;
@@ -80,10 +91,13 @@ export * from './math';
 export type { Player } from './entities/player';
 export type { Enemy } from './entities/enemy';
 export type { Projectile } from './entities/projectile';
+export type { Pickup } from './entities/pickup';
+export type { WaveState, WavePhase } from './systems/waves';
 export { TEAM_PLAYER, TEAM_ENEMY } from './entities/projectile';
 export { hasLineOfSight, raycast } from './collision/world';
 export { spawnEnemy } from './systems/enemies';
 export { threatOf } from './systems/autoaim';
 export { serializeState, hashState } from './serialize';
 export { SCOUT_WINDUP } from './ai/scout';
+export { botInput } from './ai/playerBot';
 export { GUNNER_HIDE, GUNNER_PEEK, GUNNER_SEEK, GUNNER_OPEN, GUNNER_RETURN } from './ai/gunner';

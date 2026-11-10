@@ -138,6 +138,32 @@ export class Sfx {
     this.burst('lowpass', 900, 100, 1, 0.2, 0.4);
   }
 
+  /** Сигнал станції перед хвилею: дві низькі ноти сирени. */
+  stationSignal(): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    for (let i = 0; i < 2; i++) {
+      const t = ctx.currentTime + i * 0.45;
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(220, t);
+      o.frequency.linearRampToValueAtTime(330, t + 0.35);
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 1200;
+      const g = ctx.createGain();
+      this.env(g, t, 0.18, 0.05, 0.38);
+      o.connect(f).connect(g).connect(this.master);
+      o.start(t);
+      o.stop(t + 0.5);
+    }
+  }
+
+  fanfare(won: boolean): void {
+    const notes = won ? [523, 659, 784, 1047] : [392, 330, 262, 196];
+    notes.forEach((f, i) => setTimeout(() => this.tone('triangle', f, f, 0.28, 0.2), i * 140));
+  }
+
   playerDown(): void {
     this.tone('sawtooth', 300, 40, 0.9, 0.3);
   }

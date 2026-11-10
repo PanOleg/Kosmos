@@ -20,15 +20,16 @@ export class GameCamera {
     this.trauma = Math.min(1, this.trauma + amount);
   }
 
-  update(points: { x: number; z: number }[], dt: number, time: number): void {
-    if (points.length > 0) {
+  update(points: { x: number; z: number }[], count: number, dt: number, time: number): void {
+    if (count > 0) {
       let cx = 0;
       let cz = 0;
       let minX = Infinity;
       let maxX = -Infinity;
       let minZ = Infinity;
       let maxZ = -Infinity;
-      for (const p of points) {
+      for (let i = 0; i < count; i++) {
+        const p = points[i]!;
         cx += p.x;
         cz += p.z;
         minX = Math.min(minX, p.x);
@@ -36,8 +37,8 @@ export class GameCamera {
         minZ = Math.min(minZ, p.z);
         maxZ = Math.max(maxZ, p.z);
       }
-      cx /= points.length;
-      cz /= points.length;
+      cx /= count;
+      cz /= count;
       const spread = Math.max(maxX - minX, (maxZ - minZ) * 1.4);
       const want = Math.min(56, Math.max(34, 26 + spread * 0.9));
       const k = 1 - Math.exp(-dt * 4);

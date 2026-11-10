@@ -16,6 +16,7 @@ export class PlayerView {
   private flash = 0;
   private muzzleT = 0;
   private recoil = 0;
+  private ringPulse = 0;
   private readonly muzzle: THREE.Mesh;
 
   constructor(readonly slot: number) {
@@ -88,6 +89,10 @@ export class PlayerView {
     this.flash = 1;
   }
 
+  pickupFlash(): void {
+    this.ringPulse = 1;
+  }
+
   fire(): void {
     this.muzzleT = 0.05;
     this.recoil = 1;
@@ -125,6 +130,10 @@ export class PlayerView {
     this.flash = Math.max(0, this.flash - dt * 6);
     this.suitMat.emissive.setRGB(this.flash, this.flash * 0.2, this.flash * 0.1);
     (this.ring.material as THREE.MeshBasicMaterial).opacity = p.dashCd > 0 ? 0.35 : 0.85;
+    // Підбір деталі: кільце коротко розширюється.
+    this.ringPulse = Math.max(0, this.ringPulse - dt * 5);
+    const rs = 1 + this.ringPulse * 0.6;
+    this.ring.scale.set(rs, 1, rs);
     this.body.rotation.x = p.down ? -1.45 : 0;
     this.root.visible = true;
   }

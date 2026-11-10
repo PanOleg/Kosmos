@@ -14,6 +14,9 @@ export type GameEventType =
   | 'impact'
   | 'playerHit'
   | 'pickup'
+  | 'wavePause'
+  | 'waveStart'
+  | 'waveCleared'
   | 'playerDown';
 
 export interface GameEvent {

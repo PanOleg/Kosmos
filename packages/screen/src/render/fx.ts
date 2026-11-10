@@ -33,6 +33,8 @@ export class FxDirector {
   private readonly dashTrail: number[] = [0, 0, 0, 0];
   private readonly flashLight: THREE.PointLight;
   private flashT = 0;
+  private pickupCombo = 0;
+  private lastPickup = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -190,12 +192,26 @@ export class FxDirector {
         this.sfx.dash();
         this.dashTrail[e.a] = 0.22;
         break;
+      case 'pickup': {
+        // Комбо: швидкі підбори підіймають тон.
+        const now = performance.now();
+        this.pickupCombo = now - this.lastPickup < 600 ? this.pickupCombo + 1 : 0;
+        this.lastPickup = now;
+        this.sfx.pickup(this.pan(e.x), this.pickupCombo);
+        this.sparks.burst(8, X, 0.7, Z, 1, 0, 4, Math.PI * 2, 0.3, 0.16, PALETTE.part);
+        this.players[e.a]?.pickupFlash();
+        break;
+      }
       case 'spawn':
         this.sparks.burst(8, X, 0.3, Z, 1, 0, 3, Math.PI * 2, 0.4, 0.2, PALETTE.emergencyAmber);
         break;
       default:
         break;
     }
+  }
+
+  destroy(): void {
+    this.vignette.remove();
   }
 
   update(game: Game, dt: number): void {

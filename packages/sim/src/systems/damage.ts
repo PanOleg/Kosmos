@@ -3,6 +3,7 @@ import type { Enemy } from '../entities/enemy';
 import type { Player } from '../entities/player';
 import { emit } from '../events';
 import type { Game } from '../state';
+import { dropParts } from './pickups';
 
 export function damagePlayer(
   game: Game,
@@ -54,5 +55,6 @@ export function killEnemy(game: Game, e: Enemy, index: number, bySlot: number): 
   const p = game.state.players[bySlot];
   if (p) p.stats.kills++;
   emit(game.events, 'kill', e.x, e.y, e.vx, e.vy, index, bySlot, ENEMIES[e.type].parts);
+  dropParts(game, e.x, e.y, ENEMIES[e.type].parts);
   for (const pl of game.state.players) if (pl.target === index) pl.target = -1;
 }
