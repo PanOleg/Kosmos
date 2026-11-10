@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { TICKS_PER_SEC, type Game } from '@horizon/sim';
-import { PALETTE } from '../render/palette';
+import { classColor, hexCss } from '../render/palette';
 import { toX, toZ } from '../render/coords';
 import { t } from './i18n';
 
@@ -13,7 +13,7 @@ const css = `
 .hud-card { position: absolute; width: 210px; padding: 8px 10px; background: rgba(8,10,16,.6); border-radius: 8px; border-left: 4px solid; font-size: 13px; }
 .hud-card .row { display: flex; justify-content: space-between; align-items: center; }
 .hud-card .cls { font-weight: 700; letter-spacing: .03em; }
-.hud-card .parts { color: #ffd84a; font-weight: 700; font-variant-numeric: tabular-nums; display: inline-block; }
+.hud-card .parts { color: #9ff4ff; font-weight: 700; font-variant-numeric: tabular-nums; display: inline-block; }
 .hud-card .parts.pop { animation: hudpop .25s ease-out; }
 @keyframes hudpop { 0% { transform: scale(1.6); } 100% { transform: scale(1); } }
 .bar { height: 7px; background: rgba(255,255,255,.12); border-radius: 4px; overflow: hidden; margin-top: 6px; }
@@ -23,7 +23,7 @@ const css = `
 .announce { position: absolute; top: 22%; left: 0; right: 0; text-align: center; font-size: 46px; font-weight: 800; letter-spacing: .12em;
   text-transform: uppercase; color: #ffaa22; text-shadow: 0 0 24px rgba(255,90,20,.6); opacity: 0; transition: opacity .25s; }
 .announce small { display: block; font-size: 18px; letter-spacing: .1em; color: #e8ecf4; opacity: .8; margin-top: 6px; }
-.arrow { position: absolute; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 14px solid #ff5a2a;
+.arrow { position: absolute; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 14px solid #ff2a3a;
   margin: -7px 0 0 -7px; opacity: .85; filter: drop-shadow(0 0 4px rgba(255,80,20,.8)); }
 .hint { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 13px; opacity: .55; transition: opacity 1s; }
 `;
@@ -36,10 +36,6 @@ const CORNERS: Partial<CSSStyleDeclaration>[] = [
 ];
 const MAX_ARROWS = 10;
 let styleInstalled = false;
-
-function hex(c: number): string {
-  return '#' + c.toString(16).padStart(6, '0');
-}
 
 interface Card {
   el: HTMLDivElement;
@@ -75,11 +71,11 @@ export class Hud {
     this.hint.textContent = t.controlsHint;
     this.root.append(this.top, this.announceEl, this.hint);
     for (const p of game.state.players) {
-      const color = hex(PALETTE.players[p.slot % PALETTE.players.length]!);
+      const color = hexCss(classColor(p.classId));
       const el = document.createElement('div');
       el.className = 'hud-card';
       Object.assign(el.style, CORNERS[p.slot % 4], { borderColor: color });
-      el.innerHTML = `<div class="row"><span class="cls" style="color:${color}">${t.className[p.classId]}</span><span class="parts">⬢ 0</span></div><div class="bar"><i style="background:${color};width:100%"></i></div>`;
+      el.innerHTML = `<div class="row"><span class="cls"><span style="opacity:.6">P${p.slot + 1}</span> <span style="color:${color}">${t.className[p.classId]}</span></span><span class="parts">⚙ 0</span></div><div class="bar"><i style="background:${color};width:100%"></i></div>`;
       this.root.appendChild(el);
       this.cards.push({
         el,
@@ -132,7 +128,7 @@ export class Hud {
       c.hp.style.width = `${(p.hp / p.maxHp) * 100}%`;
       const parts = Math.floor(p.parts + 1e-6);
       if (parts !== c.lastParts) {
-        c.parts.textContent = `⬢ ${parts}`;
+        c.parts.textContent = `⚙ ${parts}`;
         // Перезапуск CSS-анімації: зняти клас, змусити reflow, повернути.
         c.parts.classList.remove('pop');
         void c.parts.offsetWidth;

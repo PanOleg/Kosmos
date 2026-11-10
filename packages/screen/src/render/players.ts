@@ -1,12 +1,97 @@
 import * as THREE from 'three';
-import type { Player } from '@horizon/sim';
-import { PALETTE } from './palette';
+import type { ClassId, Player } from '@horizon/sim';
+import { PALETTE, classColor } from './palette';
+import { BOX, CYL, SPHERE, merge, part, type Part } from './mesh';
 import { toX, toZ } from './coords';
 
 /**
- * Силует гравця: широкі плечі, шолом з візором, рюкзак і кільце-маркер під ногами.
- * Вороги будуть кутастими й теплими — гравця впізнають за формою, а не лише кольором.
+ * Силуети класів за концептами: темна броня, пластини й візор кольору класу.
+ * Штурмовик — масивні наплічники й довга гвинтівка; Інженер — великий рюкзак-генератор;
+ * Медик — стрункий, світлі пластини, пістолет; Технік — антена й довга дугова гармата.
+ * Вороги натомість бліді з червоними очима: гравця видно за формою й кольором одночасно.
  */
+function buildClass(classId: ClassId): {
+  hull: THREE.BufferGeometry;
+  glow: THREE.BufferGeometry;
+  muzzleZ: number;
+} {
+  const c = classColor(classId);
+  const A = PALETTE.playerArmor;
+  const L = PALETTE.playerArmorLight;
+  const W = 0xdfe3ea;
+  const slim = classId === 'medic' ? 0.85 : 1;
+  const hull: Part[] = [
+    // Ноги й таз.
+    part(BOX, L, [0.14, 0.32, 0], [0.18 * slim, 0.62, 0.22]),
+    part(BOX, L, [-0.14, 0.32, 0], [0.18 * slim, 0.62, 0.22]),
+    part(BOX, c, [0.14, 0.42, 0.1], [0.16, 0.14, 0.06]),
+    part(BOX, c, [-0.14, 0.42, 0.1], [0.16, 0.14, 0.06]),
+    part(BOX, L, [0, 0.66, 0], [0.42 * slim, 0.16, 0.26]),
+    // Торс у колір класу, як на концептах; темні лише суглоби й зброя.
+    part(BOX, classId === 'medic' ? W : c, [0, 0.92, 0], [0.5 * slim, 0.42, 0.3]),
+    part(BOX, classId === 'medic' ? c : A, [0, 0.95, 0.13], [0.3 * slim, 0.22, 0.06]),
+    // Шолом.
+    part(SPHERE, classId === 'medic' ? W : c, [0, 1.3, 0], [0.36, 0.34, 0.38]),
+  ];
+  const glow: Part[] = [part(BOX, 0xffffff, [0, 1.3, 0.17], [0.26, 0.08, 0.06])];
+  let muzzleZ = 0.85;
+
+  switch (classId) {
+    case 'assault':
+      hull.push(
+        part(BOX, c, [0.36, 1.08, 0], [0.3, 0.22, 0.38], [0, 0, -0.25]),
+        part(BOX, c, [-0.36, 1.08, 0], [0.3, 0.22, 0.38], [0, 0, 0.25]),
+        part(BOX, A, [0.22, 0.86, 0.38], [0.14, 0.16, 0.95]),
+        part(BOX, L, [0.22, 0.76, 0.2], [0.08, 0.14, 0.18]),
+      );
+      glow.push(part(BOX, 0xffffff, [0.29, 0.88, 0.5], [0.02, 0.04, 0.5]));
+      muzzleZ = 0.9;
+      break;
+    case 'engineer':
+      hull.push(
+        part(BOX, c, [0.3, 1.06, 0], [0.22, 0.18, 0.32]),
+        part(BOX, c, [-0.3, 1.06, 0], [0.22, 0.18, 0.32]),
+        // Рюкзак-генератор щита.
+        part(BOX, A, [0, 1.0, -0.32], [0.56, 0.62, 0.3]),
+        part(CYL, c, [0, 1.05, -0.5], [0.5, 0.06, 0.5], [Math.PI / 2, 0, 0]),
+        part(BOX, A, [0.22, 0.84, 0.3], [0.18, 0.18, 0.6]),
+      );
+      glow.push(part(CYL, 0xffffff, [0, 1.05, -0.54], [0.22, 0.04, 0.22], [Math.PI / 2, 0, 0]));
+      muzzleZ = 0.62;
+      break;
+    case 'medic':
+      hull.push(
+        part(BOX, W, [0.24, 1.04, 0], [0.14, 0.14, 0.24]),
+        part(BOX, W, [-0.24, 1.04, 0], [0.14, 0.14, 0.24]),
+        part(BOX, A, [0.22, 0.88, 0.24], [0.08, 0.12, 0.3]),
+        part(BOX, A, [0, 0.9, -0.22], [0.3, 0.34, 0.14]),
+      );
+      // Хрест на грудях.
+      glow.push(
+        part(BOX, 0xffffff, [0, 0.96, 0.18], [0.16, 0.05, 0.02]),
+        part(BOX, 0xffffff, [0, 0.96, 0.18], [0.05, 0.16, 0.02]),
+      );
+      muzzleZ = 0.42;
+      break;
+    case 'tech':
+      hull.push(
+        part(BOX, c, [0.3, 1.06, 0], [0.22, 0.18, 0.32], [0, 0, -0.2]),
+        part(BOX, c, [-0.3, 1.06, 0], [0.22, 0.18, 0.32], [0, 0, 0.2]),
+        part(BOX, A, [0, 0.98, -0.26], [0.36, 0.44, 0.2]),
+        part(CYL, L, [0.12, 1.5, -0.3], [0.03, 0.7, 0.03]),
+        part(BOX, A, [0.22, 0.86, 0.4], [0.12, 0.14, 1.0]),
+      );
+      // Котушки дугової гармати.
+      for (let i = 0; i < 3; i++)
+        glow.push(part(BOX, 0xffffff, [0.22, 0.86, 0.3 + i * 0.22], [0.17, 0.17, 0.05]));
+      muzzleZ = 0.95;
+      break;
+  }
+  return { hull: merge(hull), glow: merge(glow), muzzleZ };
+}
+
+const modelCache = new Map<ClassId, ReturnType<typeof buildClass>>();
+
 export class PlayerView {
   readonly root = new THREE.Group();
   private readonly body = new THREE.Group();
@@ -19,44 +104,36 @@ export class PlayerView {
   private ringPulse = 0;
   private readonly muzzle: THREE.Mesh;
 
-  constructor(readonly slot: number) {
-    const color = PALETTE.players[slot % PALETTE.players.length]!;
+  constructor(
+    readonly slot: number,
+    readonly classId: ClassId,
+  ) {
+    const color = classColor(classId);
+    let model = modelCache.get(classId);
+    if (!model) {
+      model = buildClass(classId);
+      modelCache.set(classId, model);
+    }
     this.suitMat = new THREE.MeshStandardMaterial({
-      color: 0xd8dde6,
-      roughness: 0.5,
-      metalness: 0.2,
-    });
-    const accent = new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.4,
-      emissive: color,
-      emissiveIntensity: 0.35,
+      vertexColors: true,
+      roughness: 0.45,
+      metalness: 0.35,
+      flatShading: true,
     });
     this.visorMat = new THREE.MeshStandardMaterial({
       color,
       emissive: color,
-      emissiveIntensity: 1.6,
+      emissiveIntensity: 2.2,
     });
+    const hull = new THREE.Mesh(model.hull, this.suitMat);
+    const glow = new THREE.Mesh(model.glow, this.visorMat);
+    hull.castShadow = true;
+    this.body.add(hull, glow);
 
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.5, 4, 10), this.suitMat);
-    torso.position.y = 0.75;
-    const shoulders = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.22, 0.42), accent);
-    shoulders.position.y = 1.02;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 14, 10), this.suitMat);
-    head.position.y = 1.35;
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 0.12), this.visorMat);
-    visor.position.set(0, 1.37, 0.19);
-    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.55, 0.25), accent);
-    pack.position.set(0, 0.85, -0.3);
-    const gun = new THREE.Mesh(
-      new THREE.BoxGeometry(0.12, 0.12, 0.7),
-      new THREE.MeshStandardMaterial({ color: 0x30343c, metalness: 0.7, roughness: 0.3 }),
-    );
-    gun.position.set(0.32, 0.85, 0.35);
     // Спалах пострілу: два схрещені квадрати, видно з будь-якого кута камери.
     const mGeo = new THREE.PlaneGeometry(0.5, 0.5);
     const mMat = new THREE.MeshBasicMaterial({
-      color: 0xe8ffff,
+      color: PALETTE.playerShot,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
@@ -66,16 +143,12 @@ export class PlayerView {
     const m2 = new THREE.Mesh(mGeo, mMat);
     m2.rotation.y = Math.PI / 2;
     this.muzzle.add(m2);
-    this.muzzle.position.set(0.32, 0.85, 0.85);
+    this.muzzle.position.set(0.22, 0.86, model.muzzleZ);
     this.muzzle.visible = false;
     this.body.add(this.muzzle);
-    for (const m of [torso, shoulders, head, visor, pack, gun]) {
-      m.castShadow = true;
-      this.body.add(m);
-    }
     this.root.add(this.body);
     // Візуально більший за хітбокс (0.5 м): з дивана на телевізорі інакше губиться.
-    this.root.scale.setScalar(1.3);
+    this.root.scale.setScalar(1.35);
 
     this.ring = new THREE.Mesh(
       new THREE.RingGeometry(0.62, 0.78, 32).rotateX(-Math.PI / 2),
@@ -128,7 +201,7 @@ export class PlayerView {
     this.body.position.z = 0;
     this.body.translateZ(-this.recoil * 0.12);
     this.flash = Math.max(0, this.flash - dt * 6);
-    this.suitMat.emissive.setRGB(this.flash, this.flash * 0.2, this.flash * 0.1);
+    this.suitMat.emissive.setRGB(this.flash, this.flash, this.flash);
     (this.ring.material as THREE.MeshBasicMaterial).opacity = p.dashCd > 0 ? 0.35 : 0.85;
     // Підбір деталі: кільце коротко розширюється.
     this.ringPulse = Math.max(0, this.ringPulse - dt * 5);

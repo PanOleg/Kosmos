@@ -1,5 +1,5 @@
 import type { Game } from '@horizon/sim';
-import { PALETTE } from '../render/palette';
+import { classColor, hexCss } from '../render/palette';
 import { t } from './i18n';
 
 /** Екран після матчу: підсумок по кожному гравцю. */
@@ -24,8 +24,7 @@ export function showResults(game: Game, won: boolean): HTMLDivElement {
   const cell = 'padding:8px 16px';
   const rows = s.players
     .map((p) => {
-      const c =
-        '#' + PALETTE.players[p.slot % PALETTE.players.length]!.toString(16).padStart(6, '0');
+      const c = hexCss(classColor(p.classId));
       const st = p.stats;
       return `<tr><td style="${cell};color:${c};font-weight:700">${t.className[p.classId]}</td><td style="${cell}">${st.kills}</td><td style="${cell}">${st.partsCollected}</td><td style="${cell}">${st.revives}</td><td style="${cell}">${Math.round(st.damageDealt)}</td><td style="${cell}">${Math.round(st.damageTaken)}</td></tr>`;
     })

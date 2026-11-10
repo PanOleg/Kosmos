@@ -9,7 +9,7 @@ export interface ArenaView {
 }
 
 interface FlickerLight {
-  light: THREE.PointLight;
+  light?: THREE.PointLight;
   base: number;
   phase: number;
   emissive?: THREE.MeshStandardMaterial;
@@ -199,23 +199,78 @@ export function buildArena(map: MapDef): ArenaView {
   g.add(coreLight);
   flick.push({ light: coreLight, base: 40, phase: 0 });
 
-  // Аварійні лампи на стінах: червоні й жовті, по одній на сектор.
+  // Світло секторів за картою-концептом: вантажний — бурштинове робоче, лабораторія — холодне
+  // блакитне, оранжерея — тепле жовте, палуба — червоне аварійне. По одному джерелу на сектор.
+  const sectorLight = [
+    PALETTE.emergencyAmber,
+    PALETTE.labLight,
+    PALETTE.workLight,
+    PALETTE.emergencyRed,
+  ];
   for (let s = 0; s < 4; s++) {
-    const a = Math.PI / 2 - (s * Math.PI) / 2 + Math.PI / 4;
-    const color = s % 2 === 0 ? PALETTE.emergencyRed : PALETTE.emergencyAmber;
-    const l = new THREE.PointLight(color, 60, 30, 1.6);
-    l.position.set(Math.cos(a) * (R - 3), 3, -Math.sin(a) * (R - 3));
+    const a = Math.PI / 2 - (s * Math.PI) / 2;
+    const color = sectorLight[s]!;
+    const l = new THREE.PointLight(color, 70, 30, 1.5);
+    l.position.set(Math.cos(a) * (R - 9), 5, -Math.sin(a) * (R - 9));
     g.add(l);
-    const bulbMat = new THREE.MeshStandardMaterial({
-      color,
-      emissive: color,
-      emissiveIntensity: 2,
-    });
-    const bulb = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.3, 0.3), bulbMat);
-    bulb.position.set(Math.cos(a) * (R - 0.1), 2.4, -Math.sin(a) * (R - 0.1));
-    bulb.rotation.y = a + Math.PI / 2;
-    g.add(bulb);
-    flick.push({ light: l, base: 60, phase: s * 1.7 + 0.3, emissive: bulbMat });
+    flick.push({ light: l, base: 70, phase: s * 1.7 + 0.3 });
+  }
+
+  // Червоні аварійні лампи по периметру стіни (лише емісив, без джерел світла) і жовті
+  // робочі смуги внизу — ритм кола, як на концепті.
+  const redMat = new THREE.MeshStandardMaterial({
+    color: PALETTE.emergencyRed,
+    emissive: PALETTE.emergencyRed,
+    emissiveIntensity: 2.2,
+  });
+  const workMat = new THREE.MeshStandardMaterial({
+    color: PALETTE.workLight,
+    emissive: PALETTE.workLight,
+    emissiveIntensity: 1.2,
+  });
+  const lampGeo = new THREE.BoxGeometry(1.1, 0.35, 0.2);
+  const stripGeo = new THREE.BoxGeometry(1.6, 0.08, 0.1);
+  for (let i = 0; i < 24; i++) {
+    const a = ((i + 0.5) / 24) * Math.PI * 2;
+    if (angleIn(a, WEST_START, WEST_LEN)) continue;
+    const lamp = new THREE.Mesh(lampGeo, redMat);
+    lamp.position.set(Math.cos(a) * (R - 0.05), 2.2, -Math.sin(a) * (R - 0.05));
+    lamp.rotation.y = a + Math.PI / 2;
+    g.add(lamp);
+    const strip = new THREE.Mesh(stripGeo, workMat);
+    strip.position.set(Math.cos(a + 0.06) * (R - 0.05), 0.5, -Math.sin(a + 0.06) * (R - 0.05));
+    strip.rotation.y = a + Math.PI / 2;
+    g.add(strip);
+  }
+  // Лампи мерехтять окремо від джерел світла: лише емісив.
+  flick.push({ base: 0, phase: 2.2, emissive: redMat });
+
+  // Сонячні панелі назовні корпусу — силует орбітальної станції.
+  const panelMat = new THREE.MeshStandardMaterial({
+    color: 0x1d3a6e,
+    metalness: 0.7,
+    roughness: 0.3,
+    emissive: 0x0a1a3a,
+    emissiveIntensity: 0.5,
+  });
+  const strutMat = new THREE.MeshStandardMaterial({
+    color: 0x555b66,
+    metalness: 0.7,
+    roughness: 0.5,
+  });
+  for (const a of [Math.PI * 0.25, Math.PI * 0.75, Math.PI * 1.25, Math.PI * 1.75]) {
+    const grp = new THREE.Group();
+    const strut = new THREE.Mesh(new THREE.BoxGeometry(14, 0.4, 0.4), strutMat);
+    strut.position.x = 7;
+    grp.add(strut);
+    for (const off of [-3, 3]) {
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(9, 0.15, 4.5), panelMat);
+      panel.position.set(12, 0, off);
+      grp.add(panel);
+    }
+    grp.position.set(Math.cos(a) * (R + 2), 1.5, -Math.sin(a) * (R + 2));
+    grp.rotation.y = a;
+    g.add(grp);
   }
 
   return {
@@ -227,7 +282,7 @@ export function buildArena(map: MapDef): ArenaView {
         // Мерехтіння: повільна хвиля + рідкісні короткі провали.
         const slow = 0.85 + 0.15 * Math.sin(time * 2.1 + f.phase);
         const glitch = Math.sin(time * 37 + f.phase * 13) > 0.97 ? 0.25 : 1;
-        f.light.intensity = f.base * slow * glitch;
+        if (f.light) f.light.intensity = f.base * slow * glitch;
         if (f.emissive) f.emissive.emissiveIntensity = 2 * slow * glitch;
       }
     },

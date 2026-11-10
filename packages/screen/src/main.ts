@@ -90,13 +90,15 @@ function startMatch(): Match {
   const firstBot = sources.length;
   for (let i = 0; i < bots; i++) sources.push(new BotSource(() => match.game, firstBot + i));
 
+  // Класи унікальні (DECISIONS.md, п. 22); до лобі роздаємо за порядком.
+  const CLASS_ORDER = ['assault', 'engineer', 'medic', 'tech'] as const;
   const game = createGame(
     undefined,
     seed++,
-    sources.map(() => ({ classId: 'assault' as const })),
+    sources.map((_, i) => ({ classId: CLASS_ORDER[i % 4]! })),
   );
   const playerViews = game.state.players.map((p) => {
-    const v = new PlayerView(p.slot);
+    const v = new PlayerView(p.slot, p.classId);
     scene.add(v.root);
     return v;
   });

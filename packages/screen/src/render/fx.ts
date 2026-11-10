@@ -4,7 +4,7 @@ import type { Sfx } from '../audio/sfx';
 import type { GameCamera } from './camera';
 import type { EnemyRenderer } from './enemies';
 import { ParticleSystem } from './particles';
-import { PALETTE } from './palette';
+import { PALETTE, classColor } from './palette';
 import type { PlayerView } from './players';
 import { toX, toZ } from './coords';
 
@@ -101,8 +101,8 @@ export class FxDirector {
         this.sfx.kill(this.pan(e.x));
         this.cam.shake(FEEL.killShake);
         this.hitStop = Math.min(FEEL.maxHitStop, this.hitStop + FEEL.killHitStop);
-        this.sparks.burst(22, X, 0.7, Z, 1, 0, 12, Math.PI * 2, 0.35, 0.22, 0xffb060);
-        this.sparks.burst(10, X, 0.7, Z, 1, 0, 5, Math.PI * 2, 0.5, 0.35, 0xff5020);
+        this.sparks.burst(22, X, 0.7, Z, 1, 0, 12, Math.PI * 2, 0.35, 0.22, PALETTE.enemyEye);
+        this.sparks.burst(10, X, 0.7, Z, 1, 0, 5, Math.PI * 2, 0.5, 0.35, PALETTE.workLight);
         this.debris.burst(
           9,
           X,
@@ -227,7 +227,7 @@ export class FxDirector {
       this.dashTrail[s]! -= dt;
       const p = game.state.players[s];
       if (!p) continue;
-      const color = PALETTE.players[s % PALETTE.players.length]!;
+      const color = classColor(p.classId);
       for (let k = 0; k < 3; k++)
         this.sparks.emit(
           toX(p.x) + (Math.random() - 0.5) * 0.5,
