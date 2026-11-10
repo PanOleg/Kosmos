@@ -9,6 +9,8 @@ import { KeyboardInput, type InputSource } from './input/keyboard';
 import { DebugOverlay } from './debug/overlay';
 import { EnemyRenderer } from './render/enemies';
 import { ProjectileRenderer } from './render/projectiles';
+import { FxDirector } from './render/fx';
+import { Sfx } from './audio/sfx';
 
 const container = document.getElementById('app')!;
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -46,6 +48,9 @@ window.addEventListener('keydown', (e) => {
     spawnEnemy(game, 'scout', a.x * 0.95 + (k % 2), a.y * 0.95 + (k >> 1));
 });
 
+const sfx = new Sfx();
+const fx = new FxDirector(scene, cam, sfx, playerViews, enemyR);
+
 const sources: InputSource[] = [new KeyboardInput()];
 const inputs: PlayerInput[] = game.state.players.map(() => emptyInput());
 const debug = new DebugOverlay();
@@ -63,17 +68,15 @@ function frame(now: number): void {
   // Обмеження кадру: після вкладки у фоні не наздоганяємо сотні кроків.
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  acc += dt;
+  // Хіт-стоп: симуляція стоїть кілька кадрів, рендер і частинки — ні.
+  if (fx.hitStop > 0) fx.hitStop = Math.max(0, fx.hitStop - dt);
+  else acc += dt;
   let steps = 0;
-  while (acc >= DT && steps < 6) {
+  while (acc >= DT && steps < 6 && fx.hitStop <= 0) {
     for (let i = 0; i < inputs.length; i++) sources[i]?.read(inputs[i]!);
     step(game, inputs);
     const ev = game.events;
-    for (let i = 0; i < ev.count; i++) {
-      const e = ev.list[i]!;
-      if (e.type === 'hit') enemyR.hit(e.a);
-      else if (e.type === 'playerHit') playerViews[e.a]?.hitFlash();
-    }
+    for (let i = 0; i < ev.count; i++) fx.handle(ev.list[i]!);
     acc -= DT;
     steps++;
   }
@@ -90,6 +93,7 @@ function frame(now: number): void {
   }
   enemyR.update(game.state.enemies, alpha, dt, time);
   bulletR.update(game.state.projectiles, alpha);
+  fx.update(game, dt);
   arena.update(time);
   cam.update(camPoints, dt, time);
   renderer.render(scene, cam.camera);

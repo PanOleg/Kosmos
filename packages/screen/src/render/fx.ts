@@ -1,0 +1,213 @@
+import * as THREE from 'three';
+import type { Game, GameEvent } from '@horizon/sim';
+import type { Sfx } from '../audio/sfx';
+import type { GameCamera } from './camera';
+import type { EnemyRenderer } from './enemies';
+import { ParticleSystem } from './particles';
+import { PALETTE } from './palette';
+import type { PlayerView } from './players';
+import { toX, toZ } from './coords';
+
+/** Сила ефектів в одному місці — найшвидший спосіб крутити відчуття. */
+const FEEL = {
+  shotShake: 0.025,
+  hitShake: 0.03,
+  killShake: 0.16,
+  playerHitShake: 0.45,
+  killHitStop: 0.055,
+  maxHitStop: 0.1,
+  playerHitStop: 0.08,
+};
+
+/**
+ * Переводить події симуляції у зворотний зв'язок: частинки, спалахи, звук, тремтіння, хіт-стоп.
+ * Логіка гри від цього не залежить: усе тут косметика й може відставати чи пропускати.
+ */
+export class FxDirector {
+  readonly sparks: ParticleSystem;
+  readonly debris: ParticleSystem;
+  /** Секунди, протягом яких симуляція стоїть (рендер і частинки йдуть далі). */
+  hitStop = 0;
+  private readonly vignette: HTMLDivElement;
+  private vignetteA = 0;
+  private readonly dashTrail: number[] = [0, 0, 0, 0];
+  private readonly flashLight: THREE.PointLight;
+  private flashT = 0;
+
+  constructor(
+    scene: THREE.Scene,
+    private readonly cam: GameCamera,
+    private readonly sfx: Sfx,
+    private readonly players: PlayerView[],
+    private readonly enemies: EnemyRenderer,
+  ) {
+    this.sparks = new ParticleSystem(scene, 1200, {
+      additive: true,
+      gravity: 6,
+      drag: 3,
+      bounce: false,
+    });
+    this.debris = new ParticleSystem(scene, 600, {
+      additive: false,
+      gravity: 22,
+      drag: 0.6,
+      bounce: true,
+    });
+    this.vignette = document.createElement('div');
+    Object.assign(this.vignette.style, {
+      position: 'fixed',
+      inset: '0',
+      pointerEvents: 'none',
+      background:
+        'radial-gradient(ellipse at center, rgba(255,0,0,0) 45%, rgba(255,20,10,0.75) 100%)',
+      opacity: '0',
+      zIndex: '5',
+    });
+    document.body.appendChild(this.vignette);
+    // Одне спільне джерело світла для вибухів: дешевше за світло на кожен спалах.
+    this.flashLight = new THREE.PointLight(0xffaa66, 0, 10, 2);
+    this.flashLight.position.y = 1.5;
+    scene.add(this.flashLight);
+  }
+
+  private pan(x: number): number {
+    // Грубе панорамування за X світу відносно камери.
+    return Math.max(-0.8, Math.min(0.8, (toX(x) - this.cam.camera.position.x) / 25));
+  }
+
+  handle(e: GameEvent): void {
+    const X = toX(e.x);
+    const Z = toZ(e.y);
+    switch (e.type) {
+      case 'shot': {
+        this.players[e.a]?.fire();
+        this.sfx.shot(e.a, this.pan(e.x));
+        this.cam.shake(FEEL.shotShake);
+        // Гільза-іскра вбік.
+        this.sparks.burst(2, X, 0.9, Z, e.x2, -e.y2, 6, 0.8, 0.08, 0.12, PALETTE.playerShot);
+        break;
+      }
+      case 'hit': {
+        this.enemies.hit(e.a);
+        this.sfx.hit(this.pan(e.x));
+        this.cam.shake(FEEL.hitShake);
+        // Іскри летять далі за напрямком кулі.
+        this.sparks.burst(6, X, 0.8, Z, e.x2, -e.y2, 9, 1.4, 0.18, 0.14, 0xfff2c0);
+        break;
+      }
+      case 'kill': {
+        this.sfx.kill(this.pan(e.x));
+        this.cam.shake(FEEL.killShake);
+        this.hitStop = Math.min(FEEL.maxHitStop, this.hitStop + FEEL.killHitStop);
+        this.sparks.burst(22, X, 0.7, Z, 1, 0, 12, Math.PI * 2, 0.35, 0.22, 0xffb060);
+        this.sparks.burst(10, X, 0.7, Z, 1, 0, 5, Math.PI * 2, 0.5, 0.35, 0xff5020);
+        this.debris.burst(
+          9,
+          X,
+          0.7,
+          Z,
+          e.x2 || 1,
+          -(e.y2 || 0),
+          7,
+          Math.PI * 1.6,
+          1.6,
+          0.18,
+          PALETTE.enemy,
+        );
+        this.debris.burst(5, X, 0.7, Z, 1, 0, 6, Math.PI * 2, 1.4, 0.12, PALETTE.enemyDark);
+        this.flashLight.position.x = X;
+        this.flashLight.position.z = Z;
+        this.flashT = 0.12;
+        break;
+      }
+      case 'impact': {
+        this.sparks.burst(
+          4,
+          X,
+          0.9,
+          Z,
+          -e.x2,
+          e.y2,
+          5,
+          1.6,
+          0.12,
+          0.1,
+          e.a === 0 ? PALETTE.playerShot : PALETTE.enemyShot,
+        );
+        if (Math.random() < 0.3) this.sfx.wallImpact(this.pan(e.x));
+        break;
+      }
+      case 'enemyWindup':
+        this.sfx.windup(this.pan(e.x));
+        break;
+      case 'enemyAttack':
+        this.sfx.enemyAttack(this.pan(e.x));
+        this.sparks.burst(
+          5,
+          X + e.x2 * 0.8,
+          0.7,
+          Z - e.y2 * 0.8,
+          e.x2,
+          -e.y2,
+          6,
+          1,
+          0.12,
+          0.15,
+          PALETTE.danger,
+        );
+        break;
+      case 'playerHit': {
+        this.players[e.a]?.hitFlash();
+        this.sfx.playerHit();
+        this.cam.shake(FEEL.playerHitShake);
+        this.hitStop = Math.max(this.hitStop, FEEL.playerHitStop);
+        this.vignetteA = Math.min(1, this.vignetteA + 0.6);
+        this.sparks.burst(10, X, 1, Z, X - toX(e.x2), Z - toZ(e.y2), 7, 1.5, 0.25, 0.15, 0xff3020);
+        break;
+      }
+      case 'playerDown':
+        this.sfx.playerDown();
+        this.cam.shake(0.6);
+        this.vignetteA = 1;
+        break;
+      case 'dash':
+        this.sfx.dash();
+        this.dashTrail[e.a] = 0.22;
+        break;
+      case 'spawn':
+        this.sparks.burst(8, X, 0.3, Z, 1, 0, 3, Math.PI * 2, 0.4, 0.2, PALETTE.emergencyAmber);
+        break;
+      default:
+        break;
+    }
+  }
+
+  update(game: Game, dt: number): void {
+    this.sparks.update(dt);
+    this.debris.update(dt);
+    this.vignetteA = Math.max(0, this.vignetteA - dt * 2.2);
+    this.vignette.style.opacity = this.vignetteA.toFixed(3);
+    this.flashT = Math.max(0, this.flashT - dt);
+    this.flashLight.intensity = this.flashT > 0 ? 60 * (this.flashT / 0.12) : 0;
+    // Шлейф ривка: «привиди» кольору гравця вздовж шляху.
+    for (let s = 0; s < this.dashTrail.length; s++) {
+      if (this.dashTrail[s]! <= 0) continue;
+      this.dashTrail[s]! -= dt;
+      const p = game.state.players[s];
+      if (!p) continue;
+      const color = PALETTE.players[s % PALETTE.players.length]!;
+      for (let k = 0; k < 3; k++)
+        this.sparks.emit(
+          toX(p.x) + (Math.random() - 0.5) * 0.5,
+          0.3 + Math.random() * 1.1,
+          toZ(p.y) + (Math.random() - 0.5) * 0.5,
+          0,
+          0.5,
+          0,
+          0.3,
+          0.25,
+          color,
+        );
+    }
+  }
+}

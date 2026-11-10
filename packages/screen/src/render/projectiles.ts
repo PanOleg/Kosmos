@@ -46,7 +46,7 @@ export class ProjectileRenderer {
       this.q.setFromUnitVectors(this.up, this.dir);
       if (b.team === TEAM_PLAYER) {
         // Довгий трасер: довжина ~ відстань за кадр, щоб швидка куля не «мигала».
-        this.s.set(0.09, 0.09, 0.9);
+        this.s.set(0.13, 0.13, 1.4);
         this.m.compose(this.p, this.q, this.s);
         this.player.setMatrixAt(np++, this.m);
       } else {

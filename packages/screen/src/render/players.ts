@@ -14,6 +14,9 @@ export class PlayerView {
   private readonly visorMat: THREE.MeshStandardMaterial;
   private readonly suitMat: THREE.MeshStandardMaterial;
   private flash = 0;
+  private muzzleT = 0;
+  private recoil = 0;
+  private readonly muzzle: THREE.Mesh;
 
   constructor(readonly slot: number) {
     const color = PALETTE.players[slot % PALETTE.players.length]!;
@@ -49,6 +52,22 @@ export class PlayerView {
       new THREE.MeshStandardMaterial({ color: 0x30343c, metalness: 0.7, roughness: 0.3 }),
     );
     gun.position.set(0.32, 0.85, 0.35);
+    // Спалах пострілу: два схрещені квадрати, видно з будь-якого кута камери.
+    const mGeo = new THREE.PlaneGeometry(0.5, 0.5);
+    const mMat = new THREE.MeshBasicMaterial({
+      color: 0xe8ffff,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    this.muzzle = new THREE.Mesh(mGeo, mMat);
+    const m2 = new THREE.Mesh(mGeo, mMat);
+    m2.rotation.y = Math.PI / 2;
+    this.muzzle.add(m2);
+    this.muzzle.position.set(0.32, 0.85, 0.85);
+    this.muzzle.visible = false;
+    this.body.add(this.muzzle);
     for (const m of [torso, shoulders, head, visor, pack, gun]) {
       m.castShadow = true;
       this.body.add(m);
@@ -69,6 +88,14 @@ export class PlayerView {
     this.flash = 1;
   }
 
+  fire(): void {
+    this.muzzleT = 0.05;
+    this.recoil = 1;
+    this.muzzle.rotation.z = Math.random() * Math.PI;
+    const s = 0.8 + Math.random() * 0.6;
+    this.muzzle.scale.set(s, s, s);
+  }
+
   update(p: Player, alpha: number, dt: number, time: number): void {
     const x = p.px + (p.x - p.px) * alpha;
     const y = p.py + (p.y - p.py) * alpha;
@@ -82,12 +109,23 @@ export class PlayerView {
     const speed = Math.hypot(p.vx, p.vy);
     const dashing = p.dashT > 0;
     // Нахил у бік руху й легке підстрибування кроку.
-    this.body.position.y = speed > 0.5 && !dashing ? Math.abs(Math.sin(time * 14)) * 0.06 : 0;
+    this.body.position.set(
+      0,
+      speed > 0.5 && !dashing ? Math.abs(Math.sin(time * 14)) * 0.06 : 0,
+      0,
+    );
     this.body.scale.set(dashing ? 0.85 : 1, dashing ? 0.8 : 1, dashing ? 1.25 : 1);
 
+    this.muzzleT -= dt;
+    this.muzzle.visible = this.muzzleT > 0;
+    this.recoil = Math.max(0, this.recoil - dt * 14);
+    // Віддача: корпус на мить відсувається назад від напрямку стрільби.
+    this.body.position.z = 0;
+    this.body.translateZ(-this.recoil * 0.12);
     this.flash = Math.max(0, this.flash - dt * 6);
     this.suitMat.emissive.setRGB(this.flash, this.flash * 0.2, this.flash * 0.1);
     (this.ring.material as THREE.MeshBasicMaterial).opacity = p.dashCd > 0 ? 0.35 : 0.85;
+    this.body.rotation.x = p.down ? -1.45 : 0;
     this.root.visible = true;
   }
 }
