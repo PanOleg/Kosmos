@@ -46,5 +46,45 @@
   "foreman": {
     "height": 3.0,
     "static": true
+  },
+  "assault": {
+    "height": 1.46,
+    "scale": 1,
+    "static": true,
+    "muzzle": [
+      0.1,
+      0.93,
+      1.16
+    ]
+  },
+  "engineer": {
+    "height": 1.46,
+    "scale": 1,
+    "static": true,
+    "muzzle": [
+      0.1,
+      0.92,
+      0.84
+    ]
+  },
+  "medic": {
+    "height": 1.46,
+    "scale": 1,
+    "static": true,
+    "muzzle": [
+      0.26,
+      1.03,
+      0.74
+    ]
+  },
+  "tech": {
+    "height": 1.46,
+    "scale": 1,
+    "static": true,
+    "muzzle": [
+      0.1,
+      0.9,
+      1.3
+    ]
   }
 }

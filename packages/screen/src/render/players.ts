@@ -165,6 +165,9 @@ export class PlayerView {
   private readonly model: ModelInstance | null;
   /** Лікувальний дрон Медика: кружляє біля плеча (концепт classes.jpg). */
   private drone: THREE.Object3D | null = null;
+  /** Ноги статичної моделі на шарнірі в стегні: код крокує ними на бігу. */
+  private readonly legs: THREE.Object3D[] = [];
+  private stride = 0;
 
   constructor(
     readonly slot: number,
@@ -191,7 +194,33 @@ export class PlayerView {
     });
     // Готова glTF-модель класу, якщо є (docs/models/README.md); інакше — примітиви.
     this.model = models.instantiate(classId);
-    if (this.model) {
+    const parts = models.staticParts(classId);
+    let muzzle: V3 = model.muzzle;
+    if (parts) {
+      // Статична модель з Blender (docs/models/players.py): тіло, візор, дві ноги окремо.
+      for (const m of parts.meshes) {
+        const mesh = new THREE.Mesh(m.geometry, m.glow ? this.visorMat : this.suitMat);
+        mesh.castShadow = !m.glow;
+        if (/leg/i.test(m.name)) {
+          // Шарнір — верх ноги (стегно): геометрію зсуваємо так, щоб він був у початку координат.
+          m.geometry.computeBoundingBox();
+          const b = m.geometry.boundingBox!;
+          const pivot = new THREE.Group();
+          pivot.position.set((b.min.x + b.max.x) / 2, b.max.y, (b.min.z + b.max.z) / 2);
+          mesh.position.copy(pivot.position).negate();
+          pivot.add(mesh);
+          this.legs.push(pivot);
+          this.body.add(pivot);
+        } else this.body.add(mesh);
+      }
+      if (parts.entry.muzzle) muzzle = parts.entry.muzzle;
+      if (classId === 'engineer') this.body.add(hexShield(color));
+      if (classId === 'medic') {
+        this.drone = medicDrone(color);
+        this.drone.position.set(0.55, 1.45, -0.1);
+        this.body.add(this.drone);
+      }
+    } else if (this.model) {
       // root масштабується на VISUAL_SCALE нижче, а висота з маніфесту — уже кінцева.
       this.model.root.scale.setScalar(1 / VISUAL_SCALE);
       this.body.add(this.model.root);
@@ -221,7 +250,7 @@ export class PlayerView {
     const m2 = new THREE.Mesh(mGeo, mMat);
     m2.rotation.y = Math.PI / 2;
     this.muzzle.add(m2);
-    this.muzzle.position.set(...model.muzzle);
+    this.muzzle.position.set(...muzzle);
     this.muzzle.visible = false;
     this.body.add(this.muzzle);
     this.root.add(this.body);
@@ -309,6 +338,14 @@ export class PlayerView {
     const rs = 1 + this.ringPulse * 0.6;
     this.ring.scale.set(rs, 1, rs);
     this.body.rotation.x = p.down ? -1.45 : 0;
+    // Крок: ноги розгойдуються в протифазі, частота й розмах ростуть зі швидкістю.
+    if (this.legs.length) {
+      const run = !p.down && !dashing ? Math.min(1, speed / 5) : 0;
+      this.stride += dt * (6 + speed * 1.6) * (run > 0.05 ? 1 : 0);
+      const swing = Math.sin(this.stride) * 0.6 * run;
+      for (let i = 0; i < this.legs.length; i++)
+        this.legs[i]!.rotation.x = i % 2 === 0 ? swing : -swing;
+    }
     // Вибулий до наступної хвилі зникає з арени.
     this.root.visible = !p.out;
     if (this.drone) {

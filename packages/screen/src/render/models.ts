@@ -21,17 +21,36 @@ export interface ModelEntry {
   static?: boolean;
   /** Статична: 'feet' (типово) — ставимо на підлогу; 'center' — дрон, висоту дає код. */
   origin?: 'feet' | 'center';
+  /** Явний масштаб замість підгонки під height (моделі, змодельовані в одиницях гри). */
+  scale?: number;
+  /** Гравець: точка дула для спалаху пострілу, координати моделі. */
+  muzzle?: [number, number, number];
+}
+
+/** Окремий меш статичної моделі: гравцю потрібні частини (ноги розгойдує код). */
+export interface StaticMesh {
+  name: string;
+  geometry: THREE.BufferGeometry;
+  glow: boolean;
 }
 
 export interface StaticParts {
   hull: THREE.BufferGeometry;
   glow: THREE.BufferGeometry;
+  meshes: StaticMesh[];
+  entry: ModelEntry;
 }
 
 const staticParts = new Map<string, StaticParts>();
 
 /** Лише позиція, нормаль і колір (RGB): так геометрії однакові з примітивами й зливаються. */
-function bakeStatic(scene: THREE.Object3D, scale: number, lift: number): StaticParts {
+function bakeStatic(
+  scene: THREE.Object3D,
+  scale: number,
+  lift: number,
+  entry: ModelEntry,
+): StaticParts {
+  const meshes: StaticMesh[] = [];
   scene.updateMatrixWorld(true);
   const hull: THREE.BufferGeometry[] = [];
   const glow: THREE.BufferGeometry[] = [];
@@ -50,7 +69,9 @@ function bakeStatic(scene: THREE.Object3D, scale: number, lift: number): StaticP
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
     g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(m, mesh.matrixWorld));
     g.computeVertexNormals();
-    (/glow/i.test(mesh.name) ? glow : hull).push(g);
+    const isGlow = /glow/i.test(mesh.name);
+    (isGlow ? glow : hull).push(g);
+    meshes.push({ name: mesh.name, geometry: g, glow: isGlow });
   });
   const merge = (list: THREE.BufferGeometry[]) =>
     list.length === 0
@@ -58,7 +79,7 @@ function bakeStatic(scene: THREE.Object3D, scale: number, lift: number): StaticP
       : list.length === 1
         ? list[0]!
         : mergeGeometries(list)!;
-  return { hull: merge(hull), glow: merge(glow) };
+  return { hull: merge(hull), glow: merge(glow), meshes, entry };
 }
 
 interface Loaded {
@@ -135,12 +156,12 @@ export const models = {
           const entry = manifest[id]!;
           const box = new THREE.Box3().setFromObject(gltf.scene);
           const size = box.getSize(new THREE.Vector3());
-          const scale = entry.height / Math.max(1e-6, size.y);
+          const scale = entry.scale ?? entry.height / Math.max(1e-6, size.y);
           const center = box.getCenter(new THREE.Vector3());
           if (entry.static) {
             staticParts.set(
               id,
-              bakeStatic(gltf.scene, scale, entry.origin === 'center' ? 0 : -box.min.y),
+              bakeStatic(gltf.scene, scale, entry.origin === 'center' ? 0 : -box.min.y, entry),
             );
             return;
           }
