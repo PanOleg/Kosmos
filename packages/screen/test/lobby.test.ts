@@ -119,4 +119,81 @@ describe('lobby', () => {
     a.onUnreliable(v);
     expect(host.slots[0]!.input.move.x).toBe(1);
   });
+
+  /** Два пульти в матчі; повертає їхні лінки й токени. */
+  function inMatch() {
+    const env = setup();
+    const a = env.join('a');
+    const b = env.join('b');
+    const order = env.host.slots.filter((s) => s !== null);
+    env.host.beginMatch(
+      createGame(
+        undefined,
+        1,
+        order.map((s) => ({ classId: s.classId! })),
+      ),
+      order,
+    );
+    return { ...env, a, b, tokenB: b.last('welcome')!.token };
+  }
+
+  test('any controller pauses; resume counts down before the match runs', () => {
+    const { host, a, b, advance } = inMatch();
+    expect(host.running()).toBe(true);
+    b.onReliable({ t: 'pause', on: true });
+    expect(host.running()).toBe(false);
+    expect(host.pause?.by).toBe(1);
+    host.update();
+    expect(a.last('status')?.pause?.by).toBe(1);
+    a.onReliable({ t: 'pause', on: false });
+    expect(host.pause).toBeNull();
+    expect(host.running()).toBe(false);
+    expect(host.resumeIn()).toBe(3);
+    advance(3000);
+    expect(host.running()).toBe(true);
+  });
+
+  test('disconnect: bot after 5 s by default, or wait on pause if someone asks', () => {
+    const { host, join, a, b, tokenB, advance } = inMatch();
+    b.close();
+    advance(1000);
+    expect(host.dropped()).toEqual([{ slot: 1, botIn: 4 }]);
+    expect(host.running()).toBe(true);
+    a.onReliable({ t: 'wait', slot: 1 });
+    expect(host.running()).toBe(false);
+    expect(host.pause?.waiting).toEqual([1]);
+    expect(host.dropped()).toEqual([]);
+    // Повернувся — пауза була лише через очікування, тож продовжуємо з відліком.
+    join('b2', tokenB);
+    expect(host.pause).toBeNull();
+    expect(host.resumeIn()).toBe(3);
+  });
+
+  test('continuing without the awaited player hands them to the bot at once', () => {
+    const { host, a, b, advance } = inMatch();
+    b.close();
+    a.onReliable({ t: 'wait', slot: 1 });
+    advance(500);
+    a.onReliable({ t: 'pause', on: false });
+    expect(host.botControlled(host.slots[1]!)).toBe(true);
+    expect(host.dropped()).toEqual([{ slot: 1, botIn: 0 }]);
+  });
+
+  test('manual pause stays on when the awaited player returns', () => {
+    const { host, join, a, b, tokenB } = inMatch();
+    b.close();
+    a.onReliable({ t: 'pause', on: true });
+    a.onReliable({ t: 'wait', slot: 1 });
+    join('b2', tokenB);
+    expect(host.pause).toEqual({ by: 0, waiting: [] });
+  });
+
+  test('when every human is gone the match waits instead of playing itself', () => {
+    const { host, a, b } = inMatch();
+    a.close();
+    b.close();
+    host.update();
+    expect(host.running()).toBe(false);
+    expect(host.pause?.waiting.sort()).toEqual([0, 1]);
+  });
 });

@@ -53,7 +53,11 @@ export interface LobbySlotInfo {
 export type ControllerMessage =
   | { t: 'hello'; v: number; token: string }
   | { t: 'class'; classId: ClassId }
-  | { t: 'ready'; ready: boolean };
+  | { t: 'ready'; ready: boolean }
+  /** on: true — пауза (пульт утримав кнопку 0.5 с); false — продовжити, відсутніх веде бот. */
+  | { t: 'pause'; on: boolean }
+  /** Не віддавати відключеного гравця боту, а чекати його на паузі. */
+  | { t: 'wait'; slot: number };
 
 /** Екран → пульт. */
 export type ScreenMessage =
@@ -77,9 +81,28 @@ export type ScreenMessage =
       revive: ReviveInfo | null;
       /** Секунди до вибування, якщо впав; −1 — вибув до наступної хвилі. */
       bleed: number;
+      /** Матч на паузі; null — іде (або йде відлік до продовження). */
+      pause: PauseInfo | null;
+      /** Секунди відліку до продовження після паузи; 0 — відліку немає. */
+      resumeIn: number;
+      /** Відключені гравці, яких не чекаємо: їх веде або скоро поведе бот. */
+      dropped: DroppedInfo[];
     }
   | { t: 'hurt'; amount: number }
   | { t: 'bought'; item: number; ok: boolean };
+
+export interface PauseInfo {
+  /** Хто поставив: слот пульта, −1 — екран (клавіатура), −2 — автоматично (чекаємо гравця). */
+  by: number;
+  /** Слоти відключених, на яких чекаємо. */
+  waiting: number[];
+}
+
+export interface DroppedInfo {
+  slot: number;
+  /** Секунд до того, як поведе бот; 0 — бот уже веде. */
+  botIn: number;
+}
 
 export interface ReviveInfo {
   cost: number;

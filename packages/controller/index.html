@@ -306,6 +306,79 @@
           display: flex !important;
         }
       }
+      /* Пауза: утримання 0.5 с (DECISIONS.md, п. 9) — смужка заповнюється знизу. */
+      .pausebtn {
+        position: relative;
+        overflow: hidden;
+        width: 40px;
+        height: 34px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.2);
+        color: #fff;
+        font-size: 16px;
+        touch-action: none;
+      }
+      .pausebtn i {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 0;
+        background: rgba(255, 255, 255, 0.45);
+      }
+      .pausebtn.hold i {
+        height: 100%;
+        transition: height 0.5s linear;
+      }
+      .drops {
+        position: absolute;
+        top: 58px;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        z-index: 3;
+        pointer-events: none;
+      }
+      .drops div {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: rgba(0, 0, 0, 0.45);
+        border-radius: 10px;
+        padding: 6px 8px 6px 14px;
+        font-size: 15px;
+        font-weight: 700;
+        pointer-events: auto;
+      }
+      .drops button {
+        border: 0;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-weight: 800;
+        background: #fff;
+        color: #111;
+      }
+      #paused .center {
+        gap: 10px;
+      }
+      #paused.count {
+        background: rgba(0, 0, 0, 0.3);
+      }
+      #paused.count h1 {
+        font-size: 96px;
+      }
+      .resume {
+        margin-top: 18px;
+        min-width: 240px;
+        font-size: 20px;
+        padding: 16px 28px;
+        background: #fff;
+        color: #111;
+      }
       .conn-hint {
         margin-top: 14px;
         max-width: 34em;
@@ -523,7 +596,9 @@
         <button id="life" class="medkit life" hidden>♥ <span id="life-price">40</span></button>
         <span>⚙ <span id="parts">0</span></span
         ><span class="sep">|</span><span id="cls"></span>
+        <button id="pause" class="pausebtn" aria-label="Пауза"><i></i>⏸</button>
       </div>
+      <div id="drops" class="drops"></div>
       <div id="left" class="zone left">
         <div id="base" class="stick-base"></div>
         <div id="knob" class="stick-knob"></div>
@@ -584,6 +659,13 @@
       <div class="center">
         <h1>Не вдалося</h1>
         <div id="full-msg" class="muted"></div>
+      </div>
+    </div>
+    <div id="paused" class="overlay">
+      <div class="center">
+        <h1 id="paused-title">Пауза</h1>
+        <div id="paused-sub" class="muted"></div>
+        <button id="resume" class="btn resume">Продовжити</button>
       </div>
     </div>
     <div id="reconnect" class="overlay">

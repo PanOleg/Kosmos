@@ -40,7 +40,7 @@ import { Hud } from './ui/hud';
 import { showResults } from './ui/results';
 import { LobbyView } from './ui/lobby';
 import { t } from './ui/i18n';
-import { LobbyHost, type Slot } from './net/lobby';
+import { LobbyHost, PAUSE_BY_SCREEN, type Slot } from './net/lobby';
 import { PeerJsHost } from './net/peerjsHost';
 import { LocalHost } from './net/localHost';
 import { RoomTakenError } from './net/transport';
@@ -308,6 +308,8 @@ function firstLocal(kind: Slot['kind']): Slot | undefined {
 window.addEventListener('keydown', (e) => {
   if (match) {
     if (e.code === 'Enter' && match.results) endMatch();
+    if ((e.code === 'Escape' || e.code === 'KeyP') && !match.results)
+      lobby.togglePause(PAUSE_BY_SCREEN);
     if (DEBUG && (e.code === 'F1' || e.code === 'F2')) {
       e.preventDefault();
       const g = match.game;
@@ -464,8 +466,11 @@ function frameLobby(now: number, dt: number): void {
 
 function frameMatch(m: Match, now: number, dt: number): void {
   const g = m.game;
+  // Пауза й відлік після неї: симуляція стоїть, рендер живе (DECISIONS.md, п. 42).
+  const running = lobby.running();
+  if (!running) acc = 0;
   // Хіт-стоп: симуляція стоїть кілька кадрів, рендер і частинки — ні.
-  if (m.fx.hitStop > 0) m.fx.hitStop = Math.max(0, m.fx.hitStop - dt);
+  else if (m.fx.hitStop > 0) m.fx.hitStop = Math.max(0, m.fx.hitStop - dt);
   else acc += dt;
   let steps = 0;
   while (acc >= DT && steps < 6 && m.fx.hitStop <= 0) {
@@ -521,6 +526,7 @@ function frameMatch(m: Match, now: number, dt: number): void {
   cam.update(m.camPoints, live, dt, time);
   m.enemyR.updateBars(g.state.enemies, alpha, cam.camera);
   m.hud.update(g, cam.camera, dt);
+  m.hud.setPause(lobby.pause, lobby.resumeIn(), m.results ? [] : lobby.dropped(), g);
 }
 
 function debugLine(): string {

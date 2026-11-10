@@ -99,6 +99,74 @@ function run(room: string): void {
   const lifeBtn = $<HTMLButtonElement>('life');
   lifeBtn.addEventListener('pointerdown', () => pressBuy(BUY_LIFE, lifeBtn));
 
+  // Пауза: утримати кнопку 0.5 с, щоб не поставити випадково долонею.
+  const pauseBtn = $('pause');
+  let holdTimer = 0;
+  const holdEnd = () => {
+    window.clearTimeout(holdTimer);
+    pauseBtn.classList.remove('hold');
+  };
+  pauseBtn.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    pauseBtn.setPointerCapture(e.pointerId);
+    pauseBtn.classList.add('hold');
+    holdTimer = window.setTimeout(() => {
+      holdEnd();
+      navigator.vibrate?.(30);
+      blip(520, 0.08);
+      net.send({ t: 'pause', on: true });
+    }, 500);
+  });
+  pauseBtn.addEventListener('pointerup', holdEnd);
+  pauseBtn.addEventListener('pointercancel', holdEnd);
+  $('resume').addEventListener('click', () => {
+    blip(880, 0.08);
+    net.send({ t: 'pause', on: false });
+  });
+  // «Чекати»: відключеного напарника не віддаємо боту — матч стає на паузу до його повернення.
+  $('drops').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-slot]');
+    if (!b) return;
+    blip(660, 0.06);
+    net.send({ t: 'wait', slot: Number(b.dataset.slot) });
+  });
+  let pauseSig = '';
+  const renderPause = (m: Extract<ScreenMessage, { t: 'status' }>) => {
+    const inMatch = m.phase === 'match';
+    const sig = JSON.stringify([inMatch, m.pause, m.resumeIn, m.dropped]);
+    if (sig === pauseSig) return;
+    pauseSig = sig;
+    const p = inMatch ? m.pause : null;
+    const counting = inMatch && !p && m.resumeIn > 0;
+    const el = $('paused');
+    el.classList.toggle('on', !!p || counting);
+    el.classList.toggle('count', counting);
+    $('resume').hidden = !p;
+    if (p) {
+      const who = (n: number[]) => n.map((i) => `P${i + 1}`).join(', ');
+      $('paused-title').textContent = 'Пауза';
+      $('paused-sub').textContent = p.waiting.length
+        ? `Чекаємо ${who(p.waiting)} — немає зв'язку`
+        : p.by >= 0
+          ? p.by === slot
+            ? 'Ви поставили паузу'
+            : `Паузу поставив P${p.by + 1}`
+          : '';
+      $('resume').textContent = p.waiting.length ? 'Продовжити з ботом' : 'Продовжити';
+    } else if (counting) {
+      $('paused-title').textContent = String(m.resumeIn);
+      $('paused-sub').textContent = '';
+    }
+    $('drops').innerHTML = inMatch
+      ? m.dropped
+          .map(
+            (d) =>
+              `<div>P${d.slot + 1} без зв'язку · ${d.botIn > 0 ? `бот через ${d.botIn} с` : 'керує бот'}<button data-slot="${d.slot}">Чекати</button></div>`,
+          )
+          .join('')
+      : '';
+  };
+
   const renderShop = (shop: ShopInfo | null, parts: number, fullHp: boolean) => {
     const open = shop !== null;
     shopEl.hidden = !open;
@@ -225,6 +293,7 @@ function run(room: string): void {
         const ring = rv ? rv.progress : m.ability;
         $('ring').setAttribute('stroke-dasharray', `${Math.round(ring * 100)} 100`);
         renderShop(m.shop, m.parts, m.hp >= m.maxHp);
+        renderPause(m);
         break;
       }
       case 'hurt':

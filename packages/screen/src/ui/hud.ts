@@ -9,6 +9,7 @@ import {
   wholeParts,
   type Game,
 } from '@horizon/sim';
+import type { DroppedInfo, PauseInfo } from '@horizon/sim/protocol';
 import { classColor, hexCss } from '../render/palette';
 import { toX, toZ } from '../render/coords';
 import { t } from './i18n';
@@ -71,6 +72,18 @@ const css = `
 .announce small { display: block; font-size: 18px; letter-spacing: .1em; color: #e8ecf4; opacity: .8; margin-top: 6px; }
 .arrow { position: absolute; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 14px solid #ff2a3a;
   margin: -7px 0 0 -7px; opacity: .85; filter: drop-shadow(0 0 4px rgba(255,80,20,.8)); }
+.pause { position: absolute; inset: 0; z-index: 5; display: none; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(6, 9, 18, .62); backdrop-filter: blur(3px); text-align: center; }
+.pause.on { display: flex; }
+.pause .pt { font-size: 64px; font-weight: 800; letter-spacing: .2em; }
+.pause .ps { font-size: 20px; opacity: .85; margin-top: 10px; letter-spacing: .06em; }
+.pause .ph { font-size: 14px; opacity: .55; margin-top: 26px; letter-spacing: .06em; }
+.pause.count { background: transparent; backdrop-filter: none; }
+.pause.count .pt { font-size: 120px; letter-spacing: 0; text-shadow: 0 0 30px rgba(0,0,0,.6); }
+.drops { position: absolute; top: 96px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.drops div { background: rgba(10, 14, 26, .75); border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: 6px 14px;
+  font-size: 15px; letter-spacing: .04em; }
+.drops b { color: var(--c, #fff); }
 .hint { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 13px; opacity: .55; transition: opacity 1s; }
 `;
 
@@ -106,6 +119,9 @@ export class Hud {
   private announceT = 0;
   private readonly shop = document.createElement('div');
   private shopSig = '';
+  private readonly pauseEl = document.createElement('div');
+  private readonly dropsEl = document.createElement('div');
+  private pauseSig = '';
   private readonly v = new THREE.Vector3();
   private lastTop = '';
 
@@ -122,7 +138,9 @@ export class Hud {
     this.hint.className = 'hint';
     this.hint.textContent = t.controlsHint;
     this.shop.className = 'shop';
-    this.root.append(this.top, this.announceEl, this.hint, this.shop);
+    this.pauseEl.className = 'pause';
+    this.dropsEl.className = 'drops';
+    this.root.append(this.top, this.announceEl, this.hint, this.shop, this.dropsEl, this.pauseEl);
     for (const p of game.state.players) {
       const color = hexCss(classColor(p.classId));
       const el = document.createElement('div');
@@ -210,6 +228,34 @@ export class Hud {
     this.shop.innerHTML = `<div class="ttl">${t.shopTitle(Math.ceil(s.wave.timer / TICKS_PER_SEC))}</div><div class="cols">${cols}</div><div class="hint">${t.shopHint}</div>`;
     for (const slot of flashing)
       this.shop.querySelector(`.col[data-slot="${slot}"]`)?.classList.add('flash');
+  }
+
+  /** Пауза, відлік до продовження й смужки «P2 без зв'язку» (DECISIONS.md, п. 42). */
+  setPause(pause: PauseInfo | null, resumeIn: number, dropped: DroppedInfo[], game: Game): void {
+    const sig = JSON.stringify([pause, resumeIn, dropped]);
+    if (sig === this.pauseSig) return;
+    this.pauseSig = sig;
+    const name = (slot: number) => {
+      const p = game.state.players[slot];
+      const c = p ? hexCss(classColor(p.classId)) : '#fff';
+      return `<b style="--c:${c}">P${slot + 1}</b>`;
+    };
+    this.pauseEl.classList.toggle('on', pause !== null || resumeIn > 0);
+    this.pauseEl.classList.toggle('count', pause === null && resumeIn > 0);
+    if (pause) {
+      const sub = pause.waiting.length
+        ? t.pauseWaiting(pause.waiting.map(name).join(', '))
+        : pause.by >= 0
+          ? t.pausedBy(name(pause.by))
+          : '';
+      this.pauseEl.innerHTML = `<div class="pt">${t.pauseTitle}</div><div class="ps">${sub}</div><div class="ph">${pause.waiting.length ? t.pauseHintBot : t.pauseHint}</div>`;
+    } else if (resumeIn > 0) this.pauseEl.innerHTML = `<div class="pt">${resumeIn}</div>`;
+    this.dropsEl.innerHTML = dropped
+      .map(
+        (d) =>
+          `<div>${d.botIn > 0 ? t.dropSoon(name(d.slot), d.botIn) : t.dropBot(name(d.slot))}</div>`,
+      )
+      .join('');
   }
 
   announce(title: string, sub = '', seconds = 2.2): void {

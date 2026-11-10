@@ -25,7 +25,9 @@ import {
   encodePing,
   seqNewer,
   type ControllerMessage,
+  type DroppedInfo,
   type LobbySlotInfo,
+  type PauseInfo,
   type ScreenPhase,
 } from '@horizon/sim/protocol';
 import type { Link } from './transport';
@@ -46,6 +48,8 @@ export interface Slot {
   rtt: number;
   /** Час розриву, мс; null — на зв'язку. */
   lostAt: number | null;
+  /** Гравці вирішили продовжити без нього: бот веде одразу, без 5 с очікування. */
+  forceBot: boolean;
 }
 
 const PING_EVERY = 1000;
@@ -53,6 +57,11 @@ const STATUS_EVERY = 100;
 /** Через стільки після розриву гравця в матчі веде бот (DECISIONS.md, п. 15). */
 export const BOT_TAKEOVER_MS = 5000;
 const LOBBY_DROP_MS = 20000;
+/** Відлік після паузи: встигнути взяти телефон у руки (DECISIONS.md, п. 42). */
+export const RESUME_MS = 3000;
+/** PauseInfo.by: паузу поставив екран (клавіатура) / сама гра, бо чекає відключеного. */
+export const PAUSE_BY_SCREEN = -1;
+export const PAUSE_BY_AUTO = -2;
 
 /**
  * Лобі й зв'язок з пультами без DOM: слоти, токени повернення, унікальні класи, пінг, статус.
@@ -61,6 +70,10 @@ const LOBBY_DROP_MS = 20000;
 export class LobbyHost {
   readonly slots: (Slot | null)[] = [null, null, null, null];
   phase: ScreenPhase = 'lobby';
+  /** Пауза матчу; null — гра йде (можливо, ще триває відлік resumeAt). */
+  pause: PauseInfo | null = null;
+  /** Коли закінчиться відлік після паузи, мс; null — відліку немає. */
+  private resumeAt: number | null = null;
   private game: Game | null = null;
   private lastPing = 0;
   private lastStatus = 0;
@@ -124,12 +137,24 @@ export class LobbyHost {
       }
       slot.link = link;
       slot.lostAt = null;
+      slot.forceBot = false;
+      this.unwait(slot.index);
       link.sendReliable({ t: 'welcome', slot: slot.index, token: slot.token });
       this.markDirty();
       return;
     }
     const s = this.slotOf(link);
-    if (!s || this.phase !== 'lobby') return;
+    if (!s) return;
+    if (m.t === 'pause') {
+      if (m.on) this.requestPause(s.index);
+      else this.resume();
+      return;
+    }
+    if (m.t === 'wait') {
+      this.waitFor(m.slot);
+      return;
+    }
+    if (this.phase !== 'lobby') return;
     if (m.t === 'class') this.pickClass(s, m.classId);
     else if (m.t === 'ready') {
       s.ready = m.ready && s.classId !== null;
@@ -172,6 +197,7 @@ export class LobbyHost {
       lastSeq: -1,
       rtt: NaN,
       lostAt: null,
+      forceBot: false,
     };
     this.slots[index] = s;
     // Перший вільний клас одразу, щоб можна було просто натиснути «готовий».
@@ -239,12 +265,14 @@ export class LobbyHost {
 
   endMatch(): void {
     this.phase = 'results';
+    this.clearPause();
     this.markDirty();
   }
 
   backToLobby(): void {
     this.phase = 'lobby';
     this.game = null;
+    this.clearPause();
     for (const s of this.slots) if (s && s.kind === 'phone') s.ready = false;
     this.markDirty();
   }
@@ -273,9 +301,109 @@ export class LobbyHost {
     this.slots[slot]?.link?.sendReliable({ t: 'hurt', amount });
   }
 
+  // ---------- Пауза й відключення (DECISIONS.md, п. 9, 15, 42) ----------
+
+  /** Симуляція крокує: матч, не пауза й не відлік до продовження. */
+  running(): boolean {
+    if (this.phase !== 'match' || this.pause) return false;
+    if (this.resumeAt !== null && this.now() < this.resumeAt) return false;
+    this.resumeAt = null;
+    return true;
+  }
+
+  /** Секунди відліку до продовження; 0 — відліку немає. */
+  resumeIn(): number {
+    if (this.pause || this.resumeAt === null) return 0;
+    return Math.max(0, Math.ceil((this.resumeAt - this.now()) / 1000));
+  }
+
+  /** Пауза з пульта (by — слот) чи екрана. Під час відліку — повернення в паузу. */
+  requestPause(by: number): void {
+    if (this.phase !== 'match') return;
+    this.resumeAt = null;
+    if (this.pause) this.pause.by = by;
+    else this.pause = { by, waiting: [] };
+    this.statusSoon();
+  }
+
+  /** Продовжити: тих, на кого чекали, а їх досі немає, веде бот — одразу. */
+  resume(): void {
+    if (!this.pause) return;
+    for (const i of this.pause.waiting) {
+      const s = this.slots[i];
+      if (s && s.lostAt !== null) s.forceBot = true;
+    }
+    this.pause = null;
+    this.resumeAt = this.now() + RESUME_MS;
+    this.statusSoon();
+  }
+
+  togglePause(by: number): void {
+    if (this.pause) this.resume();
+    else this.requestPause(by);
+  }
+
+  /** Чекати відключеного гравця на паузі замість бота. */
+  waitFor(slot: number, by = PAUSE_BY_AUTO): void {
+    const s = this.slots[slot];
+    if (this.phase !== 'match' || !s || s.kind !== 'phone' || s.lostAt === null) return;
+    s.forceBot = false;
+    if (!this.pause) {
+      this.resumeAt = null;
+      this.pause = { by, waiting: [] };
+    }
+    if (!this.pause.waiting.includes(slot)) this.pause.waiting.push(slot);
+    this.statusSoon();
+  }
+
+  /** Гравець повернувся: якщо пауза була лише через очікування — продовжуємо з відліком. */
+  private unwait(slot: number): void {
+    const p = this.pause;
+    if (!p) return;
+    const i = p.waiting.indexOf(slot);
+    if (i < 0) return;
+    p.waiting.splice(i, 1);
+    if (p.waiting.length === 0 && p.by === PAUSE_BY_AUTO) this.resume();
+    else this.statusSoon();
+  }
+
+  private clearPause(): void {
+    this.pause = null;
+    this.resumeAt = null;
+  }
+
+  /** Хтось із людей ще тримає керування: клавіатура або пульт на зв'язку. */
+  private humanPresent(): boolean {
+    return this.slots.some((s) => s && (s.kind === 'keyboard' || (s.kind === 'phone' && s.link)));
+  }
+
+  /** Відключені, яких не чекаємо: бот уже веде або поведе за botIn секунд. */
+  dropped(): DroppedInfo[] {
+    const out: DroppedInfo[] = [];
+    if (this.phase !== 'match') return out;
+    const t = this.now();
+    for (const s of this.slots) {
+      if (!s || s.kind !== 'phone' || s.lostAt === null) continue;
+      if (this.pause?.waiting.includes(s.index)) continue;
+      const left = s.forceBot ? 0 : BOT_TAKEOVER_MS - (t - s.lostAt);
+      out.push({ slot: s.index, botIn: Math.max(0, Math.ceil(left / 1000)) });
+    }
+    return out;
+  }
+
+  private statusSoon(): void {
+    this.lastStatus = -Infinity;
+    this.onChange();
+  }
+
   /** Раз на кадр: пінги, статус, розсилка лобі при змінах. */
   update(): void {
     const t = this.now();
+    // Усі люди без зв'язку: бот не має за кого грати «за вибором інших» — чекаємо на паузі.
+    if (this.phase === 'match' && !this.humanPresent())
+      for (const s of this.slots)
+        if (s && s.kind === 'phone' && s.lostAt !== null && !this.pause?.waiting.includes(s.index))
+          this.waitFor(s.index);
     // У лобі телефон, що зник надовго, звільняє місце й клас.
     if (this.phase === 'lobby')
       for (const s of this.slots)
@@ -297,6 +425,7 @@ export class LobbyHost {
     if (t - this.lastStatus >= STATUS_EVERY) {
       this.lastStatus = t;
       const g = this.game;
+      const dropped = this.dropped();
       for (const s of this.slots) {
         if (!s?.link) continue;
         const p = g?.state.players[s.index];
@@ -326,6 +455,9 @@ export class LobbyHost {
               : null,
           revive: p && g && !p.down ? reviveInfo(g, p) : null,
           bleed: p && p.down ? (p.out ? -1 : Math.ceil(p.bleedT / TICKS_PER_SEC)) : 0,
+          pause: this.pause && { by: this.pause.by, waiting: [...this.pause.waiting] },
+          resumeIn: this.resumeIn(),
+          dropped,
         });
       }
     }
@@ -335,7 +467,11 @@ export class LobbyHost {
   botControlled(s: Slot): boolean {
     return (
       s.kind === 'bot' ||
-      (s.kind === 'phone' && s.lostAt !== null && this.now() - s.lostAt > BOT_TAKEOVER_MS)
+      (s.kind === 'phone' &&
+        s.lostAt !== null &&
+        // Того, на кого чекаємо на паузі, бот не веде.
+        !this.pause?.waiting.includes(s.index) &&
+        (s.forceBot || this.now() - s.lostAt > BOT_TAKEOVER_MS))
     );
   }
 }
