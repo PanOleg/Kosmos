@@ -7,3 +7,4 @@ coverage
 .playwright-mcp
 .vercel
 .env*
+scripts/voice/raw

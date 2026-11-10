@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Горизонт: запис озвучки</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        background: #0c0e14;
+        color: #e8ecf4;
+        font-family: 'Inter', system-ui, sans-serif;
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        height: 100vh;
+      }
+      main {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 22px;
+        padding: 24px;
+      }
+      .n {
+        opacity: 0.55;
+        letter-spacing: 0.1em;
+        font-size: 14px;
+      }
+      .phrase {
+        font-size: 46px;
+        font-weight: 800;
+        text-align: center;
+        max-width: 900px;
+      }
+      .mood {
+        font-size: 18px;
+        color: #ffaa22;
+      }
+      .meter {
+        width: 420px;
+        height: 14px;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.1);
+        overflow: hidden;
+      }
+      .meter i {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: #7dffb0;
+        transition: width 0.05s;
+      }
+      .state {
+        font-size: 20px;
+        min-height: 28px;
+      }
+      .state.rec {
+        color: #ff5a3a;
+        font-weight: 800;
+      }
+      .btns {
+        display: flex;
+        gap: 12px;
+      }
+      button {
+        font: inherit;
+        font-size: 17px;
+        padding: 12px 18px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        color: inherit;
+        cursor: pointer;
+      }
+      button.primary {
+        background: #ffaa22;
+        color: #14100a;
+        border-color: #ffaa22;
+        font-weight: 700;
+      }
+      .keys {
+        opacity: 0.55;
+        font-size: 14px;
+        text-align: center;
+        line-height: 1.6;
+      }
+      aside {
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
+        overflow: auto;
+        padding: 12px;
+        font-size: 14px;
+      }
+      aside div {
+        padding: 6px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        gap: 8px;
+      }
+      aside div.cur {
+        background: rgba(255, 170, 34, 0.18);
+      }
+      aside div .ok {
+        width: 16px;
+        color: #7dffb0;
+      }
+      .done {
+        color: #7dffb0;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="n" id="n"></div>
+      <div class="phrase" id="phrase"></div>
+      <div class="mood" id="mood"></div>
+      <div class="meter"><i id="level"></i></div>
+      <div class="state" id="state">Натисніть «Запис» або Пробіл (браузер попросить мікрофон)</div>
+      <div class="btns">
+        <button id="b-prev">← Назад</button>
+        <button id="b-rec" class="primary">● Запис</button>
+        <button id="b-play">▶ Прослухати</button>
+        <button id="b-next">Далі →</button>
+      </div>
+      <div class="keys">
+        Пробіл — почати / зупинити запис · P — прослухати · Enter — далі · ← → — між фразами<br />
+        Запис зберігається одразу після зупинки. Говоріть на відстані долоні від мікрофона, у тиші.
+      </div>
+      <div id="progress"></div>
+    </main>
+    <aside id="list"></aside>
+    <script type="module" src="/src/record.ts"></script>
+  </body>
+</html>
