@@ -22,6 +22,7 @@ const css = `
 .hud-top .pb { height: 6px; margin: 6px 0 4px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; }
 .hud-top .pb > i { display: block; height: 100%; background: #e8323a; box-shadow: 0 0 8px #e8323a; transition: width .2s; }
 .hud-top .boss { margin: 4px 0 2px; font-size: 12px; font-weight: 800; letter-spacing: .2em; color: #ffcc40; }
+.hud-top .boss .ph { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
 .hud-top .boss .pb { height: 9px; border: 1px solid rgba(255,204,64,.5); }
 .hud-top .boss .pb > i { background: linear-gradient(90deg, #ffb020, #ffdc60); box-shadow: 0 0 10px #ffb020; }
 .hud-top .big { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
@@ -238,8 +239,12 @@ export class Hud {
       // Міні-бос: окрема жовта смуга здоров'я під лічильником.
       if (def.boss && w.phase === 'active') {
         const b = s.enemies.find((e) => e.alive && e.type === def.boss);
+        const phase =
+          def.boss === 'core' && s.boss.phase > 0
+            ? `<div class="ph">${t.bossPhase(s.boss.phase)}${s.boss.transition > 0 ? ` · ${t.bossShift}` : ''}</div>`
+            : '';
         if (b)
-          topText += `<div class="boss"><div class="pb"><i style="width:${Math.ceil((b.hp / b.maxHp) * 100)}%"></i></div></div>`;
+          topText += `<div class="boss">${phase}<div class="pb"><i style="width:${Math.ceil((b.hp / b.maxHp) * 100)}%"></i></div></div>`;
       }
     }
     if (topText !== this.lastTop) {

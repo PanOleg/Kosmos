@@ -34,6 +34,7 @@ import { Sfx } from './audio/sfx';
 import { PostFx } from './render/post';
 import { AbilityRenderer } from './render/abilities';
 import { PropRenderer, RocketRenderer } from './render/hazards';
+import { BossRenderer } from './render/boss';
 import { models } from './render/models';
 import { Hud } from './ui/hud';
 import { showResults } from './ui/results';
@@ -185,6 +186,7 @@ interface Match {
   abilityR: AbilityRenderer;
   rocketR: RocketRenderer;
   propR: PropRenderer;
+  bossR: BossRenderer;
   hud: Hud;
   camPoints: { x: number; z: number }[];
   results: HTMLDivElement | null;
@@ -232,6 +234,7 @@ function startMatch(): void {
     fx,
     rocketR: new RocketRenderer(scene, game.state.rockets.length),
     propR: new PropRenderer(scene, game.state.props.length),
+    bossR: new BossRenderer(scene, game.config.map),
     abilityR: new AbilityRenderer(
       scene,
       fx.sparks,
@@ -285,6 +288,9 @@ function endMatch(): void {
       else mat?.dispose();
     });
   }
+  arena.setDarkness(0);
+  arena.setReactorVisible(true);
+  scene.environmentIntensity = 0.32;
   match.fx.destroy();
   match.hud.destroy();
   match.results?.remove();
@@ -401,6 +407,10 @@ function handleMatchEvents(m: Match): void {
       m.hud.announce(t.revived(e.a + 1), '', 1.6);
     } else if (e.type === 'waveCleared' && def && e.b === 0) {
       m.hud.announce(t.waveCleared, '', 2);
+    } else if (e.type === 'bossPhase') {
+      m.hud.announce(t.bossPhase(e.b), e.b === 1 ? t.lightsOut : '', 2.2);
+    } else if (e.type === 'airlockWarn') {
+      m.hud.announce(t.airlockAlert, '', 1.5);
     }
   }
 }
@@ -503,6 +513,11 @@ function frameMatch(m: Match, now: number, dt: number): void {
   m.abilityR.update(g, dt, time);
   m.rocketR.update(g.state.rockets, time);
   m.propR.update(g.state.props, dt);
+  m.bossR.update(g.state.boss, g.state.enemies, ps, dt, time);
+  // Фаза 1 Ядра: станція гасить світло, лишаються ліхтарі гравців і світні смуги.
+  arena.setDarkness(m.bossR.darkness);
+  arena.setReactorVisible(!m.bossR.present);
+  scene.environmentIntensity = 0.32 * (1 - 0.85 * m.bossR.darkness);
   cam.update(m.camPoints, live, dt, time);
   m.enemyR.updateBars(g.state.enemies, alpha, cam.camera);
   m.hud.update(g, cam.camera, dt);

@@ -66,6 +66,7 @@ const VISUAL_SCALE: Record<EnemyType, number> = {
   repairer: 1.3,
   foreman: 1.15,
   turret: 1.2,
+  core: 1,
 };
 const AIR = new Set<EnemyType>(['wasp', 'kamikaze', 'sniper', 'swarm']);
 
@@ -377,6 +378,8 @@ const GROUND_GEO = {
   repairer: repairerParts(),
   foreman: foremanParts(),
   turret: turretParts(),
+  // Ядро малює BossRenderer; запис лише для повноти таблиці.
+  core: turretParts(),
 };
 
 const DRONE_GEO = {
@@ -565,7 +568,8 @@ export class EnemyRenderer {
     const W = 0.9;
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i]!;
-      if (!e.alive || e.hp >= e.maxHp) continue;
+      // Ядро має власну смугу в HUD.
+      if (!e.alive || e.hp >= e.maxHp || e.type === 'core') continue;
       const x = e.px + (e.x - e.px) * alpha;
       const y = e.py + (e.y - e.py) * alpha;
       const h = e.air
@@ -601,7 +605,7 @@ export class EnemyRenderer {
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i]!;
       let v = this.views[i];
-      if (!e.alive) {
+      if (!e.alive || e.type === 'core') {
         if (v) v.root.visible = false;
         continue;
       }

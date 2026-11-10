@@ -252,6 +252,47 @@ export class Sfx {
     this.burst('bandpass', 1800, 600, 3, 0.2, 0.2, pan);
   }
 
+  /** Ядро міняє фазу: сирена станції й низький гул. */
+  bossPhase(): void {
+    this.tone('sine', 55, 40, 2, 0.6);
+    [0, 450, 900].forEach((d) => setTimeout(() => this.tone('sawtooth', 380, 620, 0.35, 0.12), d));
+  }
+
+  /** Лазерна сітка заряджається: висхідне дзижчання. */
+  gridWarn(): void {
+    this.tone('sawtooth', 120, 900, 1.4, 0.07);
+  }
+
+  gridFire(): void {
+    this.tone('square', 1600, 200, 0.3, 0.2);
+    this.burst('highpass', 4000, 1000, 1, 0.3, 0.3);
+  }
+
+  /** Шлюз: тривожна сирена. */
+  airlockWarn(pan: number): void {
+    [0, 300, 600, 900, 1200].forEach((d, i) =>
+      setTimeout(
+        () => this.tone('square', i % 2 ? 520 : 700, i % 2 ? 520 : 700, 0.22, 0.1, pan),
+        d,
+      ),
+    );
+  }
+
+  /** Шлюз відкрито: ревіння повітря, що витікає. */
+  airlockOpen(pan: number): void {
+    this.burst('lowpass', 900, 300, 0.6, 4, 0.5, pan);
+    this.burst('bandpass', 2400, 800, 1.5, 4, 0.2, pan);
+  }
+
+  airlockClose(pan: number): void {
+    this.tone('square', 90, 50, 0.25, 0.4, pan);
+  }
+
+  /** Гравця затягнуло в шлюз. */
+  sucked(pan: number): void {
+    this.tone('sawtooth', 700, 80, 0.9, 0.25, pan);
+  }
+
   bossDown(): void {
     this.tone('sine', 160, 30, 1.4, 0.8);
     [523, 659, 784, 1047].forEach((f, i) =>

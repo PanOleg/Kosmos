@@ -192,6 +192,36 @@ export class FxDirector {
         this.flashT = 0.15;
         break;
       }
+      case 'bossPhase':
+        this.sfx.bossPhase();
+        this.cam.shake(0.9);
+        this.hitStop = Math.max(this.hitStop, 0.12);
+        this.sparks.burst(50, X, 4, Z, 1, 0, 12, Math.PI * 2, 0.7, 0.35, 0xff5a3a);
+        this.flashLight.position.x = X;
+        this.flashLight.position.z = Z;
+        this.flashT = 0.3;
+        break;
+      case 'gridWarn':
+        this.sfx.gridWarn();
+        break;
+      case 'gridFire':
+        this.sfx.gridFire();
+        this.cam.shake(0.35);
+        break;
+      case 'airlockWarn':
+        this.sfx.airlockWarn(this.pan(e.x));
+        break;
+      case 'airlockOpen':
+        this.sfx.airlockOpen(this.pan(e.x));
+        this.cam.shake(0.3);
+        break;
+      case 'airlockClose':
+        this.sfx.airlockClose(this.pan(e.x));
+        break;
+      case 'sucked':
+        this.sfx.sucked(this.pan(e.x));
+        this.sparks.burst(16, X, 1, Z, toX(e.x2) - X, toZ(e.y2) - Z, 9, 0.8, 0.4, 0.2, 0xcfe6ff);
+        break;
       case 'propPlaced':
         this.sfx.propPlaced(this.pan(e.x));
         this.sparks.burst(14, X, 0.2, Z, 1, 0, 5, Math.PI * 2, 0.3, 0.15, 0xffd070);

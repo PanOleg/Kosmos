@@ -17,6 +17,10 @@ import {
 export interface ArenaView {
   group: THREE.Group;
   update(time: number): void;
+  /** Темрява фази 1 Ядра: 0 — звичайне світло, 1 — вимкнене (лишаються емісиви й ліхтарі гравців). */
+  setDarkness(k: number): void;
+  /** Ховає колону й клітку реактора, поки на ньому стоїть Ядро. */
+  setReactorVisible(on: boolean): void;
 }
 
 interface FlickerLight {
@@ -158,7 +162,16 @@ export function buildArena(map: MapDef): ArenaView {
   g.add(planet);
 
   // Перешкоди.
-  for (const o of map.obstacles) g.add(makeObstacle(o));
+  let reactor: THREE.Object3D | null = null;
+  for (const o of map.obstacles) {
+    const obj = makeObstacle(o);
+    // Реактор не пакується: у бою з Ядром його ховає тіло боса.
+    if (o.kind === 'circle' && o.tag === 'core') {
+      obj.userData.dynamic = true;
+      reactor = obj;
+    }
+    g.add(obj);
+  }
 
   // Шлюзи: двері з маркуванням і написом, червоні лампи обабіч, смуга небезпеки на підлозі.
   const lockNames = ['ШЛЮЗ ПН', 'ШЛЮЗ СХ', 'ШЛЮЗ ПД', 'ШЛЮЗ ЗХ'];
@@ -214,7 +227,8 @@ export function buildArena(map: MapDef): ArenaView {
 
   // Світло. Мало точкових джерел — інтегрована графіка; решту настрою дають емісивні смуги.
   // Розсіяне світло з червонуватим відтінком: станція залита аварійним світлом.
-  g.add(new THREE.HemisphereLight(0x9a8a96, 0x3a1410, 1.25));
+  const hemi = new THREE.HemisphereLight(0x9a8a96, 0x3a1410, 1.25);
+  g.add(hemi);
   const moon = new THREE.DirectionalLight(0xb0c0e0, 1.2);
   moon.position.set(-30, 40, 10);
   moon.target.position.set(0, 0, 0);
@@ -316,16 +330,27 @@ export function buildArena(map: MapDef): ArenaView {
   // ?nobatch — без злиття, для налагодження вигляду окремих деталей.
   if (!new URLSearchParams(location.search).has('nobatch')) batchStatic(g);
 
+  let dark = 0;
   return {
     group: g,
+    setDarkness(k: number) {
+      dark = k;
+    },
+    setReactorVisible(on: boolean) {
+      if (reactor) reactor.visible = on;
+    },
     update(time: number) {
+      // У темряві лишається дрібка розсіяного світла, щоб силуети не зникали зовсім.
+      const lit = 1 - 0.92 * dark;
+      hemi.intensity = 1.25 * (1 - 0.8 * dark);
+      moon.intensity = 1.2 * lit;
       planet.rotation.y = time * 0.01;
       stars.rotation.y = time * 0.002;
       for (const f of flick) {
         // Мерехтіння: повільна хвиля + рідкісні короткі провали.
         const slow = 0.85 + 0.15 * Math.sin(time * 2.1 + f.phase);
         const glitch = Math.sin(time * 37 + f.phase * 13) > 0.97 ? 0.25 : 1;
-        if (f.light) f.light.intensity = f.base * slow * glitch;
+        if (f.light) f.light.intensity = f.base * slow * glitch * lit;
         if (f.emissive) f.emissive.emissiveIntensity = 2 * slow * glitch;
       }
     },
