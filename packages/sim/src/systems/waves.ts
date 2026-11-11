@@ -1,6 +1,7 @@
 import { randInt } from '../rng';
 import { PICKUPS, PLAYER_COUNT_MUL } from '../config/waves';
 import { AIR_TYPES, SWARM } from '../config/enemies';
+import { swarmCount } from '../config/difficulty';
 import { SWARM_GROUPS } from './enemies';
 import { returnOutPlayers } from './revive';
 import { clearProps } from './props';
@@ -66,7 +67,7 @@ function unitsOf(game: Game, type: EnemyTypeArg, base: number): number {
   // Бос завжди один; більшій команді він стає міцнішим (DECISIONS.md, п. 39).
   if (BOSS_TYPES.has(type)) return base;
   const c = groupCount(game, base, AIR_TYPES.has(type));
-  return type === 'swarm' ? c * SWARM.count : c;
+  return type === 'swarm' ? c * swarmCount(game.config.mods, SWARM.count) : c;
 }
 
 /** Склад хвилі для підказки в паузі: типи в порядку появи й скільки їх буде для цієї команди. */
@@ -243,8 +244,9 @@ function spawnAt(game: Game, type: EnemyTypeArg, count: number, a: { x: number; 
   if (type === 'swarm') {
     for (let k = 0; k < count; k++) {
       const group = w.groupSeq++ % SWARM_GROUPS;
-      for (let i = 0; i < SWARM.count; i++) {
-        const ang = (i / SWARM.count) * Math.PI * 2;
+      const size = swarmCount(game.config.mods, SWARM.count);
+      for (let i = 0; i < size; i++) {
+        const ang = (i / size) * Math.PI * 2;
         add(a.x + Math.cos(ang) * 1.2 + k * 2, a.y + Math.sin(ang) * 1.2, group);
       }
     }

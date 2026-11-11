@@ -177,3 +177,19 @@ describe('map hazards', () => {
     120000,
   );
 });
+
+describe('swarm size by difficulty', () => {
+  test('a swarm is 30% smaller on easy and normal than on hard', () => {
+    const size = (preset: 'easy' | 'normal' | 'hard') => {
+      const cfg = buildConfig({ ...DEFAULT_SETTINGS, preset });
+      const g = createGame(cfg, 1, [{ classId: 'assault' }]);
+      const i = cfg.waves.findIndex((w) => w.groups.some((x) => x.type === 'swarm'));
+      const row = wavePreview(g, i).find((x) => x.type === 'swarm')!;
+      return { total: row.count, per: cfg.mods.swarmSize };
+    };
+    expect(size('normal').per).toBe(0.7);
+    expect(size('normal').total % 8).toBe(0);
+    expect(size('hard').total % 12).toBe(0);
+    expect(size('easy').total).toBeLessThanOrEqual(size('normal').total);
+  });
+});

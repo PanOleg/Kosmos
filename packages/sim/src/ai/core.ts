@@ -1,4 +1,5 @@
 import { CORE, SWARM, TURRET } from '../config/enemies';
+import { swarmCount } from '../config/difficulty';
 import { PLAYER_COUNT_MUL } from '../config/waves';
 import { resolveCircle } from '../collision/world';
 import type { Enemy } from '../entities/enemy';
@@ -302,8 +303,9 @@ function phase3(game: Game, e: Enemy, index: number): void {
         if (small < CORE.swarmCap) {
           const v = game.config.map.vents[randInt(s.rng, 0, game.config.map.vents.length - 1)]!;
           const group = s.wave.groupSeq++ % SWARM_GROUPS;
-          for (let i = 0; i < SWARM.count; i++) {
-            const ang = (i / SWARM.count) * Math.PI * 2;
+          const size = swarmCount(game.config.mods, SWARM.count);
+          for (let i = 0; i < size; i++) {
+            const ang = (i / size) * Math.PI * 2;
             spawnEnemy(game, 'swarm', v.x + Math.cos(ang) * 1.2, v.y + Math.sin(ang) * 1.2, group);
           }
           emit(game.events, 'enemyWindup', e.x, e.y, v.x, v.y, index, 9, 0);
