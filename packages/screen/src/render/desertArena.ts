@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import type { MapDef, Obstacle } from '@horizon/sim';
 import { BOX, CONE4, CYL, SPHERE, merge, part, seg, type Part } from './mesh';
 import { toX, toZ } from './coords';
-import type { ArenaView } from './arena';
+import { SHADOW_HALF, followShadow, type ArenaView } from './arena';
+import { contactShadows } from './contact';
 
 /**
  * Пустельний аванпост (DECISIONS.md, п. 49): світла денна карта. Пісок із брижами, дюни й скелі
@@ -15,6 +16,7 @@ type V3 = [number, number, number];
 const P = (x: number, y: number, h: number): V3 => [toX(x), h, toZ(y)];
 
 const SAND = 0xe2bd86;
+const SUN_OFFSET = new THREE.Vector3(-25, 45, 18);
 /** Груба куля для дюн, мішків і острівців: з пласким затіненням різниці не видно, трикутників утричі менше. */
 const LOW = new THREE.SphereGeometry(0.5, 8, 5);
 const BAG = new THREE.SphereGeometry(0.5, 6, 4);
@@ -422,7 +424,7 @@ export function buildDesertArena(map: MapDef): ArenaView {
     merge(glow),
     new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(3.2, 3.2, 3.2) }),
   );
-  g.add(solidMesh, glowMesh);
+  g.add(solidMesh, glowMesh, contactShadows(map, 0.42, 1.4));
 
   // ---------- Світло: яскравий день ----------
   const hemi = new THREE.HemisphereLight(0xfff2dc, 0xb08a5a, 1.7);
@@ -432,10 +434,10 @@ export function buildDesertArena(map: MapDef): ArenaView {
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
   const sc = sun.shadow.camera;
-  sc.left = -R - 4;
-  sc.right = R + 4;
-  sc.top = R + 4;
-  sc.bottom = -R - 4;
+  sc.left = -SHADOW_HALF;
+  sc.right = SHADOW_HALF;
+  sc.top = SHADOW_HALF;
+  sc.bottom = -SHADOW_HALF;
   sc.near = 1;
   sc.far = 140;
   sun.shadow.bias = -0.0008;
@@ -451,6 +453,10 @@ export function buildDesertArena(map: MapDef): ArenaView {
       env: 0.85,
       exposure: 1.0,
       bloom: [2.4, 0.4],
+      // Холодні сині тіні проти теплого піску, більше контрасту, слабша віньєтка.
+      grade: { shadowTint: 0x05103a, contrast: 1.2, saturation: 1.18, vignette: 0.3 },
+      // Темна сталь: світло-сірі роботи на світлому піску губились.
+      enemyTint: 0x6f7480,
     },
     setDarkness(k: number) {
       dark = k;
@@ -458,7 +464,8 @@ export function buildDesertArena(map: MapDef): ArenaView {
     setReactorVisible(on: boolean) {
       if (reactor) reactor.visible = on;
     },
-    update(time: number) {
+    update(time: number, focus?: THREE.Vector3) {
+      followShadow(sun, SUN_OFFSET, focus);
       // Фаза 1 Ядра в пустелі — піщана буря: світло меркне, лишаються вогні й ліхтарі.
       hemi.intensity = 1.7 * (1 - 0.82 * dark);
       sun.intensity = 3.2 * (1 - 0.92 * dark);

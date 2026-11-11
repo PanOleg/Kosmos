@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildDecor } from './decor';
+import { contactShadows } from './contact';
 import type { MapDef, Obstacle } from '@horizon/sim';
 import { PALETTE } from './palette';
 import { toX, toZ } from './coords';
@@ -17,7 +18,8 @@ import {
 
 export interface ArenaView {
   group: THREE.Group;
-  update(time: number): void;
+  /** focus — куди дивиться камера: карта тіней накриває лише цю ділянку, тож тіні чіткіші. */
+  update(time: number, focus?: THREE.Vector3): void;
   /** Темрява фази 1 Ядра: 0 — звичайне світло, 1 — вимкнене (лишаються емісиви й ліхтарі гравців). */
   setDarkness(k: number): void;
   /** Ховає колону й клітку реактора, поки на ньому стоїть Ядро. */
@@ -34,6 +36,32 @@ export interface ArenaSky {
   exposure: number;
   /** Поріг і сила bloom. */
   bloom: [number, number];
+  /** Фінальна корекція кольору (post.ts): відтінок тіней, контраст, насиченість, віньєтка. */
+  grade: { shadowTint: number; contrast: number; saturation: number; vignette: number };
+  /** Множник кольору корпусів ворогів: щоб читались на тлі цієї карти. */
+  enemyTint: number;
+}
+
+/** Пів-сторони ділянки, яку накриває карта тіней навколо точки погляду камери, м. */
+export const SHADOW_HALF = 23;
+const MOON_OFFSET = new THREE.Vector3(-30, 40, 10);
+
+/**
+ * Карта тіней ходить за камерою (DECISIONS.md, п. 58): 1024 px на 46 м замість 60–68 м —
+ * тіні в півтора раза чіткіші без додаткової ціни. Крок 2 м, щоб краї не «пливли» щокадру.
+ */
+export function followShadow(
+  light: THREE.DirectionalLight,
+  offset: THREE.Vector3,
+  focus?: THREE.Vector3,
+): void {
+  if (!focus) return;
+  const x = Math.round(focus.x / 2) * 2;
+  const z = Math.round(focus.z / 2) * 2;
+  if (light.target.position.x === x && light.target.position.z === z) return;
+  light.target.position.set(x, 0, z);
+  light.position.set(x + offset.x, offset.y, z + offset.z);
+  light.target.updateMatrixWorld();
 }
 
 interface FlickerLight {
@@ -248,10 +276,10 @@ export function buildArena(map: MapDef): ArenaView {
   moon.castShadow = true;
   moon.shadow.mapSize.set(1024, 1024);
   const sc = moon.shadow.camera;
-  sc.left = -R;
-  sc.right = R;
-  sc.top = R;
-  sc.bottom = -R;
+  sc.left = -SHADOW_HALF;
+  sc.right = SHADOW_HALF;
+  sc.top = SHADOW_HALF;
+  sc.bottom = -SHADOW_HALF;
   sc.near = 1;
   sc.far = 120;
   moon.shadow.bias = -0.0008;
@@ -338,6 +366,7 @@ export function buildArena(map: MapDef): ArenaView {
     g.add(grp);
   }
 
+  g.add(contactShadows(map, 0.6));
   // Наповнення відсіків (труби, розмітка, обладнання, трава) — вже злите у три меші.
   g.add(buildDecor(map));
 
@@ -355,7 +384,9 @@ export function buildArena(map: MapDef): ArenaView {
       fogDensity: 0.007,
       env: 0.32,
       exposure: 1.1,
-      bloom: [0.9, 0.55],
+      bloom: [0.9, 0.5],
+      grade: { shadowTint: 0x330808, contrast: 1.12, saturation: 1.12, vignette: 0.55 },
+      enemyTint: 0xffffff,
     },
     setDarkness(k: number) {
       dark = k;
@@ -363,7 +394,8 @@ export function buildArena(map: MapDef): ArenaView {
     setReactorVisible(on: boolean) {
       if (reactor) reactor.visible = on;
     },
-    update(time: number) {
+    update(time: number, focus?: THREE.Vector3) {
+      followShadow(moon, MOON_OFFSET, focus);
       // У темряві лишається дрібка розсіяного світла, щоб силуети не зникали зовсім.
       const lit = 1 - 0.92 * dark;
       hemi.intensity = 1.25 * (1 - 0.8 * dark);

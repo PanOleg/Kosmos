@@ -3,7 +3,7 @@ import { TEAM_PLAYER, type ClassId, type Projectile } from '@horizon/sim';
 import { PALETTE } from './palette';
 
 /** Трасери за класом (концепт hud.jpg). Червоний — лише ворожий. */
-const TRACER: Record<ClassId, number> = {
+export const TRACER: Record<ClassId, number> = {
   assault: 0xffb050,
   engineer: 0xff9030,
   medic: 0xfff07a,
@@ -62,11 +62,12 @@ export class ProjectileRenderer {
       this.q.setFromUnitVectors(this.up, this.dir);
       if (b.team === TEAM_PLAYER) {
         // Довгий трасер: довжина ~ відстань за кадр, щоб швидка куля не «мигала».
-        this.s.set(0.13, 0.13, 1.4);
+        // Тонкий і довгий: читається як трасер, а не як пляма світіння.
+        this.s.set(0.075, 0.075, 2.3);
         this.m.compose(this.p, this.q, this.s);
         this.c.setHex(TRACER[classes[b.owner] ?? 'assault'] ?? PALETTE.playerShot);
-        // Понад 1: трасер потрапляє в bloom і світиться, як на макеті.
-        this.c.multiplyScalar(2.2);
+        // Трохи понад 1: світиться в bloom, але лишається кольору класу, а не білим.
+        this.c.multiplyScalar(1.5);
         this.player.setColorAt(np, this.c);
         this.player.setMatrixAt(np++, this.m);
       } else {

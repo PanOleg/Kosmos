@@ -16,6 +16,11 @@ export class GameCamera {
     this.camera = new THREE.PerspectiveCamera(45, aspect, 0.5, 400);
   }
 
+  /** Точка на підлозі, куди дивиться камера: за нею ходить карта тіней. */
+  get focusPoint(): THREE.Vector3 {
+    return this.focus;
+  }
+
   /** 0..1, квадратичне згасання дає «удар», а не постійне дрижання. */
   shake(amount: number): void {
     this.trauma = Math.min(1, this.trauma + amount);

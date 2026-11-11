@@ -44,6 +44,7 @@ const GradeShader = {
 export class PostFx {
   private composer: EffectComposer | null;
   private readonly bloom: UnrealBloomPass | null = null;
+  private readonly grade: ShaderPass | null = null;
 
   constructor(
     private readonly renderer: THREE.WebGLRenderer,
@@ -66,8 +67,24 @@ export class PostFx {
     this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.55, 0.45, 0.9);
     composer.addPass(this.bloom);
     composer.addPass(new OutputPass());
-    composer.addPass(new ShaderPass(GradeShader));
+    this.grade = new ShaderPass(GradeShader);
+    composer.addPass(this.grade);
     this.composer = composer;
+  }
+
+  /** Фінальна корекція за картою: відтінок тіней, контраст, насиченість, віньєтка. */
+  setGrade(g: {
+    shadowTint: number;
+    contrast: number;
+    saturation: number;
+    vignette: number;
+  }): void {
+    const u = this.grade?.uniforms;
+    if (!u) return;
+    (u.shadowTint!.value as THREE.Color).setHex(g.shadowTint);
+    u.contrast!.value = g.contrast;
+    u.saturation!.value = g.saturation;
+    u.vignette!.value = g.vignette;
   }
 
   /** Поріг і сила світіння — свої в кожної карти: на сонячному піску поріг вищий. */

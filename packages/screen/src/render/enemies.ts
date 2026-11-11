@@ -74,6 +74,16 @@ const VISUAL_SCALE: Record<EnemyType, number> = {
   core: 1,
 };
 const AIR = new Set<EnemyType>(['wasp', 'kamikaze', 'sniper', 'swarm']);
+/** Розмір контактної тіні наземних ворогів (множник кола радіусом 0.45 м). */
+const GROUND_SHADOW: Partial<Record<EnemyType, number>> = {
+  scout: 1.3,
+  gunner: 1.4,
+  repairer: 1.5,
+  spider: 2.0,
+  turret: 2.0,
+  shell: 3.4,
+  foreman: 3.8,
+};
 
 const P = PALETTE;
 
@@ -475,7 +485,9 @@ export function buildEnemyVisual(type: EnemyType, instanced = false): EnemyVisua
   const shadow = new THREE.Mesh(shadowGeo, shadowMat);
   shadow.position.y = 0.025;
   // В інстансованому режимі тінь теж малює EnemyInstances; меш лишається носієм позиції.
-  shadow.visible = AIR.has(type) && (model !== null || !instanced);
+  shadow.visible = model !== null || !instanced;
+  // Наземним — контактна пляма за розміром тіла; дронам розмір рахується щокадру від висоти.
+  if (!AIR.has(type)) shadow.scale.setScalar(GROUND_SHADOW[type] ?? 1.2);
   root.add(shadow);
   body.scale.setScalar(VISUAL_SCALE[type]);
   let bubble: THREE.Mesh | null = null;
@@ -571,7 +583,9 @@ class EnemyInstances {
   constructor(
     private readonly scene: THREE.Scene,
     private readonly capacity: number,
+    tint: number,
   ) {
+    this.hullMat.color.setHex(tint);
     this.shadows = new THREE.InstancedMesh(shadowGeo, shadowMat, capacity);
     this.shadows.frustumCulled = false;
     this.shadows.count = 0;
@@ -621,7 +635,7 @@ class EnemyInstances {
     const k = v.glowMat.emissiveIntensity;
     const ge = v.glowMat.emissive;
     this.push(this.batch(this.glows, v.type, true), m, ge.r * k, ge.g * k, ge.b * k);
-    if (AIR.has(v.type)) {
+    {
       v.shadow.updateWorldMatrix(true, false);
       this.shadows.setMatrixAt(this.nShadow++, v.shadow.matrixWorld);
     }
@@ -667,11 +681,13 @@ export class EnemyRenderer {
   private readonly tmp2 = new THREE.Vector3();
   private readonly instances: EnemyInstances;
 
+  /** tint — множник кольору корпусів: на світлому піску пустелі бліді роботи мають бути темнішими. */
   constructor(
     private readonly scene: THREE.Scene,
     capacity: number,
+    tint = 0xffffff,
   ) {
-    this.instances = new EnemyInstances(scene, capacity);
+    this.instances = new EnemyInstances(scene, capacity, tint);
     for (let i = 0; i < capacity; i++) {
       this.views.push(null);
       this.gens.push(-1);

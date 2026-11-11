@@ -3,6 +3,7 @@ import type { ClassId, Player } from '@horizon/sim';
 import { PALETTE, classColor } from './palette';
 import { BOX, CYL, SPHERE, merge, part, seg, type Part } from './mesh';
 import { models, type ModelInstance } from './models';
+import { TRACER } from './projectiles';
 import { toX, toZ } from './coords';
 
 /**
@@ -148,6 +149,14 @@ function buildClass(classId: ClassId): {
 /** Візуально більший за хітбокс (0.5 м): з дивана на телевізорі інакше губиться. */
 const VISUAL_SCALE = 1.35;
 
+const BLOB_GEO = new THREE.CircleGeometry(0.5, 20).rotateX(-Math.PI / 2);
+const BLOB_MAT = new THREE.MeshBasicMaterial({
+  color: 0x000000,
+  transparent: true,
+  opacity: 0.38,
+  depthWrite: false,
+});
+
 /** Косметичні забарвлення (DECISIONS.md, п. 48): множник кольору, металевість, шорсткість. */
 const SKIN_LOOK: Record<string, { tint: [number, number, number]; metal: number; rough: number }> =
   {
@@ -256,9 +265,10 @@ export class PlayerView {
     }
 
     // Спалах пострілу: два схрещені квадрати, видно з будь-якого кута камери.
-    const mGeo = new THREE.PlaneGeometry(0.5, 0.5);
+    // Невеликий і кольору трасера класу: гурт, що стріляє, не зливається в білу пляму.
+    const mGeo = new THREE.PlaneGeometry(0.34, 0.34);
     const mMat = new THREE.MeshBasicMaterial({
-      color: PALETTE.playerShot,
+      color: TRACER[classId] ?? PALETTE.playerShot,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
@@ -281,6 +291,10 @@ export class PlayerView {
     );
     this.ring.position.y = 0.02;
     this.root.add(this.ring);
+    // Контактна тінь-пляма: «ставить» персонажа на підлогу й без карти тіней (слабкий екран).
+    const blob = new THREE.Mesh(BLOB_GEO, BLOB_MAT);
+    blob.position.y = 0.015;
+    this.root.add(blob);
   }
 
   hitFlash(): void {

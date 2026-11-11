@@ -143,6 +143,7 @@ function makeArena(settings: SessionSettings): ArenaView {
   (scene.fog as THREE.FogExp2).density = a.sky.fogDensity;
   renderer.toneMappingExposure = a.sky.exposure;
   post.setBloom(...a.sky.bloom);
+  post.setGrade(a.sky.grade);
   envBase = a.sky.env;
   // Звук за картою (п. 50–51): своя музика й фон; у пустелі ще ріг і піщані пориви.
   sfx.theme = map.id === 'desert' ? 'desert' : 'station';
@@ -304,7 +305,7 @@ function startMatch(): void {
     scene.add(v.root);
     return v;
   });
-  const enemyR = new EnemyRenderer(scene, game.state.enemies.length);
+  const enemyR = new EnemyRenderer(scene, game.state.enemies.length, arena.sky.enemyTint);
   const fx = new FxDirector(scene, cam, sfx, playerViews, enemyR);
   match = {
     game,
@@ -727,7 +728,7 @@ function frame(now: number): void {
   music.setMuffled(!!match && (lobby.pause !== null || lobby.resumeIn() > 0 || !!match.results));
   if (match) frameMatch(match, now, dt);
   else frameLobby(now, dt);
-  arena.update(now / 1000);
+  arena.update(now / 1000, cam.focusPoint);
   renderer.info.reset();
   post.render();
   debug.frame(dt, renderer, debugLine());
