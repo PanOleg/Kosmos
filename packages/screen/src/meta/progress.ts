@@ -18,6 +18,20 @@ export interface Records {
   fastestWin: number;
   /** Найбільше вбивств одного гравця за матч. */
   bestKills: number;
+  /** Нескінченний режим: найдальша хвиля. */
+  endlessBest: number;
+  /** Сумарно за класами — для класових досягнень. */
+  classKills: Record<string, number>;
+  classRevives: Record<string, number>;
+  classWins: Record<string, number>;
+}
+
+/** Рядок таблиці рекордів нескінченного режиму. */
+export interface BoardEntry {
+  wave: number;
+  players: number;
+  map: string;
+  day: number;
 }
 
 export interface Progress {
@@ -28,6 +42,8 @@ export interface Progress {
   /** Останній день виконаного контракту та серія днів поспіль. */
   contractDay: number;
   streak: number;
+  /** Топ-5 нескінченного режиму на цьому екрані. */
+  board: BoardEntry[];
 }
 
 /** Що змінилось після матчу — для екрана результатів. */
@@ -37,6 +53,8 @@ export interface MatchOutcome {
   newRecords: string[];
   contractDone: boolean;
   streak: number;
+  /** Місце в таблиці нескінченного режиму (1..5) або 0. */
+  boardPlace: number;
 }
 
 /** Контекст матчу, якого немає в підсумку. */
@@ -47,7 +65,22 @@ export interface MatchContext {
   day: number;
 }
 
-export const SKINS = ['standard', 'graphite', 'desert', 'arctic', 'chrome', 'gold'] as const;
+export const SKINS = [
+  'standard',
+  'graphite',
+  'desert',
+  'arctic',
+  'chrome',
+  'gold',
+  'crimson',
+  'amber',
+  'jade',
+  'cobalt',
+  'dune',
+  'frost',
+  'neon',
+  'void',
+] as const;
 export type SkinId = (typeof SKINS)[number];
 
 interface Achievement {
@@ -60,14 +93,14 @@ interface Achievement {
 const total = (s: MatchSummary, f: (p: MatchSummary['players'][number]) => number) =>
   s.players.reduce((a, p) => a + f(p), 0);
 const passedForeman = (s: MatchSummary, ctx: MatchContext) =>
-  ctx.foremanWave > 0 && (s.won || s.wave > ctx.foremanWave);
+  ctx.foremanWave > 0 && (s.beatCore || s.wave > ctx.foremanWave);
 
 export const ACHIEVEMENTS: Achievement[] = [
   { id: 'first', test: () => true },
   { id: 'wave5', test: (s) => s.wave >= 5 },
   { id: 'foreman', test: (s, c) => passedForeman(s, c) },
-  { id: 'victory', skin: 'desert', test: (s) => s.won },
-  { id: 'hardWin', skin: 'gold', test: (s, c) => s.won && c.preset === 'hard' },
+  { id: 'victory', skin: 'desert', test: (s) => s.beatCore },
+  { id: 'hardWin', skin: 'gold', test: (s, c) => s.beatCore && c.preset === 'hard' },
   { id: 'untouched', skin: 'chrome', test: (s) => s.won && s.players.every((p) => p.downs === 0) },
   { id: 'angel', skin: 'arctic', test: (s) => s.players.some((p) => p.revives >= 5) },
   { id: 'hundred', skin: 'graphite', test: (s) => s.players.some((p) => p.kills >= 100) },
@@ -75,6 +108,20 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'veteran', test: (_s, _c, p) => p.records.kills >= 1000 },
   { id: 'regular', test: (_s, _c, p) => p.records.matches >= 10 },
   { id: 'streak3', test: (_s, _c, p) => p.streak >= 3 },
+  // Класові (сумарно за всі матчі) — кожне відкриває забарвлення.
+  {
+    id: 'assault500',
+    skin: 'crimson',
+    test: (_s, _c, p) => (p.records.classKills.assault ?? 0) >= 500,
+  },
+  { id: 'engineer3', skin: 'amber', test: (_s, _c, p) => (p.records.classWins.engineer ?? 0) >= 3 },
+  { id: 'medic30', skin: 'jade', test: (_s, _c, p) => (p.records.classRevives.medic ?? 0) >= 30 },
+  { id: 'tech500', skin: 'cobalt', test: (_s, _c, p) => (p.records.classKills.tech ?? 0) >= 500 },
+  // Карти й режими.
+  { id: 'desertWin', skin: 'dune', test: (s) => s.beatCore && s.map === 'desert' },
+  { id: 'iceWin', skin: 'frost', test: (s) => s.beatCore && s.map === 'ice' },
+  { id: 'modWin', skin: 'neon', test: (s) => s.beatCore && s.modifiers.length > 0 },
+  { id: 'endless20', skin: 'void', test: (s) => s.endless && s.wave >= 20 },
 ];
 
 /** Щоденні контракти: один на день, однаковий для всіх на цю дату. */
@@ -88,7 +135,7 @@ export const CONTRACTS: {
   { id: 'kills', goal: 150, test: (s) => total(s, (p) => p.kills) >= 150 },
   { id: 'revives', goal: 3, test: (s) => total(s, (p) => p.revives) >= 3 },
   { id: 'foreman', goal: 1, test: (s, c) => passedForeman(s, c) },
-  { id: 'win', goal: 1, test: (s) => s.won },
+  { id: 'win', goal: 1, test: (s) => s.beatCore },
 ];
 
 export function contractOf(day: number): (typeof CONTRACTS)[number] {
@@ -114,10 +161,15 @@ export function emptyProgress(): Progress {
       bestWave: 0,
       fastestWin: 0,
       bestKills: 0,
+      endlessBest: 0,
+      classKills: {},
+      classRevives: {},
+      classWins: {},
     },
     achievements: {},
     contractDay: -1,
     streak: 0,
+    board: [],
   };
 }
 
@@ -138,15 +190,33 @@ export function recordMatch(p: Progress, s: MatchSummary, ctx: MatchContext): Ma
   const newRecords: string[] = [];
   const bestKills = Math.max(0, ...s.players.map((q) => q.kills));
   r.matches++;
-  if (s.won) r.wins++;
+  if (s.beatCore) r.wins++;
+  for (const q of s.players) {
+    r.classKills[q.classId] = (r.classKills[q.classId] ?? 0) + q.kills;
+    r.classRevives[q.classId] = (r.classRevives[q.classId] ?? 0) + q.revives;
+    if (s.beatCore) r.classWins[q.classId] = (r.classWins[q.classId] ?? 0) + 1;
+  }
+  // Нескінченний режим: власний рекорд і таблиця топ-5 (звичайні рекорди хвилі не чіпає).
+  let boardPlace = 0;
+  if (s.endless) {
+    if (s.wave > r.endlessBest) {
+      if (r.endlessBest > 0) newRecords.push('endlessBest');
+      r.endlessBest = s.wave;
+    }
+    const entry: BoardEntry = { wave: s.wave, players: s.players.length, map: s.map, day: ctx.day };
+    p.board.push(entry);
+    p.board.sort((a, b) => b.wave - a.wave || a.day - b.day);
+    p.board.length = Math.min(p.board.length, 5);
+    boardPlace = p.board.indexOf(entry) + 1;
+  }
   r.kills += total(s, (q) => q.kills);
   r.revives += total(s, (q) => q.revives);
   r.parts += total(s, (q) => q.parts);
-  if (s.wave > r.bestWave) {
+  if (!s.endless && s.wave > r.bestWave) {
     if (r.bestWave > 0) newRecords.push('bestWave');
     r.bestWave = s.wave;
   }
-  if (s.won && (r.fastestWin === 0 || s.seconds < r.fastestWin)) {
+  if (!s.endless && s.won && (r.fastestWin === 0 || s.seconds < r.fastestWin)) {
     if (r.fastestWin > 0) newRecords.push('fastestWin');
     r.fastestWin = s.seconds;
   }
@@ -168,7 +238,13 @@ export function recordMatch(p: Progress, s: MatchSummary, ctx: MatchContext): Ma
     p.achievements[a.id] = ctx.day;
     newAchievements.push(a.id);
   }
-  return { newAchievements, newRecords, contractDone, streak: liveStreak(p, ctx.day) };
+  return {
+    newAchievements,
+    newRecords,
+    contractDone,
+    streak: liveStreak(p, ctx.day),
+    boardPlace,
+  };
 }
 
 /** Мінімальний інтерфейс localStorage: у тестах — Map. */
@@ -187,6 +263,7 @@ export function loadProgress(store: KeyValue | null): Progress {
     if (p.v !== 1) return emptyProgress();
     // Нові поля рекордів у старих збереженнях.
     p.records = { ...emptyProgress().records, ...p.records };
+    p.board ??= [];
     return p;
   } catch {
     return emptyProgress();

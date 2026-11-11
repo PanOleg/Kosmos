@@ -5,7 +5,9 @@ import {
   MOD_RANGE,
   PRESETS,
   WAVES_RANGE,
+  MODIFIERS,
   type MapId,
+  type ModifierId,
   type PresetId,
   type SessionSettings,
 } from '@horizon/sim';
@@ -40,6 +42,7 @@ const css = `
   display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
 .lobby .settings .row { display: flex; align-items: center; gap: 8px; }
 .lobby .settings .lbl { width: 110px; opacity: .7; }
+.lobby .settings button[data-mod], .lobby .settings button[data-endless] { padding: 5px 6px; font-size: 12px; white-space: nowrap; }
 .lobby .settings button { font: inherit; color: inherit; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18);
   border-radius: 8px; padding: 5px 12px; cursor: pointer; }
 .lobby .settings button.on { background: #ffaa22; color: #14100a; border-color: #ffaa22; font-weight: 700; }
@@ -47,7 +50,7 @@ const css = `
 .lobby .settings input[type=range] { flex: 1; accent-color: #ffaa22; }
 .lobby .settings .adv { display: none; flex-direction: column; gap: 6px; }
 .lobby .settings.open .adv { display: flex; }
-.lobby .crew { width: 300px; padding: 14px 16px; border-radius: 12px; background: rgba(10,12,18,.7); display: flex;
+.lobby .crew { width: 300px; max-height: 92vh; overflow: hidden; padding: 12px 16px; border-radius: 12px; background: rgba(10,12,18,.7); display: flex;
   flex-direction: column; gap: 12px; font-size: 14px; }
 .lobby .crew h3 { margin: 0; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; opacity: .6; }
 .lobby .crew .ct { padding: 10px 12px; border-radius: 10px; background: rgba(255,170,34,.1); border: 1px solid rgba(255,170,34,.35); }
@@ -57,8 +60,9 @@ const css = `
 .lobby .crew .rec { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; }
 .lobby .crew .rec span { opacity: .65; }
 .lobby .crew .rec b { font-variant-numeric: tabular-nums; text-align: right; }
+.lobby .crew .board { font-size: 12px; opacity: .85; display: flex; flex-direction: column; gap: 2px; margin-top: -6px; }
 .lobby .crew .ach { display: flex; flex-wrap: wrap; gap: 5px; }
-.lobby .crew .ach i { font-style: normal; font-size: 11px; padding: 3px 7px; border-radius: 99px; background: rgba(255,255,255,.06);
+.lobby .crew .ach i { font-style: normal; font-size: 10px; padding: 2px 6px; border-radius: 99px; background: rgba(255,255,255,.06);
   opacity: .4; }
 .lobby .crew .ach i.on { opacity: 1; background: rgba(255,170,34,.2); border: 1px solid rgba(255,170,34,.5); }
 .lobby .start { font-size: 18px; font-weight: 700; color: #7dffb0; min-height: 24px; text-align: center; }
@@ -76,7 +80,11 @@ export function loadSettings(): SessionSettings {
         preset: v.preset && v.preset in PRESETS ? v.preset : DEFAULT_SETTINGS.preset,
         custom: v.custom && typeof v.custom === 'object' ? v.custom : null,
         waves: typeof v.waves === 'number' ? v.waves : DEFAULT_SETTINGS.waves,
-        map: v.map === 'desert' ? 'desert' : 'station',
+        map: v.map && MAP_ORDER.includes(v.map) ? v.map : 'station',
+        modifiers: Array.isArray(v.modifiers)
+          ? v.modifiers.filter((m) => MODIFIERS.includes(m))
+          : [],
+        endless: v.endless === true,
       };
     }
   } catch {
@@ -94,7 +102,7 @@ function saveSettings(s: SessionSettings): void {
 }
 
 const PRESET_ORDER: PresetId[] = ['easy', 'normal', 'hard'];
-const MAP_ORDER: MapId[] = ['station', 'desert'];
+const MAP_ORDER: MapId[] = ['station', 'desert', 'ice'];
 
 let installed = false;
 
@@ -164,7 +172,18 @@ export class LobbyView {
         <span>${t.recBestWave}</span><b>${r.bestWave || '—'}</b>
         <span>${t.recFastest}</span><b>${mm(r.fastestWin)}</b>
         <span>${t.recBestKills}</span><b>${r.bestKills || '—'}</b>
+        ${r.endlessBest ? `<span>${t.recEndless}</span><b>${r.endlessBest}</b>` : ''}
       </div>
+      ${
+        p.board.length
+          ? `<h3>${t.boardTitle}</h3><div class="board">${p.board
+              .map(
+                (b, i) =>
+                  `<div>${t.boardRow(i + 1, b.wave, b.players, t.mapName[b.map] ?? b.map)}</div>`,
+              )
+              .join('')}</div>`
+          : ''
+      }
       <h3>${t.achievementsOf(got, ACHIEVEMENTS.length)}</h3>
       <div class="ach">${chips}</div>`;
   }
@@ -278,6 +297,16 @@ export class LobbyView {
       this.settings.preset = b.dataset.preset as PresetId;
       this.settings.custom = null;
       this.commit();
+    } else if (b.dataset.mod) {
+      const m = b.dataset.mod as ModifierId;
+      const cur = new Set(this.settings.modifiers ?? []);
+      if (cur.has(m)) cur.delete(m);
+      else cur.add(m);
+      this.settings.modifiers = MODIFIERS.filter((x) => cur.has(x));
+      this.commit();
+    } else if (b.dataset.endless) {
+      this.settings.endless = !this.settings.endless;
+      this.commit();
     } else if (b.dataset.waves) this.stepWaves(Number(b.dataset.waves));
     else if (b.dataset.adv) {
       this.settingsEl.classList.toggle('open');
@@ -315,6 +344,13 @@ export class LobbyView {
       (m) =>
         `<button data-map="${m}" class="${m === (s.map ?? 'station') ? 'on' : ''}">${t.mapName[m]}</button>`,
     ).join('');
+    const active = new Set(s.modifiers ?? []);
+    const mods =
+      MODIFIERS.map(
+        (m) =>
+          `<button data-mod="${m}" class="${active.has(m) ? 'on' : ''}" title="${t.modDesc[m]}">${t.modName2[m]}</button>`,
+      ).join('') +
+      `<button data-endless="1" class="${s.endless ? 'on' : ''}" title="${t.endlessDesc}" style="margin-left:auto">∞ ${t.endless}</button>`;
     const audio = (['music', 'sfx', 'voice'] as const)
       .map(
         (k) =>
@@ -323,6 +359,7 @@ export class LobbyView {
       .join('');
     this.settingsEl.innerHTML = `<div class="row"><span class="lbl">${t.mapLabel}</span>${maps}</div>
 <div class="row"><span class="lbl">${t.soundLabel}</span>${audio}</div>
+<div class="row"><span class="lbl">${t.modsLabel}</span>${mods}</div>
 <div class="row"><span class="lbl">${t.difficulty}</span>${presets}<span class="preset-note" style="opacity:.6;margin-left:auto">${s.custom ? t.customized : ''}</span></div>
 <div class="row"><span class="lbl">${t.wavesLabel}</span><button data-waves="-1">−</button><span class="val">${s.waves}</span><button data-waves="1">+</button><button data-adv="1" style="margin-left:auto">${t.advanced}</button></div>
 <div class="adv">${sliders}<div class="row"><button data-reset="1">${t.resetCustom}</button></div></div>`;

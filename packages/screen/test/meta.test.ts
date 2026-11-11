@@ -26,7 +26,18 @@ function pl(o: Partial<PlayerSummary> = {}): PlayerSummary {
   };
 }
 function sum(o: Partial<MatchSummary> = {}): MatchSummary {
-  return { won: false, wave: 3, waves: 11, seconds: 300, players: [pl()], ...o };
+  return {
+    won: false,
+    wave: 3,
+    waves: 11,
+    seconds: 300,
+    players: [pl()],
+    beatCore: o.won ?? false,
+    endless: false,
+    map: 'station',
+    modifiers: [],
+    ...o,
+  };
 }
 const ctx = (day = 100, preset = 'normal') => ({ preset, foremanWave: 6, day });
 
@@ -66,6 +77,27 @@ describe('meta progress', () => {
       'chrome',
       'gold',
     ]);
+  });
+
+  test('endless: own record and a top-5 board; class totals unlock class skins', () => {
+    const p = emptyProgress();
+    const e = (wave: number) =>
+      sum({
+        endless: true,
+        wave,
+        beatCore: wave > 11,
+        players: [pl({ classId: 'tech', kills: 260 })],
+      });
+    expect(recordMatch(p, e(14), ctx()).boardPlace).toBe(1);
+    const out = recordMatch(p, e(22), ctx());
+    expect(out.newRecords).toContain('endlessBest');
+    expect(out.newAchievements).toEqual(expect.arrayContaining(['endless20', 'tech500']));
+    for (const w of [5, 6, 7, 8, 9]) recordMatch(p, e(w), ctx());
+    expect(p.board.map((b) => b.wave)).toEqual([22, 14, 9, 8, 7]);
+    expect(recordMatch(p, e(3), ctx()).boardPlace).toBe(0);
+    // Звичайний рекорд хвилі нескінченний режим не чіпає.
+    expect(p.records.bestWave).toBe(0);
+    expect(unlockedSkins(p)).toEqual(expect.arrayContaining(['void', 'cobalt']));
   });
 
   test('foreman achievement needs the foreman wave behind', () => {

@@ -38,7 +38,12 @@ export function matchSummary(game: Game): MatchSummary {
       if (best >= 0) players[best]!.awards.push(c.key);
     }
   if (won) for (const p of players) if (p.downs === 0) p.awards.push('untouched');
+  const firstCore = game.config.waves.findIndex((w) => w.boss === 'core');
   return {
+    beatCore: won || (game.config.endless && firstCore >= 0 && s.wave.index > firstCore),
+    endless: game.config.endless,
+    map: game.config.map.id,
+    modifiers: [...game.config.modifiers],
     won,
     wave: Math.min(s.wave.index + 1, game.config.waves.length),
     waves: game.config.waves.length,

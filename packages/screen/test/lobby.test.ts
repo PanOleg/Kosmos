@@ -209,6 +209,10 @@ describe('lobby', () => {
       waves: 11,
       seconds: 600,
       players: [],
+      beatCore: true,
+      endless: false,
+      map: 'station',
+      modifiers: [],
     };
     host.endMatch(summary);
     expect(a.last('results')?.slot).toBe(0);

@@ -3,6 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   createGame,
   matchSummary,
+  stormPhase,
   buildConfig,
   step,
   spawnEnemy,
@@ -135,9 +136,13 @@ const lobbyView = new LobbyView(lobby);
 
 /** Арена вибраної в лобі карти: своє небо, серпанок і світло (DECISIONS.md, п. 49). */
 let envBase = 0.32;
+let fogBase = 0.007;
+/** 0..1 — сила бурі на екрані (серпанок густішає плавно). */
+let stormK = 0;
 function makeArena(settings: SessionSettings): ArenaView {
   const map = buildConfig(settings).map;
-  const a = map.id === 'desert' ? buildDesertArena(map) : buildArena(map);
+  const a = map.id === 'station' ? buildArena(map) : buildDesertArena(map);
+  fogBase = a.sky.fogDensity;
   (scene.background as THREE.Color).setHex(a.sky.background);
   (scene.fog as THREE.FogExp2).color.setHex(a.sky.fog);
   (scene.fog as THREE.FogExp2).density = a.sky.fogDensity;
@@ -146,9 +151,10 @@ function makeArena(settings: SessionSettings): ArenaView {
   post.setGrade(a.sky.grade);
   envBase = a.sky.env;
   // Звук за картою (п. 50–51): своя музика й фон; у пустелі ще ріг і піщані пориви.
-  sfx.theme = map.id === 'desert' ? 'desert' : 'station';
+  // Крига — надворі, як пустеля (вітер, ріг, рація), але з холодною електронікою станції.
+  sfx.theme = map.id === 'station' ? 'station' : 'desert';
   music.setTheme(map.id === 'desert' ? 'desert' : 'station');
-  voice.setTheme(map.id === 'desert' ? 'desert' : 'station');
+  voice.setTheme(map.id === 'station' ? 'station' : 'desert');
   scene.environmentIntensity = envBase;
   scene.add(a.group);
   return a;
@@ -357,7 +363,23 @@ function startMatch(): void {
   const first = game.config.waves[0];
   if (first) {
     match.hud.announce(first.name, t.stationSignal, 2.5);
-    voice.say(game.config.map.id === 'desert' ? 'startDesert' : 'start', 2);
+    voice.say(game.config.map.id === 'station' ? 'start' : 'startDesert', 2);
+    const active = lobbyView.settings.modifiers ?? [];
+    if (active.length || lobbyView.settings.endless)
+      window.setTimeout(
+        () =>
+          match?.hud.announce(
+            t.modsActive(
+              [
+                ...active.map((m) => t.modName2[m]),
+                ...(lobbyView.settings.endless ? [`∞ ${t.endless}`] : []),
+              ].join(' · '),
+            ),
+            '',
+            3,
+          ),
+        2700,
+      );
     voice.say('wave1', 1);
     sfx.stationSignal();
   }
@@ -379,6 +401,8 @@ function endMatch(): void {
   arena.setDarkness(0);
   arena.setReactorVisible(true);
   scene.environmentIntensity = envBase;
+  stormK = 0;
+  (scene.fog as THREE.FogExp2).density = fogBase;
   match.fx.destroy();
   match.hud.destroy();
   match.results?.remove();
@@ -523,6 +547,15 @@ function handleMatchEvents(m: Match): void {
     } else if (e.type === 'airlockWarn') {
       m.hud.announce(t.airlockAlert, '', 1.5);
       voice.say(desert ? 'airlockDesert' : 'airlock', 3);
+    } else if (e.type === 'stormWarn') {
+      m.hud.announce(t.stormWarn, t.stormWarnSub, 2.5);
+      sfx.airlockWarn(0);
+    } else if (e.type === 'storm') {
+      if (e.b === 1) {
+        m.hud.announce(t.stormOn, '', 2);
+        voice.say('sandstorm', 3);
+        sfx.airlockOpen(0);
+      } else m.hud.announce(t.stormOff, '', 1.5);
     } else if (e.type === 'playerDown' && g.state.players.length > 1) {
       voice.say('down', 2);
     }
@@ -629,7 +662,7 @@ function frameMatch(m: Match, now: number, dt: number): void {
     lobbyView.setProgress(progress, day);
     m.results = showResults(summary, t.preset[lobbyView.settings.preset] ?? '', outcome);
     voice.say(
-      summary.won ? (g.config.map.id === 'desert' ? 'victoryDesert' : 'victory') : 'defeat',
+      summary.won ? (g.config.map.id === 'station' ? 'victory' : 'victoryDesert') : 'defeat',
       3,
     );
     if (outcome.newAchievements.length) voice.say('achievement', 1);
@@ -682,6 +715,9 @@ function frameMatch(m: Match, now: number, dt: number): void {
   arena.setDarkness(m.bossR.darkness);
   arena.setReactorVisible(!m.bossR.present);
   scene.environmentIntensity = envBase * (1 - 0.85 * m.bossR.darkness);
+  // Буря: серпанок густішає в кілька разів і так само плавно спадає.
+  stormK += ((stormPhase(g) === 2 ? 1 : 0) - stormK) * Math.min(1, dt * 1.5);
+  (scene.fog as THREE.FogExp2).density = fogBase * (1 + 5 * stormK);
   cam.update(m.camPoints, live, dt, time);
   m.enemyR.updateBars(g.state.enemies, alpha, cam.camera);
   m.hud.update(g, cam.camera, dt);

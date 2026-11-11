@@ -73,9 +73,11 @@ function metaBlock(o: MatchOutcome | undefined): string {
     bestWave: t.recBestWave,
     fastestWin: t.recFastest,
     bestKills: t.recBestKills,
+    endlessBest: t.recEndless,
   };
   for (const r of o.newRecords) lines.push(`${t.newRecord}: <b>${recName[r] ?? r}</b>`);
   if (o.contractDone) lines.push(`<b>${t.contractCompleted(o.streak)}</b>`);
+  if (o.boardPlace > 0) lines.push(`<b>${t.boardPlace(o.boardPlace)}</b>`);
   return lines.length
     ? `<div class="meta">${lines.map((l) => `<div>${l}</div>`).join('')}</div>`
     : '';
@@ -94,12 +96,13 @@ export function showResults(
   }
   const el = document.createElement('div');
   el.className = 'res';
-  el.style.setProperty('--rc', sum.won ? '#7dffb0' : '#ff5a3a');
+  // «Без кінця» завжди закінчується падінням екіпажу — підсумок там не поразка, а досягнута хвиля.
+  el.style.setProperty('--rc', sum.endless ? '#ffaa22' : sum.won ? '#7dffb0' : '#ff5a3a');
   const total = (f: (p: PlayerSummary) => number) => sum.players.reduce((a, p) => a + f(p), 0);
   const mm = `${Math.floor(sum.seconds / 60)}:${String(sum.seconds % 60).padStart(2, '0')}`;
   el.innerHTML = `
-    <h1>${sum.won ? t.victory : t.defeat}</h1>
-    <div class="sub"><span>${t.resWave} <b>${sum.wave} / ${sum.waves}</b></span><span>${t.resTime} <b>${mm}</b></span><span>${t.resDifficulty} <b>${presetName}</b></span></div>
+    <h1>${sum.endless ? `${t.resWave} ${sum.wave}` : sum.won ? t.victory : t.defeat}</h1>
+    <div class="sub"><span>${sum.endless ? `∞ ${t.endless}` : `${t.resWave} <b>${sum.wave} / ${sum.waves}</b>`}</span><span>${t.resTime} <b>${mm}</b></span><span>${t.resDifficulty} <b>${presetName}</b></span></div>
     <div class="cards">${sum.players.map(card).join('')}</div>
     ${
       sum.players.length > 1

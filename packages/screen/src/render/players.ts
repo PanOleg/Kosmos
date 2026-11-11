@@ -165,6 +165,14 @@ const SKIN_LOOK: Record<string, { tint: [number, number, number]; metal: number;
     arctic: { tint: [2.0, 2.05, 2.2], metal: 0.2, rough: 0.6 },
     chrome: { tint: [1.35, 1.4, 1.5], metal: 0.95, rough: 0.18 },
     gold: { tint: [1.7, 1.35, 0.65], metal: 0.85, rough: 0.25 },
+    crimson: { tint: [1.9, 0.55, 0.5], metal: 0.5, rough: 0.4 },
+    amber: { tint: [1.8, 1.15, 0.4], metal: 0.45, rough: 0.45 },
+    jade: { tint: [0.6, 1.7, 1.0], metal: 0.5, rough: 0.35 },
+    cobalt: { tint: [0.55, 0.85, 2.1], metal: 0.6, rough: 0.3 },
+    dune: { tint: [1.5, 1.2, 0.8], metal: 0.1, rough: 0.95 },
+    frost: { tint: [1.5, 1.9, 2.3], metal: 0.7, rough: 0.15 },
+    neon: { tint: [1.9, 0.5, 2.0], metal: 0.6, rough: 0.25 },
+    void: { tint: [0.28, 0.26, 0.38], metal: 0.9, rough: 0.2 },
   };
 
 const modelCache = new Map<ClassId, ReturnType<typeof buildClass>>();

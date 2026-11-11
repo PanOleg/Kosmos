@@ -15,12 +15,12 @@ import { contactShadows } from './contact';
 type V3 = [number, number, number];
 const P = (x: number, y: number, h: number): V3 => [toX(x), h, toZ(y)];
 
-const SAND = 0xe2bd86;
+let SAND = 0xe2bd86;
 const SUN_OFFSET = new THREE.Vector3(-25, 45, 18);
 /** Груба куля для дюн, мішків і острівців: з пласким затіненням різниці не видно, трикутників утричі менше. */
 const LOW = new THREE.SphereGeometry(0.5, 8, 5);
 const BAG = new THREE.SphereGeometry(0.5, 6, 4);
-const C = {
+const DESERT = {
   rock: [0xa8714a, 0x8f5e3e, 0xb98a5c, 0x9c6844],
   dune: [0xdcb37a, 0xd4a96e, 0xe6c290],
   canvas: 0xd0b07e,
@@ -41,7 +41,40 @@ const C = {
   bush: [0x8a8a4a, 0x7a6a3a, 0x6a7a40],
   pebble: [0xb08a60, 0x9a7a56, 0xc8a070],
   track: 0xc9a06a,
+  island: 0xc89a64,
+  islandTop: 0x6a8a3e,
+  slow: 0xb98e58,
+  slowRing: 0x8a6a40,
 };
+/** Крижана база (п. 61): та сама геометрія, сніг і лід замість піску й скель, ялини замість пальм. */
+const ICE: typeof DESERT = {
+  rock: [0x9fc4de, 0x86b0d0, 0xb8d8ea, 0x94bcd8],
+  dune: [0xe4eef6, 0xd6e4f0, 0xf0f6fa],
+  canvas: 0xd8dde4,
+  canvasDark: 0xa8b0bc,
+  pole: 0x4a5058,
+  rust: 0xc8502a,
+  rustDark: 0x3a3e46,
+  tire: 0x22242a,
+  wood: 0x5a6672,
+  woodDark: 0x3c4650,
+  bag: 0xe8f0f6,
+  bagDark: 0xc8d6e2,
+  trunk: 0x4a3626,
+  leaf: [0x2f5a40, 0x26503a, 0x3a6a4a],
+  steel: 0x8a9098,
+  steelDark: 0x4a4f56,
+  hazard: 0xe8a020,
+  bush: [0x6a7a80, 0x58686e, 0x7a8a90],
+  pebble: [0xa8c4d8, 0x90b0c8, 0xc0d8e6],
+  track: 0xc4d4e2,
+  island: 0xe0eaf2,
+  islandTop: 0xf2f6fa,
+  slow: 0xf6fafc,
+  slowRing: 0xbcd0e0,
+};
+let C = DESERT;
+let ICY = false;
 const G = { red: 0xff3a2a, amber: 0xffa830, core: 0xff6a2a };
 
 function rng(seed: number): () => number {
@@ -76,9 +109,9 @@ function sandTexture(): THREE.CanvasTexture {
       const ripple = Math.sin((y + Math.sin(x * 0.05) * 9) * 0.32) * 10;
       const v = 214 + ripple + (r() - 0.5) * 22;
       const i = (y * 256 + x) * 4;
-      img.data[i] = v;
-      img.data[i + 1] = v * 0.86;
-      img.data[i + 2] = v * 0.64;
+      img.data[i] = ICY ? v * 0.94 : v;
+      img.data[i + 1] = ICY ? v * 0.98 : v * 0.86;
+      img.data[i + 2] = ICY ? v * 1.04 : v * 0.64;
       img.data[i + 3] = 255;
     }
   ctx.putImageData(img, 0, 0);
@@ -109,7 +142,19 @@ function stone(
   );
 }
 
+/** Теги крижаної карти — ті самі будівники, що й у пустелі (палітра інша). */
+const SAME_AS: Record<string, string> = {
+  ice: 'rock',
+  snowbank: 'sandbag',
+  module: 'tent',
+  pine: 'palm',
+  sled: 'wreck',
+};
+
 export function buildDesertArena(map: MapDef): ArenaView {
+  ICY = map.id === 'ice';
+  C = ICY ? ICE : DESERT;
+  SAND = ICY ? 0xe6eef6 : 0xe2bd86;
   const g = new THREE.Group();
   const R = map.radius;
   const r = rng(4242);
@@ -214,14 +259,15 @@ export function buildDesertArena(map: MapDef): ArenaView {
 
   // ---------- Перешкоди ----------
   let reactor: THREE.Object3D | null = null;
-  for (const o of map.obstacles) {
+  for (const src of map.obstacles) {
+    const o = { ...src, tag: (SAME_AS[src.tag] ?? src.tag) as string };
     if (o.tag === 'core' && o.kind === 'circle') {
       reactor = drillRig(o.r, o.height);
       g.add(reactor);
       continue;
     }
     if (o.kind === 'circle') {
-      if (o.tag === 'palm') palmIsland(solid, o.x, o.y, o.r, r);
+      if (o.tag === 'palm') (ICY ? pineIsland : palmIsland)(solid, o.x, o.y, o.r, r);
       else {
         // Брила: велика центральна й кілька менших довкола.
         stone(solid, C.rock[Math.floor(r() * 4)]!, o.x, o.y, o.r * 2.1, o.height, r);
@@ -424,12 +470,59 @@ export function buildDesertArena(map: MapDef): ArenaView {
     merge(glow),
     new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(3.2, 3.2, 3.2) }),
   );
-  g.add(solidMesh, glowMesh, contactShadows(map, 0.42, 1.4));
+  g.add(solidMesh, glowMesh, contactShadows(map, ICY ? 0.3 : 0.42, 1.4));
 
-  // ---------- Світло: яскравий день ----------
-  const hemi = new THREE.HemisphereLight(0xfff2dc, 0xb08a5a, 1.7);
+  // Зони сповільнення (зибучі піски / замети): пляма іншого тону з кільцем-попередженням.
+  if (map.slowZones?.length) {
+    const zp: Part[] = [];
+    for (const z of map.slowZones) {
+      zp.push(part(CYL, C.slow, P(z.x, z.y, 0.009), [z.r * 2, 0.012, z.r * 2]));
+      for (let k = 0; k < 28; k++) {
+        if (k % 2) continue;
+        const a0 = (k / 28) * Math.PI * 2;
+        const a1 = ((k + 1) / 28) * Math.PI * 2;
+        zp.push(
+          seg(
+            BOX,
+            C.slowRing,
+            P(z.x + Math.cos(a0) * z.r, z.y + Math.sin(a0) * z.r, 0.016),
+            P(z.x + Math.cos(a1) * z.r, z.y + Math.sin(a1) * z.r, 0.016),
+            0.14,
+            0.012,
+          ),
+        );
+      }
+      // Спіраль усередині — «затягує».
+      for (let k = 0; k < 22; k++) {
+        const t0 = k / 22;
+        const t1 = (k + 1) / 22;
+        const sp = (t: number): V3 =>
+          P(
+            z.x + Math.cos(t * 9) * z.r * 0.85 * (1 - t),
+            z.y + Math.sin(t * 9) * z.r * 0.85 * (1 - t),
+            0.017,
+          );
+        zp.push(seg(BOX, C.slowRing, sp(t0), sp(t1), 0.08, 0.01));
+      }
+    }
+    const zm = new THREE.Mesh(
+      merge(zp),
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }),
+    );
+    zm.receiveShadow = true;
+    g.add(zm);
+  }
+
+  // ---------- Світло: яскравий день (пустеля) або полярні сутінки (крижана база) ----------
+  const HEMI = ICY ? 1.25 : 1.7;
+  const SUN = ICY ? 2.1 : 3.2;
+  const hemi = new THREE.HemisphereLight(
+    ICY ? 0xbcd4f0 : 0xfff2dc,
+    ICY ? 0x6a7c98 : 0xb08a5a,
+    HEMI,
+  );
   g.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff0d6, 3.2);
+  const sun = new THREE.DirectionalLight(ICY ? 0xd8e6ff : 0xfff0d6, SUN);
   sun.position.set(-25, 45, 18);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
@@ -446,18 +539,30 @@ export function buildDesertArena(map: MapDef): ArenaView {
   let dark = 0;
   return {
     group: g,
-    sky: {
-      background: 0xc9dcea,
-      fog: 0xe8d6b8,
-      fogDensity: 0.0042,
-      env: 0.85,
-      exposure: 1.0,
-      bloom: [2.4, 0.4],
-      // Холодні сині тіні проти теплого піску, більше контрасту, слабша віньєтка.
-      grade: { shadowTint: 0x05103a, contrast: 1.2, saturation: 1.18, vignette: 0.3 },
-      // Темна сталь: світло-сірі роботи на світлому піску губились.
-      enemyTint: 0x6f7480,
-    },
+    sky: ICY
+      ? {
+          background: 0x18284a,
+          fog: 0xb8cce0,
+          fogDensity: 0.0048,
+          env: 0.7,
+          exposure: 0.95,
+          bloom: [1.9, 0.45],
+          grade: { shadowTint: 0x0a1a40, contrast: 1.15, saturation: 1.1, vignette: 0.4 },
+          // На снігу — майже чорна сталь.
+          enemyTint: 0x5a5f6c,
+        }
+      : {
+          background: 0xc9dcea,
+          fog: 0xe8d6b8,
+          fogDensity: 0.0042,
+          env: 0.85,
+          exposure: 1.0,
+          bloom: [2.4, 0.4],
+          // Холодні сині тіні проти теплого піску, більше контрасту, слабша віньєтка.
+          grade: { shadowTint: 0x05103a, contrast: 1.2, saturation: 1.18, vignette: 0.3 },
+          // Темна сталь: світло-сірі роботи на світлому піску губились.
+          enemyTint: 0x6f7480,
+        },
     setDarkness(k: number) {
       dark = k;
     },
@@ -467,8 +572,8 @@ export function buildDesertArena(map: MapDef): ArenaView {
     update(time: number, focus?: THREE.Vector3) {
       followShadow(sun, SUN_OFFSET, focus);
       // Фаза 1 Ядра в пустелі — піщана буря: світло меркне, лишаються вогні й ліхтарі.
-      hemi.intensity = 1.7 * (1 - 0.82 * dark);
-      sun.intensity = 3.2 * (1 - 0.92 * dark);
+      hemi.intensity = HEMI * (1 - 0.82 * dark);
+      sun.intensity = SUN * (1 - 0.92 * dark);
       if (reactor) reactor.rotation.y = time * 0.15;
     },
   };
@@ -476,8 +581,8 @@ export function buildDesertArena(map: MapDef): ArenaView {
 
 /** Острівець оази: піщаний пагорб, пальми з похилими стовбурами й листям-віялом. */
 function palmIsland(out: Part[], x: number, y: number, rad: number, r: () => number): void {
-  out.push(part(LOW, 0xc89a64, P(x, y, 0), [rad * 2.2, 0.7, rad * 2.2]));
-  out.push(part(CYL, 0x6a8a3e, P(x, y, 0.2), [rad * 1.6, 0.12, rad * 1.6]));
+  out.push(part(LOW, C.island, P(x, y, 0), [rad * 2.2, 0.7, rad * 2.2]));
+  out.push(part(CYL, C.islandTop, P(x, y, 0.2), [rad * 1.6, 0.12, rad * 1.6]));
   const n = 1 + Math.round(rad);
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + r();
@@ -518,6 +623,32 @@ function palmIsland(out: Part[], x: number, y: number, rad: number, r: () => num
         ),
       );
     }
+  }
+}
+
+/** Сніговий горбок з ялинами: три яруси гілок-пірамід зі снігом на верхівці. */
+function pineIsland(out: Part[], x: number, y: number, rad: number, r: () => number): void {
+  out.push(part(LOW, C.island, P(x, y, 0), [rad * 2.2, 0.6, rad * 2.2]));
+  const n = 1 + Math.round(rad);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + r();
+    const bx = x + Math.cos(a) * rad * 0.35;
+    const by = y + Math.sin(a) * rad * 0.35;
+    const h = 2.0 + r() * 0.8;
+    out.push(part(CYL, C.trunk, P(bx, by, 0.35), [0.2, 0.7, 0.2]));
+    for (let k = 0; k < 3; k++) {
+      const w = (1.5 - k * 0.38) * Math.min(1, rad * 0.8);
+      out.push(
+        part(
+          CONE4,
+          C.leaf[k % 3]!,
+          P(bx, by, 0.6 + k * h * 0.26 + h * 0.15),
+          [w, h * 0.42, w],
+          [0, k * 0.6, 0],
+        ),
+      );
+    }
+    out.push(part(CONE4, 0xf2f6fa, P(bx, by, 0.6 + h * 0.78), [0.42, 0.3, 0.42]));
   }
 }
 

@@ -31,6 +31,14 @@ const SKIN_NAME: Record<string, string> = {
   arctic: 'Арктика',
   chrome: 'Хром',
   gold: 'Золото',
+  crimson: 'Багрянець',
+  amber: 'Бурштин',
+  jade: 'Нефрит',
+  cobalt: 'Кобальт',
+  dune: 'Дюна',
+  frost: 'Іній',
+  neon: 'Неон',
+  void: 'Безодня',
 };
 const AWARD: Record<string, string> = {
   kills: 'Винищувач',

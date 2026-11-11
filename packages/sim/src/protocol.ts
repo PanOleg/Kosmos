@@ -117,6 +117,11 @@ export interface MatchSummary {
   waves: number;
   seconds: number;
   players: PlayerSummary[];
+  /** Ядро здолано: перемога, а в нескінченному режимі — пройдено першу хвилю Ядра. */
+  beatCore: boolean;
+  endless: boolean;
+  map: string;
+  modifiers: string[];
 }
 
 export interface PlayerSummary {

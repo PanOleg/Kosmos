@@ -37,6 +37,9 @@ export interface GameConfig {
   mods: DifficultyMods;
   waves: WaveDef[];
   rules: MatchRules;
+  /** Нескінченний режим і ввімкнені модифікатори — для підсумку й рекордів. */
+  endless: boolean;
+  modifiers: ModifierId[];
 }
 
 export const DEFAULT_CONFIG: GameConfig = {
@@ -47,6 +50,8 @@ export const DEFAULT_CONFIG: GameConfig = {
   mods: PRESETS.normal,
   waves: buildWaves(9),
   rules: DEFAULT_RULES,
+  endless: false,
+  modifiers: [],
 };
 
 export type PresetId = keyof typeof PRESETS;
@@ -106,7 +111,15 @@ export function buildConfig(s: SessionSettings): GameConfig {
   if (active.has('rush')) rules.pauseMul = 0.5;
   let list = buildWaves(waves, !!s.endless);
   if (active.has('drones')) list = dronesOnly(list);
-  return { ...DEFAULT_CONFIG, map, mods, waves: list, rules };
+  return {
+    ...DEFAULT_CONFIG,
+    map,
+    mods,
+    waves: list,
+    rules,
+    endless: !!s.endless,
+    modifiers: MODIFIERS.filter((m) => active.has(m)),
+  };
 }
 
 export * from './balance';
