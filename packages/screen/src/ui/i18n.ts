@@ -111,7 +111,6 @@ const uk = {
     together: 'Тримайтеся разом: поодинці оточують швидше',
     shop: 'Між хвилями працює магазин — витрачайте деталі на покращення',
   } as Record<string, string>,
-  mapRandom: 'Випадкова',
   mapBeaten: 'Ядро здолано на цій карті',
   pingHere: 'СЮДИ!',
   enemyName: {

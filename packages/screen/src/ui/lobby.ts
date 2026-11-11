@@ -69,7 +69,6 @@ const css = `
 `;
 
 const STORAGE_KEY = 'horizon-settings';
-const RANDOM_KEY = 'horizon-random-map';
 
 /** Налаштування сесії переживають перезавантаження екрана. */
 export function loadSettings(): SessionSettings {
@@ -279,42 +278,13 @@ export class LobbyView {
     this.onSettingsChange(this.settings);
   }
 
-  /** «Випадкова карта»: перед кожним матчем карта вибирається сама. */
-  randomMap = (() => {
-    try {
-      return localStorage.getItem(RANDOM_KEY) === '1';
-    } catch {
-      return false;
-    }
-  })();
   /** Карти, на яких екіпаж уже здолав Ядро, — зірочка на кнопці. */
   private beaten = new Set<string>();
 
-  private setRandom(on: boolean): void {
-    this.randomMap = on;
-    try {
-      localStorage.setItem(RANDOM_KEY, on ? '1' : '0');
-    } catch {
-      /* не критично */
-    }
-  }
-
-  /** Наступна карта по колу (клавіша M): три карти, далі «Випадкова». */
+  /** Наступна карта по колу (клавіша M). */
   cycleMap(): void {
     const i = MAP_ORDER.indexOf(this.settings.map ?? 'station');
-    if (this.randomMap) {
-      this.setRandom(false);
-      this.settings.map = MAP_ORDER[0];
-    } else if (i === MAP_ORDER.length - 1) this.setRandom(true);
-    else this.settings.map = MAP_ORDER[i + 1];
-    this.commit();
-  }
-
-  /** Перед стартом матчу: якщо ввімкнено «Випадкова» — інша карта, ніж щойно була. */
-  rollMap(rand: () => number = Math.random): void {
-    if (!this.randomMap) return;
-    const others = MAP_ORDER.filter((m) => m !== (this.settings.map ?? 'station'));
-    this.settings.map = others[Math.floor(rand() * others.length)] ?? MAP_ORDER[0];
+    this.settings.map = MAP_ORDER[(i + 1) % MAP_ORDER.length];
     this.commit();
   }
 
@@ -324,8 +294,7 @@ export class LobbyView {
     if (b.dataset.audio) {
       this.onAudioToggle(b.dataset.audio as 'music' | 'sfx' | 'voice');
     } else if (b.dataset.map) {
-      this.setRandom(b.dataset.map === 'random');
-      if (!this.randomMap) this.settings.map = b.dataset.map as MapId;
+      this.settings.map = b.dataset.map as MapId;
       this.commit();
     } else if (b.dataset.preset) {
       this.settings.preset = b.dataset.preset as PresetId;
@@ -374,12 +343,10 @@ export class LobbyView {
       return `<div class="row"><span class="lbl">${t.modName[k]}</span><input type="range" min="${MOD_RANGE.min}" max="${MOD_RANGE.max}" step="0.05" value="${v}" data-mod="${k}"><span class="val">×${v.toFixed(2)}</span></div>`;
     }).join('');
     const open = this.settingsEl.classList.contains('open');
-    const maps =
-      MAP_ORDER.map(
-        (m) =>
-          `<button data-map="${m}" class="${!this.randomMap && m === (s.map ?? 'station') ? 'on' : ''}"${this.beaten.has(m) ? ` title="${t.mapBeaten}"` : ''}>${t.mapName[m]}${this.beaten.has(m) ? ' ★' : ''}</button>`,
-      ).join('') +
-      `<button data-map="random" class="${this.randomMap ? 'on' : ''}">🎲 ${t.mapRandom}</button>`;
+    const maps = MAP_ORDER.map(
+      (m) =>
+        `<button data-map="${m}" class="${m === (s.map ?? 'station') ? 'on' : ''}"${this.beaten.has(m) ? ` title="${t.mapBeaten}"` : ''}>${t.mapName[m]}${this.beaten.has(m) ? ' ★' : ''}</button>`,
+    ).join('');
     const active = new Set(s.modifiers ?? []);
     const mods =
       MODIFIERS.map(

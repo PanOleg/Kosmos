@@ -317,8 +317,6 @@ function startMatch(): void {
     (s): s is Slot => s !== null && s.classId !== null && (s.kind !== 'phone' || s.link !== null),
   );
   if (order.length === 0) return;
-  // «Випадкова карта»: вибираємо зараз — арена перебудовується до створення гри.
-  lobbyView.rollMap();
   const game = createGame(
     buildConfig(lobbyView.settings),
     seed++,
