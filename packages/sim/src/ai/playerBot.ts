@@ -5,6 +5,7 @@ import { SPIDER_FLIGHT, SPIDER_WINDUP } from './spider';
 import { SNIPER_AIM } from './sniper';
 import { BUY_LIFE, BUY_MEDKIT } from '../protocol';
 import { UPGRADES } from '../config/upgrades';
+import { slowAt, type SlowZone } from '../config/map';
 import { SCOUT_WINDUP } from './scout';
 import { KAMI_DIVE, KAMI_WINDUP } from './kamikaze';
 import { TEAM_ENEMY } from '../entities/projectile';
@@ -42,8 +43,65 @@ import { UPGRADE_ORDER } from '../config/upgrades';
  * відступає до Медика, піднімає впалих, збирає деталі, коли спокійно, купує з розумом,
  * а здібність тисне за призначенням класу.
  */
+/** Запас до краю зибучих пісків/заметів, який бот тримає, і як далеко дивиться вперед, м. */
+const SLOW_MARGIN = 0.6;
+const SLOW_LOOK = 4;
+const steer = { x: 0, y: 0 };
+
+/**
+ * Обхід зон сповільнення: напрямок (ux, uy) одиничний, результат — у steer. Зовні, якщо шлях
+ * перетинає зону ближче ніж SLOW_LOOK, — іде по дотичній з ближчого боку; на краю — не дає
+ * зайти; усередині — веде назовні найкоротшим шляхом. Повертає true, якщо бот у самій зоні.
+ */
+function avoidSlow(zones: SlowZone[], px: number, py: number, ux: number, uy: number): boolean {
+  let inside = false;
+  for (const z of zones) {
+    const wx = z.x - px;
+    const wy = z.y - py;
+    const d = Math.hypot(wx, wy) || 0.01;
+    const R = z.r + SLOW_MARGIN;
+    if (d < R) {
+      // На краю або всередині: прибираємо рух до центру; усередині ще й штовхаємо назовні.
+      const nx = wx / d;
+      const ny = wy / d;
+      const into = ux * nx + uy * ny;
+      if (into > 0) {
+        ux -= nx * into;
+        uy -= ny * into;
+      }
+      if (d < z.r) {
+        inside = true;
+        ux -= nx * 1.5;
+        uy -= ny * 1.5;
+      } else if (Math.hypot(ux, uy) < 0.2) {
+        // Ішли просто в центр: далі — уздовж краю.
+        ux = -ny;
+        uy = nx;
+      }
+    } else {
+      const along = wx * ux + wy * uy;
+      const cross = wx * uy - wy * ux;
+      if (along <= 0 || Math.abs(cross) >= R) continue;
+      if (along - Math.sqrt(R * R - cross * cross) > SLOW_LOOK) continue;
+      // Дотична до кола з того боку, куди вже хилиться напрямок.
+      const a = Math.asin(R / d) * (cross >= 0 ? 1 : -1);
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      ux = (wx * c - wy * sn) / d;
+      uy = (wx * sn + wy * c) / d;
+    }
+    const l = Math.hypot(ux, uy) || 1;
+    ux /= l;
+    uy /= l;
+  }
+  steer.x = ux;
+  steer.y = uy;
+  return inside;
+}
+
 export function botInput(game: Game, slot: number, out: PlayerInput): void {
   const s = game.state;
+  const map = game.config.map;
   const p = s.players[slot];
   out.ability = false;
   out.dash = false;
@@ -228,6 +286,8 @@ export function botInput(game: Game, slot: number, out: PlayerInput): void {
   let pd = 1e9;
   for (const k of s.pickups) {
     if (!k.alive) continue;
+    // У бою по деталі в зибучі піски не ходимо; коли спокійно — можна.
+    if (near > 0 && slowAt(map, k.x, k.y) < 1) continue;
     const d = (k.x - p.x) ** 2 + (k.y - p.y) ** 2;
     if (d < pd) {
       pd = d;
@@ -321,8 +381,18 @@ export function botInput(game: Game, slot: number, out: PlayerInput): void {
     out.move.x = ax / l;
     out.move.y = ay / l;
   }
-  // Поки Камікадзе лише цілиться, ривок не витрачаємо на дрібниці.
-  out.dash = p.dashCd === 0 && (dodging || (danger && !kamiAiming));
+  // Зибучі піски й замети обходимо по краю. Не тоді, коли рятуємося від удару (вийти із зони
+  // ракети важливіше), ідемо піднімати впалого чи спокійно збираємо деталь, що лежить у пісках.
+  let stuck = false;
+  const calmLoot = near === 0 && pd < 1e9 && slowAt(map, px, py) < 1;
+  if (map.slowZones && !dodging && !danger && rescue < 0 && !calmLoot) {
+    stuck = avoidSlow(map.slowZones, p.x, p.y, out.move.x, out.move.y);
+    out.move.x = steer.x;
+    out.move.y = steer.y;
+  }
+  // Поки Камікадзе лише цілиться, ривок не витрачаємо на дрібниці. Загрузли під натиском —
+  // ривок перетинає піски.
+  out.dash = p.dashCd === 0 && (dodging || ((danger || (stuck && near >= 2)) && !kamiAiming));
   // Біля упалого тримає кнопку (підйом), решту логіки здібності пропускає.
   if (
     rescue >= 0 &&

@@ -7,6 +7,7 @@ import {
   emptyInput,
   DEFAULT_SETTINGS,
   MAPS,
+  slowAt,
   type ClassId,
   type PlayerInput,
 } from '../src/index';
@@ -53,4 +54,27 @@ describe('desert map', () => {
     },
     120000,
   );
+  test('bots walk around quicksand instead of through it', () => {
+    // Напарник стоїть за зибучими пісками: гурт тягне бота навпростець, через зону (-15, 9).
+    const cfg = buildConfig({ ...DEFAULT_SETTINGS, map: 'desert' });
+    const g = createGame(cfg, 1, [{ classId: 'assault' }, { classId: 'medic' }]);
+    const [bot, mate] = g.state.players as [
+      (typeof g.state.players)[0],
+      (typeof g.state.players)[0],
+    ];
+    bot.x = -19.5;
+    bot.y = 9;
+    mate.x = -9;
+    mate.y = 9;
+    const inputs = [emptyInput(), emptyInput()];
+    for (let t = 0; t < 240; t++) {
+      botInput(g, 0, inputs[0]!);
+      step(g, inputs);
+      mate.x = -9;
+      mate.y = 9;
+      expect(slowAt(cfg.map, bot.x, bot.y)).toBe(1);
+    }
+    // І при цьому таки наблизився до напарника (обійшов), а не застиг перед зоною.
+    expect(Math.hypot(bot.x - mate.x, bot.y - mate.y)).toBeLessThan(8.5);
+  });
 });
