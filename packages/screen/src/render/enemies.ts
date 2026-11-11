@@ -49,6 +49,9 @@ export interface EnemyVisual {
   type: EnemyType;
   flash: number;
   spawnT: number;
+  /** Фаза й сила кроку (0..1) для анімації ніг у шейдері. */
+  walk: number;
+  walkAmp: number;
   /** Готова glTF-модель замість примітивів, якщо є. */
   model: ModelInstance | null;
   /**
@@ -523,6 +526,8 @@ export function buildEnemyVisual(type: EnemyType, instanced = false): EnemyVisua
     type,
     flash: 0,
     spawnT: 0,
+    walk: Math.random() * 6.28,
+    walkAmp: 0,
     model,
     instanced: instanced && model === null,
   };
@@ -532,14 +537,27 @@ export function buildEnemyVisual(type: EnemyType, instanced = false): EnemyVisua
  * Емісія на інстанс: атрибут instanceEmissive додається до totalEmissiveRadiance. Так спалах
  * влучання й світіння ока лишаються індивідуальними, а тип ворога малюється одним викликом.
  */
-function withInstanceEmissive<M extends THREE.Material>(mat: M): M {
+function withInstanceEmissive<M extends THREE.Material>(mat: M, legs = false): M {
+  // Крок (п. 59): вершини нижче стегна зсуваються вперед-назад і трохи вгору, ліва й права
+  // ноги — у протифазі. instanceAnim = (фаза, розмах, висота стегна, мін. |x| ноги).
+  const walk = legs
+    ? `
+float legW = clamp((instanceAnim.z - position.y) / max(instanceAnim.z, 0.001), 0.0, 1.0)
+  * step(instanceAnim.w, abs(position.x));
+float legS = position.x >= 0.0 ? 1.0 : -1.0;
+transformed.z += legS * sin(instanceAnim.x) * instanceAnim.y * legW;
+transformed.y += max(0.0, legS * cos(instanceAnim.x)) * instanceAnim.y * 0.4 * legW;`
+    : '';
   mat.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
       .replace(
         '#include <common>',
-        '#include <common>\nattribute vec3 instanceEmissive;\nvarying vec3 vInstEm;',
+        `#include <common>\nattribute vec3 instanceEmissive;\nvarying vec3 vInstEm;${legs ? '\nattribute vec4 instanceAnim;' : ''}`,
       )
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvInstEm = instanceEmissive;');
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>\nvInstEm = instanceEmissive;${walk}`,
+      );
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vInstEm;')
       .replace(
@@ -547,14 +565,25 @@ function withInstanceEmissive<M extends THREE.Material>(mat: M): M {
         '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vInstEm;',
       );
   };
-  mat.customProgramCacheKey = () => 'instEm';
+  mat.customProgramCacheKey = () => (legs ? 'instEmLegs' : 'instEm');
   return mat;
 }
 
 interface Batch {
   mesh: THREE.InstancedMesh;
   emissive: THREE.InstancedBufferAttribute;
+  anim: THREE.InstancedBufferAttribute | null;
 }
+
+/** Хода за типом: висота стегна, розмах (м), мін. |x| ноги (Павук: лише лапи), кроків на метр. */
+const WALK: Partial<Record<EnemyType, { hip: number; amp: number; xMin: number; rate: number }>> = {
+  scout: { hip: 0.76, amp: 0.2, xMin: 0, rate: 2.6 },
+  gunner: { hip: 0.66, amp: 0.15, xMin: 0, rate: 2.4 },
+  repairer: { hip: 0.6, amp: 0.13, xMin: 0, rate: 2.4 },
+  shell: { hip: 1.2, amp: 0.3, xMin: 0, rate: 1.3 },
+  foreman: { hip: 1.0, amp: 0.28, xMin: 0, rate: 1.2 },
+  spider: { hip: 0.78, amp: 0.13, xMin: 0.3, rate: 5 },
+};
 
 /**
  * Один InstancedMesh на тип для корпусу й один для ока, плюс спільний для тіней дронів.
@@ -573,6 +602,7 @@ class EnemyInstances {
       flatShading: true,
       emissive: 0x000000,
     }),
+    true,
   );
   private readonly glowMat = withInstanceEmissive(
     new THREE.MeshStandardMaterial({ color: 0xffb0a0, emissive: 0x000000 }),
@@ -605,12 +635,18 @@ class EnemyInstances {
     emissive.setUsage(THREE.DynamicDrawUsage);
     mesh.geometry = mesh.geometry.clone();
     mesh.geometry.setAttribute('instanceEmissive', emissive);
+    let anim: THREE.InstancedBufferAttribute | null = null;
+    if (!glow) {
+      anim = new THREE.InstancedBufferAttribute(new Float32Array(this.capacity * 4), 4);
+      anim.setUsage(THREE.DynamicDrawUsage);
+      mesh.geometry.setAttribute('instanceAnim', anim);
+    }
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     mesh.frustumCulled = false;
     mesh.castShadow = !glow;
     mesh.count = 0;
     this.scene.add(mesh);
-    b = { mesh, emissive };
+    b = { mesh, emissive, anim };
     map.set(type, b);
     return b;
   }
@@ -620,10 +656,21 @@ class EnemyInstances {
     this.nShadow = 0;
   }
 
-  private push(b: Batch, m: THREE.Matrix4, r: number, g: number, bl: number): void {
+  private push(
+    b: Batch,
+    m: THREE.Matrix4,
+    r: number,
+    g: number,
+    bl: number,
+    v?: EnemyVisual,
+  ): void {
     const n = this.counts.get(b.mesh) ?? 0;
     b.mesh.setMatrixAt(n, m);
     b.emissive.setXYZ(n, r, g, bl);
+    if (b.anim && v) {
+      const w = WALK[v.type];
+      b.anim.setXYZW(n, v.walk, w ? w.amp * v.walkAmp : 0, w?.hip ?? 0, w?.xMin ?? 0);
+    }
     this.counts.set(b.mesh, n + 1);
   }
 
@@ -631,7 +678,7 @@ class EnemyInstances {
     v.body.updateWorldMatrix(true, false);
     const m = v.body.matrixWorld;
     const he = v.hullMat.emissive;
-    this.push(this.batch(this.hulls, v.type, false), m, he.r, he.g, he.b);
+    this.push(this.batch(this.hulls, v.type, false), m, he.r, he.g, he.b, v);
     const k = v.glowMat.emissiveIntensity;
     const ge = v.glowMat.emissive;
     this.push(this.batch(this.glows, v.type, true), m, ge.r * k, ge.g * k, ge.b * k);
@@ -650,6 +697,7 @@ class EnemyInstances {
         if (n > 0) {
           b.mesh.instanceMatrix.needsUpdate = true;
           b.emissive.needsUpdate = true;
+          if (b.anim) b.anim.needsUpdate = true;
         }
       }
     this.shadows.count = this.nShadow;
@@ -811,6 +859,13 @@ export class EnemyRenderer {
           ? 0.8
           : 1;
       const speed = Math.hypot(e.vx, e.vy);
+      // Фаза кроку росте з пройденим шляхом — ноги не «ковзають»; стоїть або оглушений — завмирає.
+      const wk = WALK[v.type];
+      if (wk) {
+        v.walk += dt * speed * wk.rate;
+        const want = e.stun > 0 ? 0 : Math.min(1, speed / 1.2);
+        v.walkAmp += (want - v.walkAmp) * Math.min(1, dt * 10);
+      }
       const bob = Math.abs(Math.sin(time * 18 + i)) * 0.05 * Math.min(1, speed / 3);
       const bs = VISUAL_SCALE[v.type];
       v.body.scale.set(bs, bs * crouch * v.spawnT, bs);

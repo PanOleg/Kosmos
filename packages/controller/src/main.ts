@@ -289,8 +289,29 @@ function run(room: string): void {
     if (text && el.textContent !== text) el.textContent = text;
   };
 
+  // Вібрація на події, які легко пропустити, дивлячись на телевізор (де браузер її вміє —
+  // Android; iPhone Safari вібрації не дає): здібність готова, підбір деталей, напарник упав
+  // поруч, початок хвилі.
+  const hp = { ability: 1, parts: 0, revive: false, shop: false, partsAt: 0 };
+  const haptics = (m: Extract<ScreenMessage, { t: 'status' }>) => {
+    if (m.phase !== 'match' || m.down) return;
+    const now = performance.now();
+    if (m.ability >= 1 && hp.ability < 1) navigator.vibrate?.(25);
+    if (m.parts > hp.parts && !m.shop && now - hp.partsAt > 250) {
+      navigator.vibrate?.(8);
+      hp.partsAt = now;
+    }
+    if (m.revive && !hp.revive) navigator.vibrate?.([40, 50, 40]);
+    if (!m.shop && hp.shop) navigator.vibrate?.(70);
+    hp.ability = m.ability;
+    hp.parts = m.parts;
+    hp.revive = !!m.revive;
+    hp.shop = !!m.shop;
+  };
+
   const stick = new Joystick($('left'), $('base'), $('knob'), () => {
     blip(520, 0.05, 0.08);
+    navigator.vibrate?.(12);
     if (tipsSeen.has('aim')) learn('dash');
   });
   const ability = $('ability');
@@ -400,6 +421,7 @@ function run(room: string): void {
         renderShop(m.shop, m.parts, m.hp >= m.maxHp);
         renderPause(m);
         renderTip(m);
+        haptics(m);
         break;
       }
       case 'hurt':
