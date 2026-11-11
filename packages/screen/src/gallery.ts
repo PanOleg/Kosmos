@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createGame, type ClassId, type EnemyType } from '@horizon/sim';
 import { PlayerView } from './render/players';
-import { buildEnemyVisual } from './render/enemies';
+import { buildEnemyVisual, setEnemySet } from './render/enemies';
 import { buildArena } from './render/arena';
 import { PostFx } from './render/post';
 import { models } from './render/models';
@@ -27,6 +27,8 @@ scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.32;
 
 await models.load();
+// ?set=desert — пустельний вигляд ворогів (механічні тварини).
+setEnemySet(new URLSearchParams(location.search).get('set') ?? '');
 let camera: THREE.Camera;
 if (m === 'map') {
   const arena = buildArena(createGame().config.map);

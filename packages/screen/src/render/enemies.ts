@@ -407,9 +407,19 @@ const DRONE_GEO = {
   swarm: droneParts('swarm'),
 };
 
+/**
+ * Набір вигляду ворогів за картою (DECISIONS.md, п. 65): у пустелі ті самі вороги виглядають
+ * як механічні тварини — моделі public/models/<набір>/<тип>.glb. Немає моделі — звичайна.
+ */
+let enemySet = '';
+export function setEnemySet(set: string): void {
+  enemySet = set;
+}
+
 function geometryOf(type: EnemyType): { hull: THREE.BufferGeometry; glow: THREE.BufferGeometry } {
   // Статична модель з Blender (public/models) замінює примітиви, якщо завантажена.
-  const model = models.staticParts(type);
+  const model =
+    (enemySet ? models.staticParts(`${enemySet}/${type}`) : null) ?? models.staticParts(type);
   if (model) return model;
   if (type === 'scout') return scoutGeo;
   if (type === 'gunner') return gunnerGeo;
@@ -590,6 +600,22 @@ const WALK: Partial<Record<EnemyType, { hip: number; amp: number; xMin: number; 
  * На слабкому телевізорі сотня ворогів як окремі об'єкти (з власними матеріалами й проходом
  * тіней) з'їдала кадр на процесорі; так — ~2 виклики на тип незалежно від кількості.
  */
+/** Хода пустельних тварин: Кобра повзе без кроку, у Шакала й Верблюда — чотири лапи. */
+const WALK_SETS: Record<string, typeof WALK> = {
+  desert: {
+    scout: { hip: 0.6, amp: 0.2, xMin: 0, rate: 3 },
+    repairer: { hip: 0.42, amp: 0.1, xMin: 0, rate: 2.6 },
+    shell: { hip: 1.25, amp: 0.3, xMin: 0, rate: 1.3 },
+    foreman: { hip: 0.95, amp: 0.26, xMin: 0.55, rate: 1.4 },
+    spider: { hip: 0.78, amp: 0.13, xMin: 0.3, rate: 5 },
+  },
+};
+function walkOf(type: EnemyType): (typeof WALK)[EnemyType] {
+  const set = WALK_SETS[enemySet];
+  if (set && models.staticParts(`${enemySet}/${type}`)) return set[type];
+  return WALK[type];
+}
+
 class EnemyInstances {
   private readonly hulls = new Map<EnemyType, Batch>();
   private readonly glows = new Map<EnemyType, Batch>();
@@ -668,7 +694,7 @@ class EnemyInstances {
     b.mesh.setMatrixAt(n, m);
     b.emissive.setXYZ(n, r, g, bl);
     if (b.anim && v) {
-      const w = WALK[v.type];
+      const w = walkOf(v.type);
       b.anim.setXYZW(n, v.walk, w ? w.amp * v.walkAmp : 0, w?.hip ?? 0, w?.xMin ?? 0);
     }
     this.counts.set(b.mesh, n + 1);
@@ -734,7 +760,9 @@ export class EnemyRenderer {
     private readonly scene: THREE.Scene,
     capacity: number,
     tint = 0xffffff,
+    set = '',
   ) {
+    setEnemySet(set);
     this.instances = new EnemyInstances(scene, capacity, tint);
     for (let i = 0; i < capacity; i++) {
       this.views.push(null);
@@ -860,7 +888,7 @@ export class EnemyRenderer {
           : 1;
       const speed = Math.hypot(e.vx, e.vy);
       // Фаза кроку росте з пройденим шляхом — ноги не «ковзають»; стоїть або оглушений — завмирає.
-      const wk = WALK[v.type];
+      const wk = walkOf(v.type);
       if (wk) {
         v.walk += dt * speed * wk.rate;
         const want = e.stun > 0 ? 0 : Math.min(1, speed / 1.2);

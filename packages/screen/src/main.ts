@@ -310,7 +310,12 @@ function startMatch(): void {
     scene.add(v.root);
     return v;
   });
-  const enemyR = new EnemyRenderer(scene, game.state.enemies.length, arena.sky.enemyTint);
+  const enemyR = new EnemyRenderer(
+    scene,
+    game.state.enemies.length,
+    arena.sky.enemyTint,
+    game.config.map.id,
+  );
   const fx = new FxDirector(scene, cam, sfx, playerViews, enemyR);
   match = {
     game,
