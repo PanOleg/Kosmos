@@ -155,7 +155,8 @@ export class LobbyHost {
           this.log(`відмова пульту: матч уже йде, а токен ${m.token ? 'не знайдено' : 'порожній'}`);
           return;
         }
-        const free = this.slots.findIndex((s) => s === null);
+        let free = this.slots.findIndex((s) => s === null);
+        if (free < 0) free = this.evictForNewcomer();
         if (free < 0) {
           link.sendReliable({ t: 'full', reason: 'full' });
           this.log('відмова пульту: усі чотири місця зайняті');
@@ -300,6 +301,24 @@ export class LobbyHost {
     if (classId === null) s.ready = false;
     this.markDirty();
     return true;
+  }
+
+  /**
+   * Лобі повне, а прийшов живий гравець: звільняємо місце пульта без зв'язку (того, що зник
+   * найдавніше), а якщо таких немає — бота. Живих гравців і клавіатуру не чіпаємо.
+   */
+  private evictForNewcomer(): number {
+    const dead = this.slots
+      .filter((s): s is Slot => s !== null && s.kind === 'phone' && s.link === null)
+      .sort((a, b) => (a.lostAt ?? 0) - (b.lostAt ?? 0))[0];
+    const victim = dead ?? this.slots.find((s): s is Slot => s !== null && s.kind === 'bot');
+    if (!victim) return -1;
+    this.log(
+      `P${victim.index + 1}: місце звільнено для нового гравця (${victim.kind === 'bot' ? 'бот' : "пульт без зв'язку"})`,
+    );
+    const i = victim.index;
+    this.slots[i] = null;
+    return i;
   }
 
   addLocal(kind: 'keyboard' | 'bot'): Slot | null {

@@ -48,7 +48,9 @@ function show(v: View): void {
 
 // Журнал зв'язку (DECISIONS.md, п. 69): кнопка — там, де гравець застряг, і в паузі.
 watchPage('пульт');
-startUpload('controller', () => new URLSearchParams(location.search).get('room') ?? '');
+startUpload('controller', () =>
+  (new URLSearchParams(location.search).get('room') ?? '').toUpperCase(),
+);
 function syncDiagButton(): void {
   const stuck =
     view === 'join' ||

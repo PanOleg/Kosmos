@@ -83,9 +83,14 @@ export class ControllerNet implements ClientTransport {
         this.unreliable.binaryType = 'arraybuffer';
         this.unreliable.onmessage = (e) => this.onPacket(new DataView(e.data as ArrayBuffer));
         this.unreliable.onopen = () => logNet('канал вводу відкрито');
-        this.unreliable.onerror = (e) => logErr('канал вводу', (e as RTCErrorEvent).error);
-        conn.peerConnection.addEventListener('iceconnectionstatechange', () => {
-          const s = conn.peerConnection.iceConnectionState;
+        const ch = this.unreliable;
+        // Власне закриття каналу теж приходить сюди — це не збій.
+        ch.onerror = (e) =>
+          this.unreliable === ch && logErr('канал вводу', (e as RTCErrorEvent).error);
+        // conn.peerConnection після закриття стає null — тримаємо власне посилання.
+        const pc = conn.peerConnection;
+        pc.addEventListener('iceconnectionstatechange', () => {
+          const s = pc.iceConnectionState;
           if (s === 'failed' || s === 'disconnected' || s === 'closed') this.lose(conn, `ICE ${s}`);
         });
         this.retries = 0;

@@ -131,6 +131,24 @@ describe('lobby', () => {
     expect(log.some((l) => l.startsWith('P1:') && l.includes('утрачено'))).toBe(true);
   });
 
+  test('a full lobby frees an offline phone (oldest first) or a bot for a newcomer', () => {
+    const { host, join, advance } = setup();
+    const a = join('a');
+    const b = join('b');
+    join('c');
+    host.addLocal('bot');
+    b.close();
+    advance(1000);
+    a.close();
+    const e = join('e');
+    expect(e.last('welcome')?.slot).toBe(1);
+    const f = join('f');
+    expect(f.last('welcome')?.slot).toBe(0);
+    const g = join('g');
+    expect(g.last('welcome')?.slot).toBe(3);
+    expect(join('h').last('full')?.reason).toBe('full');
+  });
+
   test('fifth player is rejected', () => {
     const { join } = setup();
     for (const id of ['a', 'b', 'c', 'd']) join(id);

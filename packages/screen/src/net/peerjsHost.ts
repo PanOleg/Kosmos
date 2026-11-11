@@ -91,11 +91,24 @@ export class PeerJsHost implements HostTransport {
       unreliable.binaryType = 'arraybuffer';
       unreliable.onmessage = (e) => link.onUnreliable(new DataView(e.data as ArrayBuffer));
       unreliable.onopen = () => logNet(`${who}: канал вводу відкрито`);
-      unreliable.onerror = (e) => logErr(`${who}: канал вводу`, (e as RTCErrorEvent).error);
+      unreliable.onerror = (e) => {
+        // Власне закриття лінії теж приходить сюди — це не збій.
+        if (!closed) logErr(`${who}: канал вводу`, (e as RTCErrorEvent).error);
+      };
       // Телефон, що заснув, не закриває канал — ICE падає в disconnected/failed.
-      conn.peerConnection.addEventListener('iceconnectionstatechange', () => {
-        const s = conn.peerConnection.iceConnectionState;
+      // disconnected буває хвилинами без переходу у failed (через ретранслятор) — тоді слот
+      // у лобі висів би «на зв'язку» й займав місце. Чекаємо 5 с на відновлення й закриваємо.
+      const pc = conn.peerConnection;
+      let limbo = 0;
+      pc.addEventListener('iceconnectionstatechange', () => {
+        const s = pc.iceConnectionState;
+        window.clearTimeout(limbo);
         if (s === 'failed' || s === 'closed') finish(`ICE ${s}`);
+        else if (s === 'disconnected')
+          limbo = window.setTimeout(() => {
+            finish('ICE disconnected довше 5 с');
+            conn.close();
+          }, 5000);
       });
       this.onLink(link);
     });
