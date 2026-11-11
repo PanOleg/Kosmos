@@ -23,6 +23,7 @@ export class Joystick {
     zone.addEventListener('pointerdown', (e) => {
       if (this.pointer !== null) return;
       this.pointer = e.pointerId;
+      zone.classList.add('touch');
       zone.setPointerCapture(e.pointerId);
       const r = zone.getBoundingClientRect();
       this.cx = e.clientX - r.left;
@@ -63,6 +64,7 @@ export class Joystick {
     const end = (e: PointerEvent) => {
       if (e.pointerId !== this.pointer) return;
       this.pointer = null;
+      zone.classList.remove('touch');
       this.x = this.y = 0;
       base.style.display = knob.style.display = 'none';
     };

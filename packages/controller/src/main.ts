@@ -83,6 +83,7 @@ function run(room: string): void {
   let ready = false;
   let classId: ClassId | null = null;
   let abilityPressed = false;
+  let ghostUsed = false;
 
   const classSelect = new ClassSelect($('classes'), (c) => {
     blip(660, 0.06);
@@ -98,6 +99,9 @@ function run(room: string): void {
     net.send({ t: 'again' });
   });
   $('ready').addEventListener('click', () => {
+    // Повний екран, де браузер дозволяє (Android): адресний рядок не забирає місце в пальців.
+    if (!document.fullscreenElement)
+      void document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {});
     blip(ready ? 440 : 880, 0.08);
     net.send({ t: 'ready', ready: !ready });
   });
@@ -227,13 +231,75 @@ function run(room: string): void {
     $('medkit-price').textContent = shop.medkit === null ? '✓' : String(shop.medkit);
   };
 
-  const stick = new Joystick($('left'), $('base'), $('knob'), () => blip(520, 0.05, 0.08));
+  // Навчання (DECISIONS.md, п. 56): підказки по одній у першому матчі на цьому телефоні;
+  // кожна зникає, щойно гравець зробив описане, і більше не з'являється.
+  const TIPS_KEY = 'horizon-tips';
+  const tipsSeen = new Set<string>(
+    (() => {
+      try {
+        return JSON.parse(localStorage.getItem(TIPS_KEY) ?? '[]') as string[];
+      } catch {
+        return [];
+      }
+    })(),
+  );
+  if (tipsSeen.has('move')) {
+    // Досвідчений гравець: зона руху одразу лише тьмяний орієнтир.
+    ghostUsed = true;
+    $('ghost').classList.add('used');
+  }
+  const tipShownAt = new Map<string, number>();
+  const learn = (id: string) => {
+    if (tipsSeen.has(id)) return;
+    tipsSeen.add(id);
+    try {
+      localStorage.setItem(TIPS_KEY, JSON.stringify([...tipsSeen]));
+    } catch {
+      /* не критично */
+    }
+  };
+  const renderTip = (m: Extract<ScreenMessage, { t: 'status' }>) => {
+    const now = performance.now();
+    const shownFor = (id: string) => {
+      if (!tipShownAt.has(id)) tipShownAt.set(id, now);
+      return now - tipShownAt.get(id)!;
+    };
+    let text = '';
+    if (m.phase !== 'match' || m.down || m.pause) text = '';
+    else if (!tipsSeen.has('move')) text = '';
+    else if (m.revive && !tipsSeen.has('revive'))
+      text = 'Напарник упав поруч: тримайте праву кнопку, щоб підняти';
+    else if (m.shop && !tipsSeen.has('shop'))
+      text = 'Пауза між хвилями: витрачайте ⚙ на покращення праворуч';
+    else if (!tipsSeen.has('aim')) {
+      text = 'Зброя стріляє сама в найближчого ворога — ви рухаєтесь і ховаєтесь';
+      if (shownFor('aim') > 7000) learn('aim');
+    } else if (!tipsSeen.has('dash')) {
+      text = 'Різко смикніть пальцем — ривок крізь небезпеку';
+      if (shownFor('dash') > 12000) learn('dash');
+    } else if (!m.shop && !m.revive && m.ability >= 1 && !tipsSeen.has('ability') && m.classId)
+      text = `Кільце праворуч повне — тисніть: ${CLASS_META[m.classId].ability}`;
+    // Підказка відіграла, щойно її привід зник.
+    if (!m.revive && tipShownAt.has('revive')) learn('revive');
+    if (!m.shop && tipShownAt.has('shop')) learn('shop');
+    if (m.revive && !tipsSeen.has('revive')) shownFor('revive');
+    if (m.shop && !tipsSeen.has('shop')) shownFor('shop');
+    const el = $('tip');
+    el.hidden = text === '';
+    if (text && el.textContent !== text) el.textContent = text;
+  };
+
+  const stick = new Joystick($('left'), $('base'), $('knob'), () => {
+    blip(520, 0.05, 0.08);
+    if (tipsSeen.has('aim')) learn('dash');
+  });
   const ability = $('ability');
   const right = $('right');
   right.addEventListener('pointerdown', () => {
     // У паузі права половина — магазин, здібність не тиснеться.
     if (!shopEl.hidden) return;
     abilityPressed = true;
+    if (ability.classList.contains('ready')) learn('ability');
     ability.classList.add('press');
     blip(330, 0.08);
   });
@@ -326,11 +392,14 @@ function run(room: string): void {
           ? rv.affordable
             ? `ПІДНЯТИ · ⚙${rv.cost}`
             : `ПОТРІБНО ⚙${rv.cost}`
-          : '';
+          : m.classId
+            ? CLASS_META[m.classId].ability.toUpperCase()
+            : '';
         const ring = rv ? rv.progress : m.ability;
         $('ring').setAttribute('stroke-dasharray', `${Math.round(ring * 100)} 100`);
         renderShop(m.shop, m.parts, m.hp >= m.maxHp);
         renderPause(m);
+        renderTip(m);
         break;
       }
       case 'hurt':
@@ -404,6 +473,12 @@ function run(room: string): void {
     if (net.state !== 'open' || phase !== 'match') return;
     inp.move.x = stick.x;
     inp.move.y = stick.y;
+    // Гравець уже рухався — підказка зони руху тьмяніє до ледь помітного орієнтира.
+    if (!ghostUsed && (stick.x !== 0 || stick.y !== 0)) {
+      ghostUsed = true;
+      learn('move');
+      window.setTimeout(() => $('ghost').classList.add('used'), 1500);
+    }
     inp.ability = abilityPressed;
     inp.dash = performance.now() < stick.dashUntil;
     inp.buy = performance.now() < buyUntil ? buyItem : 0;

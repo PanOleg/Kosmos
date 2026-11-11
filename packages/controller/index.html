@@ -151,6 +151,13 @@
       .cls .ic {
         font-size: 14px;
       }
+      .cls .ab {
+        font-size: 10.5px;
+        line-height: 1.25;
+        opacity: 0.75;
+        padding: 0 6px;
+        text-align: center;
+      }
       .cls .nm {
         font-weight: 800;
         font-size: 16px;
@@ -256,15 +263,102 @@
         display: none;
         pointer-events: none;
       }
-      .stick-hint {
+      /* «Привид» стіка: показує, що ліва половина — зона руху. Яскравий, доки гравець
+         не поворухнувся; далі тьмяний орієнтир, а під пальцем зникає зовсім. */
+      .zone.left {
+        border-right: 1px dashed rgba(255, 255, 255, 0.14);
+      }
+      .ghost {
         position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 22px;
+        left: 50%;
+        top: 56%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
         text-align: center;
-        font-size: 13px;
-        opacity: 0.5;
         pointer-events: none;
+        transition: opacity 0.4s;
+      }
+      .ghost .ring {
+        position: relative;
+        width: 130px;
+        height: 130px;
+        border-radius: 50%;
+        border: 3px dashed rgba(255, 255, 255, 0.7);
+        animation: ghostPulse 1.6s ease-in-out infinite;
+      }
+      .ghost .ring::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 52px;
+        height: 52px;
+        margin: -26px 0 0 -26px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.55);
+        animation: ghostKnob 2.4s ease-in-out infinite;
+      }
+      .ghost .ring i {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 0;
+        height: 0;
+        border: 9px solid transparent;
+        border-bottom-color: rgba(255, 255, 255, 0.8);
+        margin: -9px 0 0 -9px;
+      }
+      .ghost .ring i:nth-child(1) {
+        transform: translateY(-84px);
+      }
+      .ghost .ring i:nth-child(2) {
+        transform: rotate(90deg) translateY(-84px);
+      }
+      .ghost .ring i:nth-child(3) {
+        transform: rotate(180deg) translateY(-84px);
+      }
+      .ghost .ring i:nth-child(4) {
+        transform: rotate(270deg) translateY(-84px);
+      }
+      .ghost b {
+        margin-top: 14px;
+        font-size: 20px;
+        letter-spacing: 0.2em;
+      }
+      .ghost span {
+        font-size: 13px;
+        line-height: 1.4;
+        opacity: 0.8;
+      }
+      .ghost.used {
+        opacity: 0.28;
+      }
+      .ghost.used .ring,
+      .ghost.used .ring::after {
+        animation: none;
+      }
+      .ghost.used span {
+        display: none;
+      }
+      .zone.left.touch .ghost {
+        opacity: 0;
+      }
+      @keyframes ghostPulse {
+        50% {
+          transform: scale(1.06);
+          border-color: #fff;
+        }
+      }
+      @keyframes ghostKnob {
+        25% {
+          transform: translate(26px, -10px);
+        }
+        60% {
+          transform: translate(-22px, 16px);
+        }
       }
       .ability {
         position: relative;
@@ -454,6 +548,23 @@
         background: rgba(255, 255, 255, 0.92);
         color: #111;
         text-decoration: none;
+      }
+      /* Навчальні підказки першого матчу: по одній, знизу по центру, пальцям не заважають. */
+      .tip {
+        position: absolute;
+        left: 50%;
+        bottom: 12px;
+        transform: translateX(-50%);
+        max-width: 70%;
+        padding: 9px 16px;
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        font-size: 14px;
+        font-weight: 700;
+        text-align: center;
+        pointer-events: none;
+        z-index: 3;
       }
       .conn-hint {
         margin-top: 14px;
@@ -681,7 +792,14 @@
       <div id="left" class="zone left">
         <div id="base" class="stick-base"></div>
         <div id="knob" class="stick-knob"></div>
-        <div class="stick-hint">рух · різкий рух пальцем — ривок</div>
+        <div id="ghost" class="ghost">
+          <div class="ring"><i></i><i></i><i></i><i></i></div>
+          <b>РУХ</b>
+          <span
+            >Покладіть палець будь-де в цій половині й ведіть.<br />Різкий рух пальцем —
+            ривок.</span
+          >
+        </div>
       </div>
       <div id="right" class="zone right">
         <div id="ability" class="ability">
@@ -726,6 +844,7 @@
           </button>
         </div>
       </div>
+      <div id="tip" class="tip" hidden></div>
       <div id="down" class="down">Ви впали</div>
     </div>
     <div id="v-results" class="view">
