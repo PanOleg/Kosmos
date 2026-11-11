@@ -1,3 +1,4 @@
+import { slowAt } from '../config/map';
 import { resolveCircle } from '../collision/world';
 import { DT, secToTicks } from '../math';
 import type { PlayerInput } from '../protocol';
@@ -77,8 +78,10 @@ export function updatePlayers(game: Game, inputs: readonly PlayerInput[]): void 
         p.vy = p.dashDy * cfg.speed;
       }
     } else {
-      const tx = mx * cfg.speed;
-      const ty = my * cfg.speed;
+      // Зибучі піски й замети сповільнюють крок; ривок їх перетинає.
+      const slow = slowAt(game.config.map, p.x, p.y);
+      const tx = mx * cfg.speed * slow;
+      const ty = my * cfg.speed * slow;
       let dvx = tx - p.vx;
       let dvy = ty - p.vy;
       const dl = Math.sqrt(dvx * dvx + dvy * dvy);

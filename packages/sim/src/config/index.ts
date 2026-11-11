@@ -2,7 +2,32 @@ import { PLAYER } from './balance';
 import { CLASSES, AUTOAIM } from './classes';
 import { PRESETS, type DifficultyMods } from './difficulty';
 import { MAP, MAPS, type MapDef, type MapId } from './map';
-import { buildWaves, type WaveDef } from './waves';
+import { buildWaves, dronesOnly, type WaveDef } from './waves';
+
+/** Правила матчу поверх пресету складності — їх змінюють модифікатори (п. 60). */
+export interface MatchRules {
+  /** Множник деталей з ворогів. */
+  partsMul: number;
+  /** Множник шкоди гравців. */
+  playerDamageMul: number;
+  /** Множник паузи між хвилями. */
+  pauseMul: number;
+  /** Магазин між хвилями відкритий. */
+  shop: boolean;
+}
+export const DEFAULT_RULES: MatchRules = {
+  partsMul: 1,
+  playerDamageMul: 1,
+  pauseMul: 1,
+  shop: true,
+};
+
+/**
+ * Модифікатори матчу: rich — удвічі більше деталей, вороги швидші; glass — усі б'ють удвічі
+ * сильніше; drones — лише дрони; noShop — без магазину; rush — паузи вдвічі коротші.
+ */
+export const MODIFIERS = ['rich', 'glass', 'drones', 'noShop', 'rush'] as const;
+export type ModifierId = (typeof MODIFIERS)[number];
 
 export interface GameConfig {
   map: MapDef;
@@ -11,6 +36,7 @@ export interface GameConfig {
   autoaim: typeof AUTOAIM;
   mods: DifficultyMods;
   waves: WaveDef[];
+  rules: MatchRules;
 }
 
 export const DEFAULT_CONFIG: GameConfig = {
@@ -20,6 +46,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   autoaim: AUTOAIM,
   mods: PRESETS.normal,
   waves: buildWaves(9),
+  rules: DEFAULT_RULES,
 };
 
 export type PresetId = keyof typeof PRESETS;
@@ -31,6 +58,10 @@ export interface SessionSettings {
   waves: number;
   /** Карта (п. 49); старі збереження без неї — станція. */
   map?: MapId;
+  /** Модифікатори матчу (п. 60). */
+  modifiers?: ModifierId[];
+  /** Нескінченний режим: після Ядра хвилі тривають. */
+  endless?: boolean;
 }
 
 /** Повзунки розширених налаштувань; шкода ворогів іде за пресетом. */
@@ -61,7 +92,21 @@ export function buildConfig(s: SessionSettings): GameConfig {
     }
   const waves = Math.round(clamp(s.waves || WAVES_RANGE.default, WAVES_RANGE.min, WAVES_RANGE.max));
   const map = (s.map && MAPS[s.map]) || MAP;
-  return { ...DEFAULT_CONFIG, map, mods, waves: buildWaves(waves) };
+  const active = new Set((s.modifiers ?? []).filter((m) => MODIFIERS.includes(m)));
+  const rules: MatchRules = { ...DEFAULT_RULES };
+  if (active.has('rich')) {
+    rules.partsMul = 2;
+    mods.enemySpeed *= 1.2;
+  }
+  if (active.has('glass')) {
+    rules.playerDamageMul = 2;
+    mods.enemyDamage *= 2;
+  }
+  if (active.has('noShop')) rules.shop = false;
+  if (active.has('rush')) rules.pauseMul = 0.5;
+  let list = buildWaves(waves, !!s.endless);
+  if (active.has('drones')) list = dronesOnly(list);
+  return { ...DEFAULT_CONFIG, map, mods, waves: list, rules };
 }
 
 export * from './balance';

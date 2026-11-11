@@ -68,12 +68,29 @@ function unitsOf(game: Game, type: EnemyTypeArg, base: number): number {
   return type === 'swarm' ? c * SWARM.count : c;
 }
 
+/** 0 — спокійно, 1 — попередження, 2 — буря. Рахується з таймера хвилі: без власного стану. */
+function stormPhaseAt(game: Game, timer: number): 0 | 1 | 2 {
+  const st = game.config.map.storm;
+  if (!st || timer <= 0) return 0;
+  const period = secToTicks(st.every);
+  const t = timer % period;
+  const start = period - secToTicks(st.duration);
+  if (t >= start) return 2;
+  if (t >= start - secToTicks(st.warn)) return 1;
+  return 0;
+}
+
+export function stormPhase(game: Game): 0 | 1 | 2 {
+  const w = game.state.wave;
+  return w.phase === 'active' ? stormPhaseAt(game, w.timer) : 0;
+}
+
 export function startWave(game: Game, index: number): void {
   const w = game.state.wave;
   const def = game.config.waves[index]!;
   w.index = index;
   w.phase = 'pause';
-  w.timer = secToTicks(def.pause);
+  w.timer = secToTicks(def.pause * game.config.rules.pauseMul);
   w.nextGroup = 0;
   w.spawnedTotal = 0;
   w.plannedTotal = def.groups.reduce((a, g) => a + unitsOf(game, g.type, g.count), 0);
@@ -116,6 +133,13 @@ export function updateWaves(game: Game): void {
   }
 
   w.timer++;
+  // Буря карти: попередження й початок/кінець — подіями для екрана й голосу.
+  const st = stormPhase(game);
+  const prev = stormPhaseAt(game, w.timer - 1);
+  if (st !== prev) {
+    if (st === 1) emit(game.events, 'stormWarn', 0, 0, 0, 0, 0);
+    else emit(game.events, 'storm', 0, 0, 0, 0, st === 2 ? 1 : 0);
+  }
   while (w.nextGroup < def.groups.length) {
     const g = def.groups[w.nextGroup]!;
     const due = w.timer >= secToTicks(g.at) || s.enemiesAlive < def.pressureBelow;
@@ -136,6 +160,12 @@ export function updateWaves(game: Game): void {
     w.timer = secToTicks(PICKUPS.vacuum);
     clearProps(game);
   }
+}
+
+/** Нескінченний режим: хвилі після Ядра мають міцніших ворогів. */
+function scaleHp(game: Game, en: { hp: number; maxHp: number }): void {
+  const mul = game.config.waves[game.state.wave.index]?.hpMul ?? 1;
+  if (mul !== 1) en.hp = en.maxHp = Math.round(en.maxHp * mul);
 }
 
 function spawnGroup(
@@ -163,6 +193,7 @@ function spawnGroup(
             en.maxHp * PLAYER_COUNT_MUL[Math.min(n, PLAYER_COUNT_MUL.length - 1)]!,
           );
         }
+        scaleHp(game, en);
         if (type === 'core') initCore(game, e);
         w.spawnedTotal++;
       }
@@ -177,6 +208,7 @@ function spawnGroup(
     const e = spawnEnemy(game, type, x, y, group);
     if (e >= 0) {
       game.state.enemies[e]!.speed *= w.speedMul;
+      scaleHp(game, game.state.enemies[e]!);
       w.spawnedTotal++;
     }
   };

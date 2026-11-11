@@ -45,6 +45,8 @@ export function damageEnemy(
   weak = false,
 ): void {
   if (!e.alive) return;
+  // Модифікатор «Скляна гармата»: гравці б'ють сильніше (вороги — теж, через mods).
+  if (bySlot >= 0) amount *= game.config.rules.playerDamageMul;
   // Ядро між фазами невразливе: удар видно, але шкоди немає.
   if (e.type === 'core' && game.state.boss.transition > 0) {
     emit(game.events, 'armor', e.x, e.y, -kx, -ky, index);

@@ -50,7 +50,9 @@ export type GameEventType =
   | 'reviveCancel'
   | 'revived'
   | 'bleedOut'
-  | 'playerReturn';
+  | 'playerReturn'
+  | 'stormWarn'
+  | 'storm';
 
 export interface GameEvent {
   type: GameEventType;

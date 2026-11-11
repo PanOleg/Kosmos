@@ -7,7 +7,7 @@ import type { Game } from '../state';
 
 export function dropParts(game: Game, x: number, y: number, count: number): void {
   const s = game.state;
-  const total = count * s.wave.partsMul;
+  const total = count * s.wave.partsMul * game.config.rules.partsMul;
   // Дробовий залишок (рій, множники) накопичується й не губиться.
   s.partsCarry += total;
   let n = Math.floor(s.partsCarry);

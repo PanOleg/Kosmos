@@ -40,7 +40,13 @@ export type ObstacleTag =
   | 'wreck'
   | 'crate'
   | 'palm'
-  | 'sandbag';
+  | 'sandbag'
+  // Крижана база (п. 61).
+  | 'ice'
+  | 'snowbank'
+  | 'module'
+  | 'pine'
+  | 'sled';
 
 export type Obstacle = RectObstacle | CircleObstacle;
 
@@ -51,10 +57,30 @@ export interface SpawnPoint {
   sector: number;
 }
 
-export type MapId = 'station' | 'desert';
+export type MapId = 'station' | 'desert' | 'ice';
+
+/** Зона, де наземні йдуть повільніше (зибучі піски, глибокий сніг); ривок її перетинає. */
+export interface SlowZone {
+  x: number;
+  y: number;
+  r: number;
+  /** Множник швидкості всередині. */
+  mul: number;
+}
+
+/** Буря (DECISIONS.md, п. 60): раз на every секунд бою — warn с попередження, duration с бурі. */
+export interface StormDef {
+  every: number;
+  warn: number;
+  duration: number;
+  /** Множник дальності автоприцілу гравців під час бурі. */
+  aimMul: number;
+}
 
 export interface MapDef {
   id: MapId;
+  slowZones?: SlowZone[];
+  storm?: StormDef;
   radius: number;
   obstacles: Obstacle[];
   airlocks: SpawnPoint[];
@@ -276,6 +302,51 @@ export const DESERT_MAP: MapDef = {
   ...MAP,
   id: 'desert',
   obstacles: buildDesertObstacles(),
+  // Зибучі піски: на відкритих місцях між секторами — зрізати кут через них дорожче.
+  slowZones: [
+    { x: -15, y: 9, r: 2.6, mul: 0.5 },
+    { x: -15, y: -9, r: 2.6, mul: 0.5 },
+    { x: 9, y: -17.5, r: 2.2, mul: 0.5 },
+    { x: 13, y: 13.5, r: 2.4, mul: 0.5 },
+    { x: -24, y: 0, r: 2.2, mul: 0.5 },
+  ],
+  storm: { every: 50, warn: 3, duration: 9, aimMul: 0.55 },
 };
 
-export const MAPS: Record<MapId, MapDef> = { station: MAP, desert: DESERT_MAP };
+/**
+ * Крижана база (DECISIONS.md, п. 61): той самий скелет; північ — крижані брили, схід — модулі
+ * бази й снігохід, південь — ялини, захід — рівний сніг зі стартом. Замети сповільнюють.
+ */
+function buildIceObstacles(): Obstacle[] {
+  const retag: Partial<Record<ObstacleTag, ObstacleTag>> = {
+    rock: 'ice',
+    sandbag: 'snowbank',
+    tent: 'module',
+    palm: 'pine',
+    wreck: 'sled',
+  };
+  return buildDesertObstacles().map((o) => ({ ...o, tag: retag[o.tag] ?? o.tag }));
+}
+
+export const ICE_MAP: MapDef = {
+  ...MAP,
+  id: 'ice',
+  obstacles: buildIceObstacles(),
+  slowZones: [
+    { x: -16, y: 8, r: 3, mul: 0.6 },
+    { x: -16, y: -8, r: 3, mul: 0.6 },
+    { x: 10, y: -18, r: 2.4, mul: 0.6 },
+    { x: 12, y: 14, r: 2.6, mul: 0.6 },
+  ],
+};
+
+export const MAPS: Record<MapId, MapDef> = { station: MAP, desert: DESERT_MAP, ice: ICE_MAP };
+
+/** Множник швидкості наземного в точці: найповільніша із зон, що накривають її. */
+export function slowAt(map: MapDef, x: number, y: number): number {
+  let m = 1;
+  if (map.slowZones)
+    for (const z of map.slowZones)
+      if ((x - z.x) ** 2 + (y - z.y) ** 2 < z.r * z.r) m = Math.min(m, z.mul);
+  return m;
+}

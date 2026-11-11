@@ -7,6 +7,7 @@ import { SCOUT_WINDUP } from '../ai/scout';
 import type { Enemy } from '../entities/enemy';
 import type { Player } from '../entities/player';
 import type { Game } from '../state';
+import { stormPhase } from './waves';
 
 /**
  * Загроза ворога для автоприцілу: базова вага типу + ситуативні бонуси
@@ -60,12 +61,13 @@ export function updateAutoaim(game: Game): void {
   const s = game.state;
   const cfg = game.config.autoaim;
   const h = game.hash;
+  const storm = stormPhase(game) === 2;
   for (const p of s.players) {
     if (p.down) continue;
-    const range = Math.min(
-      game.config.player.autoaimRadius,
-      game.config.classes[p.classId].weapon.range,
-    );
+    // Буря: видно гірше — приціл бере ближче.
+    const range =
+      Math.min(game.config.player.autoaimRadius, game.config.classes[p.classId].weapon.range) *
+      (storm ? (game.config.map.storm?.aimMul ?? 1) : 1);
     const current = p.target;
     const currentValid = current >= 0 && valid(game, p, current, range);
     if (!currentValid) p.target = -1;

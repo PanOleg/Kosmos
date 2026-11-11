@@ -26,6 +26,8 @@ export interface WaveDef {
   pressureBelow: number;
   /** Хвиля з босом: смуга здоров'я на екрані й скасування підкріплень з його смертю. */
   boss?: 'foreman' | 'core';
+  /** Множник здоров'я ворогів хвилі (нескінченний режим). */
+  hpMul?: number;
 }
 
 /** BALANCE.md: 1 → ×1, 2 → ×1.6, 3 → ×2.3, 4 → ×3. */
@@ -213,7 +215,38 @@ export const CORE_WAVE: WaveDef = {
  * зі збереженням порядку й останньої; більше — повтор трьох останніх із +15% ворогів за коло.
  * Прораб — після хвилі ⌈0.55·N⌉.
  */
-export function buildWaves(count = 9): WaveDef[] {
+/** Скільки хвиль дописується після Ядра в нескінченному режимі (на практиці — «без кінця»). */
+export const ENDLESS_EXTRA = 60;
+
+/** Модифікатор «Лише дрони»: наземні групи замінюються повітряними. */
+const TO_DRONE: Partial<Record<SpawnGroup['type'], SpawnGroup['type']>> = {
+  scout: 'wasp',
+  gunner: 'sniper',
+  shell: 'kamikaze',
+  spider: 'kamikaze',
+  repairer: 'swarm',
+};
+
+export function dronesOnly(waves: WaveDef[]): WaveDef[] {
+  return waves.map((w) =>
+    w.boss
+      ? w
+      : {
+          ...w,
+          groups: w.groups.map((gr) =>
+            TO_DRONE[gr.type]
+              ? {
+                  ...gr,
+                  type: TO_DRONE[gr.type]!,
+                  airlock: gr.airlock === 'center' ? 'any' : gr.airlock,
+                }
+              : gr,
+          ),
+        },
+  );
+}
+
+export function buildWaves(count = 9, endless = false): WaveDef[] {
   const n = Math.max(1, Math.round(count));
   const base = BALANCE_WAVES;
   const picked: WaveDef[] = [];
@@ -240,6 +273,28 @@ export function buildWaves(count = 9): WaveDef[] {
   const after = Math.min(out.length, Math.ceil(0.55 * out.length));
   out.splice(after, 0, { ...FOREMAN_WAVE });
   out.push({ ...CORE_WAVE });
+  if (endless) {
+    // Після Ядра: найважчі хвилі по колу, щоразу більші й міцніші; кожна п'ята — Прораб,
+    // кожна десята — Ядро (теж міцніші). DECISIONS.md, п. 60.
+    for (let k = 1; k <= ENDLESS_EXTRA; k++) {
+      const hpMul = 1 + 0.07 * k;
+      if (k % 10 === 0) out.push({ ...CORE_WAVE, hpMul });
+      else if (k % 5 === 0) out.push({ ...FOREMAN_WAVE, hpMul });
+      else {
+        const src = base[base.length - 3 + (k % 3)]!;
+        const mul = 1.15 + 0.1 * k;
+        out.push({
+          ...src,
+          name: `Хвиля ${out.length + 1}`,
+          hpMul,
+          groups: src.groups.map((gr) => ({
+            ...gr,
+            count: Math.max(1, Math.round(gr.count * mul)),
+          })),
+        });
+      }
+    }
+  }
   return out;
 }
 

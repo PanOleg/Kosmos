@@ -14,7 +14,9 @@ import type { Game } from '../state';
 
 /** Магазин відкритий у паузі перед хвилею (DECISIONS.md, п. 26). */
 export function shopOpen(game: Game): boolean {
-  return game.state.phase === 'playing' && game.state.wave.phase === 'pause';
+  return (
+    game.config.rules.shop && game.state.phase === 'playing' && game.state.wave.phase === 'pause'
+  );
 }
 
 /** Ціна наступного рівня; null — уже максимум. */

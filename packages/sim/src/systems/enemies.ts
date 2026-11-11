@@ -1,3 +1,4 @@
+import { slowAt } from '../config/map';
 import { clearHash, insertHash } from '../collision/spatial';
 import { raycast, resolveCircle } from '../collision/world';
 import { AIR_TYPES, CROWD, ENEMIES, type EnemyType } from '../config/enemies';
@@ -224,8 +225,10 @@ export function updateEnemies(game: Game): void {
     // Ядро вросло в реактор: ні відкидання, ні розштовхування.
     if (e.type === 'core') continue;
 
-    let wx = steer.x * e.speed;
-    let wy = steer.y * e.speed;
+    // Наземні в'язнуть у пісках і заметах так само, як гравці; дрони — ні.
+    const slow = e.air ? 1 : slowAt(game.config.map, e.x, e.y);
+    let wx = steer.x * e.speed * slow;
+    let wy = steer.y * e.speed * slow;
     // Панцир повертає корпус сам, повільно; решта дивиться, куди йде.
     if ((wx !== 0 || wy !== 0) && e.type !== 'shell' && e.type !== 'turret') {
       e.fx = steer.x;
