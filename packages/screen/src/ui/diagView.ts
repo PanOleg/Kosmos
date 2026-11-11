@@ -34,7 +34,7 @@ export class DiagView {
     document.head.appendChild(style);
     this.root.className = 'diag';
     this.root.innerHTML = `<div class="box"><h2>Журнал зв'язку</h2>
-<div class="sub">Події екрана й пультів (П1…П4). Якщо щось не працює — скопіюйте й надішліть розробнику.</div>
+<div class="sub">Події екрана й пультів (П1…П4). На сайті гри журнал сам надсилається розробнику; за локальною адресою — скопіюйте й надішліть.</div>
 <pre></pre>
 <div class="row"><button data-a="copy">Скопіювати</button><button data-a="save">Зберегти файл</button><span class="note"></span><span style="flex:1"></span><button data-a="close">Закрити (L)</button></div></div>`;
     this.pre = this.root.querySelector('pre')!;

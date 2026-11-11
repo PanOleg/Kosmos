@@ -116,3 +116,53 @@ export function watchPeer(pc: RTCPeerConnection, who: string): void {
     if (/^turns?:/.test(ev.url)) logNet(`${who}: TURN ${ev.url} — ${ev.errorCode} ${ev.errorText}`);
   });
 }
+
+/**
+ * Автоматичне надсилання журналу розробнику (DECISIONS.md, п. 71): нові рядки — на /api/log
+ * того самого сайту. Лише в зібраній версії на хостингу; у розробці й за LAN-адресою вимкнено.
+ * Помилка чи втрата зв'язку — за 2 с, решта — раз на 30 с; закриття сторінки — sendBeacon.
+ */
+export function startUpload(role: 'screen' | 'controller', room: () => string): void {
+  const host = location.hostname;
+  if (!import.meta.env.PROD || host === 'localhost' || /^[\d.]+$/.test(host) || host.includes(':'))
+    return;
+  const sid = Array.from(crypto.getRandomValues(new Uint32Array(2)), (n) => n.toString(36)).join(
+    '',
+  );
+  let sent = diag.seq;
+  let timer = 0;
+  const payload = (): string | null => {
+    const lines = diag.since(sent);
+    if (lines.length === 0) return null;
+    sent = diag.seq;
+    return JSON.stringify({ role, room: room(), sid, lines });
+  };
+  const flush = () => {
+    window.clearTimeout(timer);
+    timer = 0;
+    const body = payload();
+    if (!body) return;
+    // Збій надсилання в журнал не пишемо: інакше він сам себе й породжував би.
+    void fetch('/api/log', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+      keepalive: true,
+    }).catch(() => {});
+  };
+  onDiag(() => {
+    const last = diag.lines()[diag.lines().length - 1] ?? '';
+    const urgent = /\[помилка\]|утрачено|відмов|failed|disconnected/.test(last);
+    if (urgent) {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(flush, 2000);
+    } else if (!timer) timer = window.setTimeout(flush, 30000);
+  });
+  window.addEventListener('pagehide', () => {
+    const body = payload();
+    if (body) navigator.sendBeacon('/api/log', body);
+  });
+  // Початок сесії — одразу: видно, хто й звідки зайшов, навіть якщо далі все зависне.
+  sent = 0;
+  timer = window.setTimeout(flush, 4000);
+}

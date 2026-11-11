@@ -13,6 +13,13 @@ describe('diagnostic log', () => {
     log.add('net', 'd');
     expect(log.lines()).toEqual(['t2 [net] b', 't3 [net] c', 't4 [net] d']);
     expect(log.drain()).toEqual(['t3 [net] c', 't4 [net] d']);
+    // Курсор для надсилання на сервер: свої й чужі рядки, не більше за буфер.
+    const mark = log.seq;
+    log.add('net', 'e');
+    log.addForeign('П1', ['f']);
+    expect(log.since(mark)).toEqual(['t5 [net] e', 'П1 f']);
+    expect(log.since(0).length).toBe(3);
+    expect(log.since(log.seq)).toEqual([]);
   });
 
   test('foreign lines are capped, filtered and never echoed back', () => {
@@ -24,6 +31,18 @@ describe('diagnostic log', () => {
     expect(log.drain()).toEqual([]);
     log.addForeign('П1', ['x'.repeat(1000)]);
     expect(log.lines().at(-1)!.length).toBe(300);
+  });
+
+  test('a line repeated in a row is written once and counted', () => {
+    const log = new DiagLog(() => 't', 50);
+    for (let i = 0; i < 1000; i++) log.add('помилка', 'boom');
+    expect(log.lines()).toEqual(['t [помилка] boom']);
+    log.add('net', 'ok');
+    expect(log.lines()).toEqual([
+      't [помилка] boom',
+      't [net] попередній рядок повторився ще 999 раз(ів)',
+      't [net] ok',
+    ]);
   });
 
   test('restored lines, error text and clock format', () => {

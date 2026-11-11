@@ -20,7 +20,7 @@ import { LocalNet } from './localNet';
 import type { ClientTransport } from './transport';
 import { Joystick } from './joystick';
 import { ClassSelect, CLASS_META } from './classSelect';
-import { diag, onDiag, watchPage } from './diag';
+import { diag, onDiag, startUpload, watchPage } from './diag';
 import { blip, hurt, lockPage, onUserGesture, setPlayerColor } from './feedback';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -48,6 +48,7 @@ function show(v: View): void {
 
 // Журнал зв'язку (DECISIONS.md, п. 69): кнопка — там, де гравець застряг, і в паузі.
 watchPage('пульт');
+startUpload('controller', () => new URLSearchParams(location.search).get('room') ?? '');
 function syncDiagButton(): void {
   const stuck =
     view === 'join' ||

@@ -20,7 +20,7 @@ import { buildArena, type ArenaView } from './render/arena';
 import { createAmbience, type Ambience } from './render/ambience';
 import { HelpOverlay } from './ui/help';
 import { DiagView } from './ui/diagView';
-import { diag, logErr, logNet, watchPage } from './diag';
+import { diag, logErr, logNet, startUpload, watchPage } from './diag';
 import { nextHint } from './meta/hint';
 import { buildDesertArena } from './render/desertArena';
 import { Music, type MusicLevel } from './audio/music';
@@ -140,6 +140,8 @@ const lobby = new LobbyHost(
 const lobbyView = new LobbyView(lobby);
 const help = new HelpOverlay();
 watchPage('екран');
+let currentRoom = '';
+startUpload('screen', () => currentRoom);
 const diagView = new DiagView();
 lobby.log = (text) => diag.add('лобі', text);
 lobby.onLog = (slot, lines) => diag.addForeign(`П${slot + 1}`, lines);
@@ -224,6 +226,7 @@ async function openRoom(): Promise<void> {
     try {
       logNet(`відкриваю кімнату ${code}${LOCAL_NET ? ' (локальна мережа вкладок)' : ''}`);
       await transport.start(code);
+      currentRoom = code;
       lobbyView.setRoom(roomQuery(code), code, controllerUrl);
       return;
     } catch (err) {

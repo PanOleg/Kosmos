@@ -18,8 +18,28 @@ export class DiagLog {
     for (const l of initial.slice(-cap)) if (typeof l === 'string') this.buf.push(l);
   }
 
+  private lastKey = '';
+  private repeats = 0;
+
+  /**
+   * Той самий рядок підряд (помилка в кожному кадрі) пишеться один раз, далі лише рахується:
+   * журнал не має ані гальмувати гру, ані витісняти корисне.
+   */
   add(tag: string, text: string): void {
-    this.push(`${this.clock()} [${tag}] ${text}`.slice(0, MAX_LINE));
+    const key = `[${tag}] ${text}`;
+    if (key === this.lastKey) {
+      this.repeats++;
+      return;
+    }
+    if (this.repeats > 0)
+      this.own(`${this.clock()} [${tag}] попередній рядок повторився ще ${this.repeats} раз(ів)`);
+    this.lastKey = key;
+    this.repeats = 0;
+    this.own(`${this.clock()} ${key}`);
+  }
+
+  private own(line: string): void {
+    this.push(line.slice(0, MAX_LINE));
     this.pending = Math.min(this.pending + 1, this.cap);
   }
 
@@ -35,7 +55,17 @@ export class DiagLog {
     return n;
   }
 
+  /** Скільки рядків додано за весь час (разом із чужими) — курсор для since(). */
+  seq = 0;
+
+  /** Рядки, додані після позначки seq (свої й чужі); не старіші за місткість буфера. */
+  since(seq: number): string[] {
+    const n = Math.min(this.seq - seq, this.buf.length);
+    return n > 0 ? this.buf.slice(-n) : [];
+  }
+
   private push(line: string): void {
+    this.seq++;
     this.buf.push(line);
     if (this.buf.length > this.cap) this.buf.shift();
     this.onAdd(line);

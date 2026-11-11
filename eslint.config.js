@@ -18,6 +18,11 @@ export default tseslint.config(
     },
   },
   {
+    // Серверні функції Vercel: Node, а не браузер.
+    files: ['api/**/*.js'],
+    languageOptions: { globals: { console: 'readonly', URL: 'readonly' } },
+  },
+  {
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
