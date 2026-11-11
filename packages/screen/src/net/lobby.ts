@@ -95,6 +95,9 @@ export class LobbyHost {
   onAudio: (what: keyof AudioPrefs) => void = () => {};
   /** Пульт на екрані результатів натиснув «Ще раз». */
   onAgain: () => void = () => {};
+  /** Гравець покликав напарників («Сюди!»): індекс гравця в матчі. */
+  onPing: (slot: number) => void = () => {};
+  private readonly pingAt = new Map<Slot, number>();
   /** Підсумок останнього матчу: пульт, що перепідключився на екрані результатів, теж його отримає. */
   private summary: MatchSummary | null = null;
 
@@ -172,6 +175,15 @@ export class LobbyHost {
     }
     if (m.t === 'audio') {
       if (m.what === 'music' || m.what === 'sfx' || m.what === 'voice') this.onAudio(m.what);
+      return;
+    }
+    if (m.t === 'ping') {
+      // Не частіше ніж раз на 2 с: мітка — сигнал, а не спам.
+      const now = this.now();
+      if (this.phase === 'match' && now - (this.pingAt.get(s) ?? -Infinity) >= 2000) {
+        this.pingAt.set(s, now);
+        this.onPing(s.index);
+      }
       return;
     }
     if (m.t === 'again') {

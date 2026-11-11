@@ -223,6 +223,23 @@ describe('lobby', () => {
     expect(again).toBe(1);
   });
 
+  test('ping reaches the screen with the player index, at most once per 2 s, only in a match', () => {
+    const lob = setup();
+    const pings: number[] = [];
+    lob.host.onPing = (i) => pings.push(i);
+    lob.join('x').onReliable({ t: 'ping' });
+    expect(pings).toEqual([]);
+    const { host, a, b, advance } = inMatch();
+    host.onPing = (i) => pings.push(i);
+    b.onReliable({ t: 'ping' });
+    b.onReliable({ t: 'ping' });
+    a.onReliable({ t: 'ping' });
+    expect(pings).toEqual([1, 0]);
+    advance(2000);
+    b.onReliable({ t: 'ping' });
+    expect(pings).toEqual([1, 0, 1]);
+  });
+
   test('skins cycle through unlocked ones only and fall back when locked', () => {
     const { host, join } = setup();
     const a = join('a');

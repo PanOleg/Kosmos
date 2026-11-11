@@ -69,6 +69,18 @@ function unitsOf(game: Game, type: EnemyTypeArg, base: number): number {
   return type === 'swarm' ? c * SWARM.count : c;
 }
 
+/** Склад хвилі для підказки в паузі: типи в порядку появи й скільки їх буде для цієї команди. */
+export function wavePreview(game: Game, index: number): { type: EnemyTypeArg; count: number }[] {
+  const out: { type: EnemyTypeArg; count: number }[] = [];
+  for (const g of game.config.waves[index]?.groups ?? []) {
+    const n = unitsOf(game, g.type, g.count);
+    const row = out.find((r) => r.type === g.type);
+    if (row) row.count += n;
+    else out.push({ type: g.type, count: n });
+  }
+  return out;
+}
+
 /** 0 — спокійно, 1 — попередження, 2 — буря. Рахується з таймера хвилі: без власного стану. */
 function stormPhaseAt(game: Game, timer: number): 0 | 1 | 2 {
   const st = game.config.map.storm;
@@ -206,7 +218,7 @@ function spawnGroup(
   const idx = airlock === 'any' ? w.airlockCursor++ % points.length : airlock % points.length;
   // Розосереджена поява (DECISIONS.md, п. 64): групу ділимо на частини, кожна виходить з іншої
   // точки — щоб хвилю не можна було перестріляти в одному проході.
-  if (game.config.map.scatterSpawns && count > 1) {
+  if ((game.config.map.scatterSpawns || game.config.rules.scatter) && count > 1) {
     const chunk = type === 'swarm' ? 1 : count <= 6 ? Math.ceil(count / 2) : 3;
     let at = idx;
     for (let left = count; left > 0; left -= chunk) {

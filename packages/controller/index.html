@@ -43,6 +43,23 @@
         -webkit-touch-callout: none;
         touch-action: none;
       }
+      /* Мало здоров'я: червона рамка пульсує, доки не підлікуєшся. */
+      body.lowhp::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        box-shadow:
+          inset 0 0 0 6px rgba(255, 40, 40, 0.9),
+          inset 0 0 60px rgba(255, 30, 30, 0.45);
+        animation: lowhp 0.7s ease-in-out infinite;
+        z-index: 50;
+      }
+      @keyframes lowhp {
+        50% {
+          opacity: 0.25;
+        }
+      }
       body.hurt {
         animation: hurt 0.35s ease-out;
       }
@@ -780,6 +797,7 @@
         <button id="life" class="medkit life" hidden>♥ <span id="life-price">40</span></button>
         <span>⚙ <span id="parts">0</span></span
         ><span class="sep">|</span><span id="cls"></span>
+        <button id="ping" class="pausebtn" aria-label="Покликати напарників">📣</button>
         <button id="pause" class="pausebtn" aria-label="Пауза"><i></i>⏸</button>
       </div>
       <div id="drops" class="drops"></div>

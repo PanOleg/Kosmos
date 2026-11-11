@@ -65,7 +65,9 @@ export type ControllerMessage =
   /** З екрана результатів — назад у лобі (будь-який пульт). */
   | { t: 'again' }
   /** Перемкнути музику / звуки / озвучку (пауза на пульті). */
-  | { t: 'audio'; what: keyof AudioPrefs };
+  | { t: 'audio'; what: keyof AudioPrefs }
+  /** «Сюди!» — мітка над гравцем на екрані, щоб покликати напарників. */
+  | { t: 'ping' };
 
 /** Екран → пульт. */
 export type ScreenMessage =

@@ -11,9 +11,9 @@
  * вентиляції. Рівні й приглушення — ті самі.
  */
 export type MusicLevel = 'calm' | 'fight' | 'boss';
-export type MusicTheme = 'desert' | 'station';
+export type MusicTheme = 'desert' | 'station' | 'ice';
 
-const BPM: Record<MusicTheme, number> = { desert: 96, station: 112 };
+const BPM: Record<MusicTheme, number> = { desert: 96, station: 112, ice: 100 };
 // Хіджаз від D3: D Eb F# G A Bb C (півтони від D).
 const SCALE = [0, 1, 4, 5, 7, 8, 10];
 const D3 = 146.83;
@@ -37,6 +37,16 @@ const CHORDS: { root: number; tones: number[] }[] = [
   { root: -4, tones: [-4, 0, 3, 7] }, // B♭maj7
   { root: -2, tones: [-2, 2, 5, 8] }, // C7
   { root: -5, tones: [-5, -2, 2, 5] }, // Am7
+];
+/**
+ * Крига (DECISIONS.md, п. 66): той самий електронний рушій, що й станція, але повільніше,
+ * з відкритими «скляними» акордами (квінти й нони без терцій) і дзвіночками, що спадають.
+ */
+const ICE_CHORDS: { root: number; tones: number[] }[] = [
+  { root: 0, tones: [0, 7, 14, 17, 19] }, // D5(add9, add11)
+  { root: -2, tones: [-2, 5, 12, 14, 19] }, // Csus2
+  { root: -7, tones: [-7, 0, 7, 9, 14] }, // G(add9)
+  { root: -5, tones: [-5, 2, 9, 12, 16] }, // Asus4
 ];
 const semi = (n: number) => D3 * Math.pow(2, n / 12);
 
@@ -145,6 +155,7 @@ export class Music {
       this.droneNodes = this.drone();
       this.windNodes = this.wind(this.amb);
     } else {
+      const ice = this.theme === 'ice';
       // Луна для арпеджіо: затримка на крапковану вісімку з затуханням.
       const dl = ctx.createDelay(1);
       dl.delayTime.value = this.stepDur * 3;
@@ -155,7 +166,8 @@ export class Music {
       dl.connect(fb).connect(dl);
       dl.connect(wet).connect(this.bus);
       this.delay = dl;
-      this.windNodes = this.hum(this.amb);
+      // На кризі замість гулу станції — вітер надворі.
+      this.windNodes = ice ? this.wind(this.amb) : this.hum(this.amb);
     }
     this.nextT = ctx.currentTime + 0.1;
     this.timer = window.setInterval(() => this.schedule(), 25);
@@ -179,7 +191,7 @@ export class Music {
     const ctx = this.ctx;
     if (!ctx) return;
     while (this.nextT < ctx.currentTime + 0.12) {
-      if (this.theme === 'station') this.stationStep(this.step, this.nextT);
+      if (this.theme !== 'desert') this.stationStep(this.step, this.nextT);
       else this.playStep(this.step, this.nextT);
       this.nextT += this.stepDur;
       this.step = (this.step + 1) % 16;
@@ -217,13 +229,14 @@ export class Music {
   private stationStep(s: number, t: number): void {
     const lv = this.level;
     const st = this.stepDur;
-    const chord = CHORDS[Math.floor(this.bar / 2) % CHORDS.length]!;
+    const ice = this.theme === 'ice';
+    const chord = (ice ? ICE_CHORDS : CHORDS)[Math.floor(this.bar / 2) % CHORDS.length]!;
     // Пад: новий акорд кожні два такти, повільна атака — фон, а не мелодія.
     if (s === 0 && this.bar % 2 === 0) this.pad(chord.tones, t, st * 32);
     // Бочка й клеп.
     const kick = lv === 'calm' ? s === 0 : s % 4 === 0 || (lv === 'boss' && s === 14);
     if (kick) this.kick(t, lv === 'calm' ? 0.3 : 0.5);
-    if (lv !== 'calm' && (s === 4 || s === 12)) this.clap(t, 0.2);
+    if (lv !== 'calm' && (s === 4 || s === 12)) this.clap(t, ice ? 0.12 : 0.2);
     // Хай-хети: у спокої — рідко й тихо, у бою — вісімки, на босі — шістнадцяті з акцентом.
     if (lv === 'calm' ? s % 4 === 2 : lv === 'fight' ? s % 2 === 1 : true)
       this.noiseHit(t, 'highpass', 8000, 0.7, 0.04, lv === 'boss' && s % 2 === 0 ? 0.08 : 0.045);
@@ -235,8 +248,13 @@ export class Music {
     }
     // Арпеджіо по тонах акорду вгору — у бою вісімками, на босі шістнадцятими, з луною.
     if (lv !== 'calm' && (lv === 'boss' || s % 2 === 0)) {
-      const k = (lv === 'boss' ? s : s / 2) % chord.tones.length;
-      this.plink(semi(chord.tones[k]! + 12), t, lv === 'boss' ? 0.07 : 0.06);
+      const i = (lv === 'boss' ? s : s / 2) % chord.tones.length;
+      // Крига: дзвіночки на октаву вище й згори вниз — «бурульки».
+      const k = ice ? chord.tones.length - 1 - i : i;
+      this.plink(semi(chord.tones[k]! + (ice ? 24 : 12)), t, lv === 'boss' ? 0.07 : 0.06);
+    } else if (ice && lv === 'calm' && s % 8 === 4) {
+      // У спокої — рідкі поодинокі дзвіночки з луною.
+      this.plink(semi(chord.tones[(this.bar + s / 4) % chord.tones.length]! + 24), t, 0.04);
     }
     if (lv === 'boss') {
       // Дріб малого в останньому такті з чотирьох; «сирена» з півтону на початку кожних 4 тактів.

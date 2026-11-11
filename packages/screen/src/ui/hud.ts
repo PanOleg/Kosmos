@@ -6,6 +6,7 @@ import {
   abilityReadiness,
   shopOpen,
   upgradePrice,
+  wavePreview,
   wholeParts,
   type Game,
 } from '@horizon/sim';
@@ -27,6 +28,8 @@ const css = `
 .hud-top .boss .pb { height: 9px; border: 1px solid rgba(255,204,64,.5); }
 .hud-top .boss .pb > i { background: linear-gradient(90deg, #ffb020, #ffdc60); box-shadow: 0 0 10px #ffb020; }
 .hud-top .big { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.hud-top .nx { font-size: 12px; opacity: .8; margin-top: 3px; line-height: 1.35; }
+.hud-top .nx b { color: #ffcc40; font-weight: 700; }
 .hud-top .big small { font-size: 12px; font-weight: 600; opacity: .6; margin-left: 6px; letter-spacing: .06em; }
 .hud-card { position: absolute; width: 250px; padding: 8px 10px 8px 64px; min-height: 58px; background: rgba(8,10,16,.72); border-radius: 10px; border-left: 4px solid; font-size: 13px; }
 .hud-card .pt { position: absolute; left: 8px; top: 8px; width: 46px; height: 46px; border-radius: 8px; background: rgba(255,255,255,.06); }
@@ -35,6 +38,8 @@ const css = `
 .hud-card .cls { font-weight: 700; letter-spacing: .03em; }
 .hud-card .parts { color: #9ff4ff; font-weight: 700; font-variant-numeric: tabular-nums; display: inline-block; }
 .hud-card .parts.pop { animation: hudpop .25s ease-out; }
+.hud-card.low { animation: hudlow .7s ease-in-out infinite; }
+@keyframes hudlow { 50% { background: rgba(150,16,24,.8); box-shadow: 0 0 18px rgba(255,40,40,.55); } }
 @keyframes hudpop { 0% { transform: scale(1.6); } 100% { transform: scale(1); } }
 .bar { height: 7px; background: rgba(255,255,255,.12); border-radius: 4px; overflow: hidden; margin-top: 6px; }
 .bar > i { display: block; height: 100%; transition: width .12s; }
@@ -65,6 +70,9 @@ const css = `
 .downmark i { display: block; height: 100%; width: 0; background: #6aff8a; }
 .downmark.rescuing b { color: #6aff8a; text-shadow: 0 0 8px rgba(60,255,120,.8); animation: none; }
 @keyframes downpulse { 50% { opacity: .5; } }
+.pingmark { position: absolute; transform: translate(-50%, -100%); padding: 4px 12px; border-radius: 99px; font-size: 16px; font-weight: 800;
+  letter-spacing: .08em; color: #0a0c12; background: var(--c, #fff); box-shadow: 0 0 18px var(--c, #fff); display: none; animation: pingpulse .5s ease-in-out infinite; }
+@keyframes pingpulse { 50% { transform: translate(-50%, -100%) scale(1.18); } }
 .over { position: absolute; width: 46px; height: 5px; margin-left: -23px; background: rgba(0,0,0,.55); border-radius: 3px; overflow: hidden; }
 .over > i { display: block; height: 100%; }
 .announce { position: absolute; top: 22%; left: 0; right: 0; text-align: center; font-size: 46px; font-weight: 800; letter-spacing: .12em;
@@ -84,6 +92,11 @@ const css = `
 .drops div { background: rgba(10, 14, 26, .75); border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: 6px 14px;
   font-size: 15px; letter-spacing: .04em; }
 .drops b { color: var(--c, #fff); }
+.maptip { position: absolute; top: 118px; left: 50%; transform: translateX(-50%); max-width: 640px; text-align: center;
+  background: rgba(10,14,26,.78); border: 1px solid rgba(255,204,64,.45); border-radius: 10px; padding: 8px 16px;
+  font-size: 15px; line-height: 1.4; opacity: 0; transition: opacity .6s; }
+.maptip.on { opacity: 1; }
+.maptip b { color: #ffcc40; margin-right: 6px; }
 .hint { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 13px; opacity: .55; transition: opacity 1s; }
 `;
 
@@ -94,6 +107,8 @@ const CORNERS: Partial<CSSStyleDeclaration>[] = [
   { right: '14px', bottom: '14px' },
 ];
 const MAX_ARROWS = 10;
+/** Частка здоров'я, нижче якої картка гравця б'є тривогу. */
+const LOW_HP = 0.3;
 let styleInstalled = false;
 
 interface Card {
@@ -117,6 +132,10 @@ export class Hud {
   private readonly downs: { el: HTMLDivElement; text: HTMLElement; bar: HTMLElement }[] = [];
   private readonly arrows: HTMLDivElement[] = [];
   private announceT = 0;
+  private readonly pings: { el: HTMLDivElement; t: number }[] = [];
+  private readonly tipEl = document.createElement('div');
+  private tips: string[] = [];
+  private tipT = 0;
   private readonly shop = document.createElement('div');
   private shopSig = '';
   private readonly pauseEl = document.createElement('div');
@@ -124,6 +143,8 @@ export class Hud {
   private pauseSig = '';
   private readonly v = new THREE.Vector3();
   private lastTop = '';
+  private previewFor = -1;
+  private preview = '';
 
   constructor(game: Game) {
     if (!styleInstalled) {
@@ -140,7 +161,16 @@ export class Hud {
     this.shop.className = 'shop';
     this.pauseEl.className = 'pause';
     this.dropsEl.className = 'drops';
-    this.root.append(this.top, this.announceEl, this.hint, this.shop, this.dropsEl, this.pauseEl);
+    this.tipEl.className = 'maptip';
+    this.root.append(
+      this.tipEl,
+      this.top,
+      this.announceEl,
+      this.hint,
+      this.shop,
+      this.dropsEl,
+      this.pauseEl,
+    );
     for (const p of game.state.players) {
       const color = hexCss(classColor(p.classId));
       const el = document.createElement('div');
@@ -162,6 +192,12 @@ export class Hud {
       over.innerHTML = `<i style="background:${color}"></i>`;
       this.root.appendChild(over);
       this.overs.push({ el: over, fill: over.querySelector('i')! });
+      const ping = document.createElement('div');
+      ping.className = 'pingmark';
+      ping.style.setProperty('--c', color);
+      ping.textContent = `P${p.slot + 1} · ${t.pingHere}`;
+      this.root.appendChild(ping);
+      this.pings.push({ el: ping, t: 0 });
       const down = document.createElement('div');
       down.className = 'downmark';
       down.innerHTML = '<b></b><span><i></i></span>';
@@ -258,6 +294,18 @@ export class Hud {
       .join('');
   }
 
+  /** Підказки про особливості карти: по одній, кожна тримається кілька секунд. */
+  showTips(tips: string[]): void {
+    this.tips = [...tips];
+    this.tipT = 0;
+  }
+
+  /** «Сюди!» від гравця: мітка над ним на 3 с. */
+  ping(slot: number): void {
+    const p = this.pings[slot];
+    if (p) p.t = 3;
+  }
+
   announce(title: string, sub = '', seconds = 2.2): void {
     this.announceEl.innerHTML = `${title}${sub ? `<small>${sub}</small>` : ''}`;
     this.announceT = seconds;
@@ -282,6 +330,22 @@ export class Hud {
           ? `${Math.ceil(w.timer / TICKS_PER_SEC)} с<small>${t.untilWave}</small>`
           : `${left}<small>${t.enemiesWord}</small>`;
       topText = `<div class="wv">${def.name}</div><div class="pb"><i style="width:${Math.round(prog * 100)}%"></i></div><div class="big">${big}</div>`;
+      // У паузі — хто йде наступною хвилею: можна готуватися й купувати під склад.
+      if (w.phase === 'pause') {
+        if (this.previewFor !== w.index) {
+          this.previewFor = w.index;
+          const names = t.enemyNameByMap[game.config.map.id] ?? {};
+          this.preview = wavePreview(game, w.index)
+            .map((r) => {
+              const nm = names[r.type] ?? t.enemyName[r.type] ?? r.type;
+              return r.type === 'foreman' || r.type === 'core'
+                ? `<b>${nm}</b>`
+                : `${nm} ×${r.count}`;
+            })
+            .join(' · ');
+        }
+        topText += `<div class="nx">${t.nextWave}: ${this.preview}</div>`;
+      }
       // Міні-бос: окрема жовта смуга здоров'я під лічильником.
       if (def.boss && w.phase === 'active') {
         const b = s.enemies.find((e) => e.alive && e.type === def.boss);
@@ -317,6 +381,8 @@ export class Hud {
         c.lastParts = parts;
       }
       c.el.style.opacity = p.out ? '0.35' : p.down ? '0.6' : '1';
+      // Мало здоров'я — картка пульсує червоним: напарники бачать, кого прикрити.
+      c.el.classList.toggle('low', !p.down && p.hp < p.maxHp * LOW_HP);
       // Статус у картці: скільки лишилось до вибування або що вибув.
       const status = p.out
         ? t.outUntilWave
@@ -330,6 +396,14 @@ export class Hud {
       o.el.style.top = `${((1 - this.v.y) / 2) * H}px`;
       o.fill.style.width = `${(p.hp / p.maxHp) * 100}%`;
       o.el.style.display = p.down ? 'none' : 'block';
+      const pg = this.pings[p.slot]!;
+      if (pg.t > 0) {
+        pg.t -= dt;
+        this.v.set(toX(p.x), 3.3, toZ(p.y)).project(camera);
+        pg.el.style.left = `${((this.v.x + 1) / 2) * W}px`;
+        pg.el.style.top = `${((1 - this.v.y) / 2) * H}px`;
+      }
+      pg.el.style.display = pg.t > 0 ? 'block' : 'none';
       // Над упалим: відлік і прогрес підйому, якщо хтось піднімає.
       const dn = this.downs[p.slot]!;
       const showDown = p.down && !p.out;
@@ -372,6 +446,14 @@ export class Hud {
     }
     for (let i = n; i < MAX_ARROWS; i++) this.arrows[i]!.style.display = 'none';
 
+    if (this.tipT > 0) {
+      this.tipT -= dt;
+      if (this.tipT <= 0.6) this.tipEl.classList.remove('on');
+    } else if (this.tips.length && s.tick > 3 * TICKS_PER_SEC) {
+      this.tipEl.innerHTML = `<b>!</b>${this.tips.shift()!}`;
+      this.tipEl.classList.add('on');
+      this.tipT = 6;
+    }
     if (this.announceT > 0) {
       this.announceT -= dt;
       this.announceEl.style.opacity = this.announceT > 0 ? '1' : '0';

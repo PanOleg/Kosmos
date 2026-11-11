@@ -17,6 +17,7 @@ import {
 } from '@horizon/sim';
 import { emptyInput } from '@horizon/sim/protocol';
 import { buildArena, type ArenaView } from './render/arena';
+import { createAmbience, type Ambience } from './render/ambience';
 import { buildDesertArena } from './render/desertArena';
 import { Music, type MusicLevel } from './audio/music';
 import { Voice } from './audio/voice';
@@ -139,6 +140,7 @@ let envBase = 0.32;
 let fogBase = 0.007;
 /** 0..1 — сила бурі на екрані (серпанок густішає плавно). */
 let stormK = 0;
+let ambience: Ambience | null = null;
 function makeArena(settings: SessionSettings): ArenaView {
   const map = buildConfig(settings).map;
   const a = map.id === 'station' ? buildArena(map) : buildDesertArena(map);
@@ -153,9 +155,11 @@ function makeArena(settings: SessionSettings): ArenaView {
   // Звук за картою (п. 50–51): своя музика й фон; у пустелі ще ріг і піщані пориви.
   // Крига — надворі, як пустеля (вітер, ріг, рація), але з холодною електронікою станції.
   sfx.theme = map.id === 'station' ? 'station' : 'desert';
-  music.setTheme(map.id === 'desert' ? 'desert' : 'station');
+  music.setTheme(map.id);
   voice.setTheme(map.id === 'station' ? 'station' : 'desert');
   scene.environmentIntensity = envBase;
+  ambience = createAmbience(map.id);
+  a.group.add(ambience.group);
   scene.add(a.group);
   return a;
 }
@@ -275,6 +279,8 @@ interface Match {
   /** Коли показали результати, мс: через RESULTS_AUTO_MS — назад у лобі. */
   resultsAt: number;
   botAnnounced: boolean[];
+  /** Вбивства гравців за поточну хвилю — для «найкращого у хвилі». */
+  waveKills: number[];
   classes: ClassId[];
 }
 
@@ -282,6 +288,11 @@ let match: Match | null = null;
 const RESULTS_AUTO_MS = 60000;
 lobby.onAgain = () => endMatch();
 lobby.onAudio = (what) => toggleAudio(what);
+lobby.onPing = (slot) => {
+  if (!match || match.results) return;
+  match.hud.ping(slot);
+  sfx.ping();
+};
 applyAudio();
 lobbyView.setAudio(audioPrefs);
 lobbyView.onAudioToggle = (what) => toggleAudio(what);
@@ -343,6 +354,7 @@ function startMatch(): void {
     results: null,
     resultsAt: 0,
     botAnnounced: order.map(() => false),
+    waveKills: order.map(() => 0),
     classes: game.state.players.map((p) => p.classId),
   };
   lobbyView.show(false);
@@ -386,6 +398,19 @@ function startMatch(): void {
       );
     voice.say('wave1', 1);
     sfx.stationSignal();
+    // Особливості карти — у перших трьох матчах на ній (лічильник на цьому екрані).
+    const tips = t.mapTip[game.config.map.id];
+    if (tips) {
+      const key = `horizon-maptips-${game.config.map.id}`;
+      let seen = 0;
+      try {
+        seen = Number(store?.getItem(key) ?? 0) || 0;
+        store?.setItem(key, String(seen + 1));
+      } catch {
+        // Сховище недоступне — просто показуємо щоразу.
+      }
+      if (seen < 3) match.hud.showTips(tips);
+    }
   }
 }
 
@@ -427,6 +452,12 @@ window.addEventListener('keydown', (e) => {
     e.code === 'KeyN' ? 'music' : e.code === 'KeyJ' ? 'sfx' : e.code === 'KeyV' ? 'voice' : null;
   if (ch) {
     toggleAudio(ch);
+    return;
+  }
+  // Повний екран — будь-коли: на телевізорі й проекторі рамка браузера лише заважає.
+  if (e.code === 'KeyF' && !e.repeat) {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void document.documentElement.requestFullscreen?.().catch(() => {});
     return;
   }
   if (match) {
@@ -527,6 +558,7 @@ function handleMatchEvents(m: Match): void {
         sfx.purchase(true);
       } else sfx.purchase(false);
     }
+    if (e.type === 'kill' && e.b >= 0 && e.b < m.waveKills.length) m.waveKills[e.b]!++;
     const def = g.config.waves[e.a];
     const desert = g.config.map.id === 'desert';
     if (e.type === 'wavePause' && def) {
@@ -540,7 +572,15 @@ function handleMatchEvents(m: Match): void {
       m.hud.announce(t.revived(e.a + 1), '', 1.6);
       voice.say('revived', 1);
     } else if (e.type === 'waveCleared' && def && e.b === 0) {
-      m.hud.announce(t.waveCleared, '', 2);
+      // Найкращий у хвилі — лише для команди: одинаку це нічого не каже.
+      const best = m.waveKills.indexOf(Math.max(...m.waveKills));
+      const bp = g.state.players[best];
+      const sub =
+        g.state.players.length > 1 && bp && m.waveKills[best]! > 0
+          ? t.waveBest(best + 1, t.className[bp.classId] ?? '', m.waveKills[best]!)
+          : '';
+      m.hud.announce(t.waveCleared, sub, sub ? 3 : 2);
+      m.waveKills.fill(0);
       voice.say('cleared', 1);
     } else if (e.type === 'bossPhase') {
       m.hud.announce(t.bossPhase(e.b), e.b === 1 ? t.lightsOut : '', 2.2);
@@ -765,6 +805,7 @@ function frame(now: number): void {
   if (match) frameMatch(match, now, dt);
   else frameLobby(now, dt);
   arena.update(now / 1000, cam.focusPoint);
+  ambience?.update(now / 1000, dt, stormK);
   renderer.info.reset();
   post.render();
   debug.frame(dt, renderer, debugLine());

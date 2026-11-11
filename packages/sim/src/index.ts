@@ -144,4 +144,4 @@ export { reviveCost, downedAllyNear } from './systems/revive';
 export type { Barrier } from './entities/barrier';
 export { GUNNER_HIDE, GUNNER_PEEK, GUNNER_SEEK, GUNNER_OPEN, GUNNER_RETURN } from './ai/gunner';
 export { matchSummary } from './systems/summary';
-export { stormPhase } from './systems/waves';
+export { stormPhase, wavePreview } from './systems/waves';

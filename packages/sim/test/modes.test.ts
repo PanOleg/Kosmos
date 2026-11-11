@@ -8,6 +8,7 @@ import {
   shopOpen,
   slowAt,
   stormPhase,
+  wavePreview,
   DEFAULT_SETTINGS,
   MAPS,
   type ClassId,
@@ -48,7 +49,14 @@ describe('match modifiers', () => {
       ...DEFAULT_SETTINGS,
       modifiers: ['rich', 'glass', 'noShop', 'rush', 'bogus' as 'rich'],
     });
-    expect(c.rules).toEqual({ partsMul: 2, playerDamageMul: 2, pauseMul: 0.5, shop: false });
+    expect(c.rules).toEqual({
+      partsMul: 2,
+      playerDamageMul: 2,
+      pauseMul: 0.5,
+      shop: false,
+      scatter: false,
+    });
+    expect(buildConfig({ ...DEFAULT_SETTINGS, modifiers: ['ambush'] }).rules.scatter).toBe(true);
     expect(c.mods.enemySpeed).toBeCloseTo(1.2);
     expect(c.mods.enemyDamage).toBe(2);
     expect(buildConfig(DEFAULT_SETTINGS).rules.shop).toBe(true);
@@ -68,6 +76,34 @@ describe('match modifiers', () => {
     const hp = e.hp;
     damageEnemy(g, e, i, 10, 1, 0, 0, 0);
     expect(hp - e.hp).toBe(20);
+  });
+
+  test('ambush scatters the first group over several gates on the station too', () => {
+    const sides = (mods: 'ambush'[]) => {
+      const g = createGame(buildConfig({ ...DEFAULT_SETTINGS, modifiers: mods }), 1, [
+        { classId: 'assault' },
+      ]);
+      const inputs = [emptyInput()];
+      while (!g.state.enemies.some((e) => e.alive)) step(g, inputs);
+      return new Set(
+        g.state.enemies
+          .filter((e) => e.alive)
+          .map((e) => (Math.abs(e.x) > Math.abs(e.y) ? Math.sign(e.x) * 2 : Math.sign(e.y))),
+      ).size;
+    };
+    expect(sides([])).toBe(1);
+    expect(sides(['ambush'])).toBeGreaterThan(1);
+  });
+
+  test('wave preview lists types in order with team-scaled counts', () => {
+    const solo = createGame(buildConfig(DEFAULT_SETTINGS), 1, [{ classId: 'assault' }]);
+    expect(wavePreview(solo, 0)).toEqual([{ type: 'scout', count: 8 }]);
+    const duo = createGame(buildConfig(DEFAULT_SETTINGS), 1, [
+      { classId: 'assault' },
+      { classId: 'medic' },
+    ]);
+    expect(wavePreview(duo, 0)[0]!.count).toBeGreaterThan(8);
+    expect(wavePreview(solo, 1).map((r) => r.type)).toEqual(['scout', 'gunner']);
   });
 
   test('drones-only waves have no ground enemies but keep the bosses', () => {

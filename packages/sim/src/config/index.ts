@@ -14,19 +14,23 @@ export interface MatchRules {
   pauseMul: number;
   /** Магазин між хвилями відкритий. */
   shop: boolean;
+  /** Групи ворогів діляться між кількома точками появи (як у пустелі) — на будь-якій карті. */
+  scatter: boolean;
 }
 export const DEFAULT_RULES: MatchRules = {
   partsMul: 1,
   playerDamageMul: 1,
   pauseMul: 1,
   shop: true,
+  scatter: false,
 };
 
 /**
  * Модифікатори матчу: rich — удвічі більше деталей, вороги швидші; glass — усі б'ють удвічі
- * сильніше; drones — лише дрони; noShop — без магазину; rush — паузи вдвічі коротші.
+ * сильніше; drones — лише дрони; noShop — без магазину; rush — паузи вдвічі коротші;
+ * ambush — вороги виходять з різних точок одночасно.
  */
-export const MODIFIERS = ['rich', 'glass', 'drones', 'noShop', 'rush'] as const;
+export const MODIFIERS = ['rich', 'glass', 'drones', 'noShop', 'rush', 'ambush'] as const;
 export type ModifierId = (typeof MODIFIERS)[number];
 
 export interface GameConfig {
@@ -109,6 +113,7 @@ export function buildConfig(s: SessionSettings): GameConfig {
   }
   if (active.has('noShop')) rules.shop = false;
   if (active.has('rush')) rules.pauseMul = 0.5;
+  if (active.has('ambush')) rules.scatter = true;
   let list = buildWaves(waves, !!s.endless);
   if (active.has('drones')) list = dronesOnly(list);
   return {

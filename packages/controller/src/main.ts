@@ -115,6 +115,15 @@ function run(room: string): void {
   lifeBtn.addEventListener('pointerdown', () => pressBuy(BUY_LIFE, lifeBtn));
 
   // Пауза: утримати кнопку 0.5 с, щоб не поставити випадково долонею.
+  // «Сюди!»: мітка над своїм персонажем на екрані. Екран приймає не частіше ніж раз на 2 с.
+  let pingAt = 0;
+  $('ping').addEventListener('click', () => {
+    if (performance.now() - pingAt < 2000) return;
+    pingAt = performance.now();
+    blip(990, 0.08);
+    navigator.vibrate?.(30);
+    net.send({ t: 'ping' });
+  });
   const pauseBtn = $('pause');
   let holdTimer = 0;
   const holdEnd = () => {
@@ -381,6 +390,12 @@ function run(room: string): void {
         applyClass(m.classId);
         $<HTMLElement>('hp').style.width = `${m.maxHp > 0 ? (m.hp / m.maxHp) * 100 : 0}%`;
         $('parts').textContent = String(m.parts);
+        {
+          // Мало здоров'я (< 30%): рамка пульсує, а на вході в небезпечну зону — подвійна вібрація.
+          const low = m.phase === 'match' && !m.down && m.maxHp > 0 && m.hp < m.maxHp * 0.3;
+          if (low && !document.body.classList.contains('lowhp')) navigator.vibrate?.([60, 60, 60]);
+          document.body.classList.toggle('lowhp', low);
+        }
         $('down').style.display = m.down ? 'block' : 'none';
         if (m.down)
           $('down').innerHTML =

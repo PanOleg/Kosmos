@@ -400,6 +400,12 @@ export class Sfx {
     this.tone('sawtooth', 300, 40, 0.9, 0.3);
   }
 
+  /** «Сюди!»: два короткі висхідні сигнали. */
+  ping(): void {
+    this.tone('square', 740, 740, 0.09, 0.12);
+    window.setTimeout(() => this.tone('square', 990, 990, 0.14, 0.12), 110);
+  }
+
   pickup(pan: number, combo: number): void {
     const f = 880 * Math.pow(2, Math.min(combo, 12) / 12);
     this.tone('triangle', f, f * 1.5, 0.09, 0.15, pan);
