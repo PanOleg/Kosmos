@@ -1,7 +1,7 @@
 import type { MatchSummary, PlayerSummary } from '@horizon/sim/protocol';
 import { classColor, hexCss } from '../render/palette';
 import { t } from './i18n';
-import { ACHIEVEMENTS, type MatchOutcome } from '../meta/progress';
+import type { MatchOutcome } from '../meta/progress';
 
 /** Екран після матчу (DECISIONS.md, п. 46): картка на гравця, відзнаки, підсумок команди. */
 export interface ResultsView {
@@ -64,10 +64,7 @@ function metaBlock(o: MatchOutcome | undefined): string {
   const lines: string[] = [];
   for (const id of o.newAchievements) {
     const [name] = t.achievement[id] ?? [id];
-    const skin = ACHIEVEMENTS.find((a) => a.id === id)?.skin;
-    lines.push(
-      `${t.newAchievement}: <b>${name}</b>${skin ? ` · ${t.skinUnlocked(t.skinName[skin] ?? skin)}` : ''}`,
-    );
+    lines.push(`${t.newAchievement}: <b>${name}</b>`);
   }
   const recName: Record<string, string> = {
     bestWave: t.recBestWave,

@@ -12,7 +12,7 @@ const uk = {
   pressStart: 'Усі готові — Enter, щоб почати',
   startingIn: (s: number) => `Старт через ${s}`,
   lobbyKeysHint:
-    'Клавіатура: Пробіл — приєднатися · Q/E — клас · C — забарвлення · M — карта · N/J/V — музика/звуки/озвучка · Enter — готовий/старт · B — додати бота · Backspace — вийти · D — складність · −/= — хвилі',
+    'Клавіатура: Пробіл — приєднатися · Q/E — клас · M — карта · N/J/V — музика/звуки/озвучка · Enter — готовий/старт · B — додати бота · Backspace — вийти · D — складність · −/= — хвилі',
   difficulty: 'Складність',
   preset: { easy: 'Легко', normal: 'Нормально', hard: 'Важко' } as Record<string, string>,
   wavesLabel: 'Хвиль',
@@ -128,7 +128,6 @@ const uk = {
   newAchievement: 'Нове досягнення',
   newRecord: 'Новий рекорд',
   contractCompleted: (streak: number) => `Контракт дня виконано · серія ${streak}`,
-  skinUnlocked: (name: string) => `відкрито забарвлення «${name}»`,
   achievement: {
     first: ['Перша зміна', 'Завершити матч'],
     wave5: ['Тримаємо оборону', 'Дійти до хвилі 5'],

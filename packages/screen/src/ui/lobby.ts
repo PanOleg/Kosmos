@@ -161,8 +161,7 @@ export class LobbyView {
     const chips = ACHIEVEMENTS.map((a) => {
       const [name, desc] = t.achievement[a.id] ?? [a.id, ''];
       const on = p.achievements[a.id] !== undefined;
-      const skin = a.skin ? ` · ${t.skinName[a.skin]}` : '';
-      return `<i class="${on ? 'on' : ''}" title="${desc}${skin}">${on ? '' : '🔒 '}${name}</i>`;
+      return `<i class="${on ? 'on' : ''}" title="${desc}">${on ? '' : '🔒 '}${name}</i>`;
     }).join('');
     this.crewEl.innerHTML = `<h3>${t.crew}</h3>
       <div class="ct ${done ? 'done' : ''}"><span>${t.contract}${done ? ` · ${t.contractDone}` : ''}${streak ? ` · ${t.streak(streak)}` : ''}</span><b>${t.contractText[c.id] ?? c.id}</b></div>
@@ -219,9 +218,8 @@ export class LobbyView {
       const conn =
         s.kind === 'phone' && !s.link ? t.slotLost : s.ready ? t.slotReady : t.slotChoosing;
       const ping = s.kind === 'phone' && !Number.isNaN(s.rtt) ? ` · ${Math.round(s.rtt)} мс` : '';
-      const skin = s.skin !== 'standard' ? ` · ${t.skinName[s.skin] ?? s.skin}` : '';
       parts.push(
-        `<div class="slot on" style="border-color:${color}">${s.classId ? `<img class="pt" src="${import.meta.env.BASE_URL}classes/${s.classId}.png" alt="">` : ''}<div class="tx"><div class="n">P${i + 1} ${kind}</div><div class="c" style="color:${color}">${s.classId ? t.className[s.classId] : '—'}</div><div class="s">${conn}${ping}${skin}</div></div></div>`,
+        `<div class="slot on" style="border-color:${color}">${s.classId ? `<img class="pt" src="${import.meta.env.BASE_URL}classes/${s.classId}.png" alt="">` : ''}<div class="tx"><div class="n">P${i + 1} ${kind}</div><div class="c" style="color:${color}">${s.classId ? t.className[s.classId] : '—'}</div><div class="s">${conn}${ping}</div></div></div>`,
       );
     }
     // Перемальовуємо лише зміни: інакше портрети блимали б щоразу (рендер — кожні 200 мс).

@@ -45,7 +45,7 @@ import { BossRenderer } from './render/boss';
 import { models } from './render/models';
 import { Hud } from './ui/hud';
 import { showResults, type ResultsView } from './ui/results';
-import { dayNumber, loadProgress, recordMatch, saveProgress, unlockedSkins } from './meta/progress';
+import { dayNumber, loadProgress, recordMatch, saveProgress } from './meta/progress';
 import { LobbyView } from './ui/lobby';
 import { t } from './ui/i18n';
 import { LobbyHost, PAUSE_BY_SCREEN, type Slot } from './net/lobby';
@@ -184,7 +184,6 @@ const store = (() => {
   }
 })();
 const progress = loadProgress(store);
-lobby.setSkins(unlockedSkins(progress));
 lobbyView.setProgress(progress, dayNumber(new Date()));
 const keyboardLayout = new Map<Slot, KeyLayout>();
 const ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -461,9 +460,6 @@ window.addEventListener('keydown', (e) => {
     case 'KeyM':
       lobbyView.cycleMap();
       break;
-    case 'KeyC':
-      if (kb) lobby.cycleSkin(kb);
-      break;
     case 'KeyQ':
     case 'KeyE':
       if (kb) lobby.cycleClass(kb, e.code === 'KeyE' ? 1 : -1);
@@ -658,7 +654,6 @@ function frameMatch(m: Match, now: number, dt: number): void {
       day,
     });
     saveProgress(store, progress);
-    lobby.setSkins(unlockedSkins(progress));
     lobbyView.setProgress(progress, day);
     m.results = showResults(summary, t.preset[lobbyView.settings.preset] ?? '', outcome);
     voice.say(
