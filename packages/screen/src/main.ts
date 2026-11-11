@@ -18,6 +18,8 @@ import {
 import { emptyInput } from '@horizon/sim/protocol';
 import { buildArena, type ArenaView } from './render/arena';
 import { createAmbience, type Ambience } from './render/ambience';
+import { HelpOverlay } from './ui/help';
+import { nextHint } from './meta/hint';
 import { buildDesertArena } from './render/desertArena';
 import { Music, type MusicLevel } from './audio/music';
 import { Voice } from './audio/voice';
@@ -134,6 +136,7 @@ const lobby = new LobbyHost(
   () => Array.from(crypto.getRandomValues(new Uint32Array(4)), (n) => n.toString(36)).join(''),
 );
 const lobbyView = new LobbyView(lobby);
+const help = new HelpOverlay();
 
 /** Арена вибраної в лобі карти: своє небо, серпанок і світло (DECISIONS.md, п. 49). */
 let envBase = 0.32;
@@ -229,11 +232,19 @@ void openRoom();
 
 // ---------- Матч ----------
 
+/** Останній заклик «Сюди!»: хто й до якого моменту (performance.now). */
+let rally: { slot: number; until: number } | null = null;
+
 class BotSource implements InputSource {
   constructor(private readonly slot: number) {}
   read(out: PlayerInput): void {
     if (!match) return;
-    botInput(match.game, this.slot, out);
+    // «Сюди!» від живого гравця: боти 5 с ідуть до нього.
+    const caller =
+      rally && performance.now() < rally.until && rally.slot !== this.slot
+        ? match.game.state.players[rally.slot]
+        : null;
+    botInput(match.game, this.slot, out, caller && !caller.down ? caller : null);
     // ?debug: window.forceAbility = true — боти тиснуть здібність, щойно вона готова (огляд ефектів).
     if (DEBUG && (window as unknown as { forceAbility?: boolean }).forceAbility)
       out.ability = match.game.state.tick % 2 === 0;
@@ -292,6 +303,7 @@ lobby.onPing = (slot) => {
   if (!match || match.results) return;
   match.hud.ping(slot);
   sfx.ping();
+  rally = { slot, until: performance.now() + 5000 };
 };
 applyAudio();
 lobbyView.setAudio(audioPrefs);
@@ -305,6 +317,8 @@ function startMatch(): void {
     (s): s is Slot => s !== null && s.classId !== null && (s.kind !== 'phone' || s.link !== null),
   );
   if (order.length === 0) return;
+  // «Випадкова карта»: вибираємо зараз — арена перебудовується до створення гри.
+  lobbyView.rollMap();
   const game = createGame(
     buildConfig(lobbyView.settings),
     seed++,
@@ -358,6 +372,7 @@ function startMatch(): void {
     classes: game.state.players.map((p) => p.classId),
   };
   lobbyView.show(false);
+  help.setButtonVisible(false);
   if (DEBUG) {
     (window as unknown as { game: Game }).game = game;
     // window.spawn('kamikaze', 3) — будь-який ворог біля випадкового люка/шлюзу.
@@ -438,6 +453,7 @@ function endMatch(): void {
   match = null;
   lobby.backToLobby();
   lobbyView.show(true);
+  help.setButtonVisible(true);
 }
 
 // ---------- Клавіатура лобі ----------
@@ -454,6 +470,12 @@ window.addEventListener('keydown', (e) => {
     toggleAudio(ch);
     return;
   }
+  // Довідка «Як грати» — лише в лобі; поки відкрита, інші клавіші лобі не діють.
+  if (!match && (e.code === 'KeyH' || (help.open && e.code === 'Escape'))) {
+    help.toggle();
+    return;
+  }
+  if (help.open) return;
   // Повний екран — будь-коли: на телевізорі й проекторі рамка браузера лише заважає.
   if (e.code === 'KeyF' && !e.repeat) {
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -593,8 +615,9 @@ function handleMatchEvents(m: Match): void {
       sfx.airlockWarn(0);
     } else if (e.type === 'storm') {
       if (e.b === 1) {
-        m.hud.announce(t.stormOn, '', 2);
-        voice.say('sandstorm', 3);
+        // Фраза записана лише про піщану бурю — на «Кризі» хуртовину оголошує тільки напис.
+        m.hud.announce(desert ? t.stormOn : t.blizzardOn, '', 2);
+        if (desert) voice.say('sandstorm', 3);
         sfx.airlockOpen(0);
       } else m.hud.announce(t.stormOff, '', 1.5);
     } else if (e.type === 'playerDown' && g.state.players.length > 1) {
@@ -700,7 +723,13 @@ function frameMatch(m: Match, now: number, dt: number): void {
     });
     saveProgress(store, progress);
     lobbyView.setProgress(progress, day);
-    m.results = showResults(summary, t.preset[lobbyView.settings.preset] ?? '', outcome);
+    const hint = nextHint(summary, lobbyView.settings.preset);
+    m.results = showResults(
+      summary,
+      t.preset[lobbyView.settings.preset] ?? '',
+      outcome,
+      hint ? (t.nextHint[hint] ?? '') : '',
+    );
     voice.say(
       summary.won ? (g.config.map.id === 'station' ? 'victory' : 'victoryDesert') : 'defeat',
       3,

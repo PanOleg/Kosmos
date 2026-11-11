@@ -24,6 +24,8 @@ export interface Records {
   classKills: Record<string, number>;
   classRevives: Record<string, number>;
   classWins: Record<string, number>;
+  /** Перемоги над Ядром за картами — зірочки в лобі й «Першопроходець». */
+  mapWins: Record<string, number>;
 }
 
 /** Рядок таблиці рекордів нескінченного режиму. */
@@ -122,6 +124,12 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'iceWin', skin: 'frost', test: (s) => s.beatCore && s.map === 'ice' },
   { id: 'modWin', skin: 'neon', test: (s) => s.beatCore && s.modifiers.length > 0 },
   { id: 'endless20', skin: 'void', test: (s) => s.endless && s.wave >= 20 },
+  { id: 'endless30', test: (s) => s.endless && s.wave >= 30 },
+  {
+    id: 'explorer',
+    test: (_s, _c, p) => ['station', 'desert', 'ice'].every((m) => (p.records.mapWins[m] ?? 0) > 0),
+  },
+  { id: 'daredevil', test: (s) => s.beatCore && s.modifiers.length >= 3 },
 ];
 
 /** Щоденні контракти: один на день, однаковий для всіх на цю дату. */
@@ -136,6 +144,8 @@ export const CONTRACTS: {
   { id: 'revives', goal: 3, test: (s) => total(s, (p) => p.revives) >= 3 },
   { id: 'foreman', goal: 1, test: (s, c) => passedForeman(s, c) },
   { id: 'win', goal: 1, test: (s) => s.beatCore },
+  { id: 'mods', goal: 5, test: (s) => s.modifiers.length > 0 && s.wave >= 5 },
+  { id: 'clean', goal: 6, test: (s) => s.wave >= 6 && s.players.some((p) => p.downs === 0) },
 ];
 
 export function contractOf(day: number): (typeof CONTRACTS)[number] {
@@ -165,6 +175,7 @@ export function emptyProgress(): Progress {
       classKills: {},
       classRevives: {},
       classWins: {},
+      mapWins: {},
     },
     achievements: {},
     contractDay: -1,
@@ -190,7 +201,10 @@ export function recordMatch(p: Progress, s: MatchSummary, ctx: MatchContext): Ma
   const newRecords: string[] = [];
   const bestKills = Math.max(0, ...s.players.map((q) => q.kills));
   r.matches++;
-  if (s.beatCore) r.wins++;
+  if (s.beatCore) {
+    r.wins++;
+    r.mapWins[s.map] = (r.mapWins[s.map] ?? 0) + 1;
+  }
   for (const q of s.players) {
     r.classKills[q.classId] = (r.classKills[q.classId] ?? 0) + q.kills;
     r.classRevives[q.classId] = (r.classRevives[q.classId] ?? 0) + q.revives;

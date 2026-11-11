@@ -99,7 +99,16 @@ function avoidSlow(zones: SlowZone[], px: number, py: number, ux: number, uy: nu
   return inside;
 }
 
-export function botInput(game: Game, slot: number, out: PlayerInput): void {
+/**
+ * rally — точка збору («Сюди!» від гравця): бот іде до неї, доки не підійде на 3 м;
+ * небезпека й підйом упалих важливіші.
+ */
+export function botInput(
+  game: Game,
+  slot: number,
+  out: PlayerInput,
+  rally: { x: number; y: number } | null = null,
+): void {
   const s = game.state;
   const map = game.config.map;
   const p = s.players[slot];
@@ -324,6 +333,15 @@ export function botInput(game: Game, slot: number, out: PlayerInput): void {
       const w = Math.min(2, (d - limit) * 0.4) * (hurt ? 1.5 : 1);
       ax += ((tx - p.x) / d) * w;
       ay += ((ty - p.y) / d) * w;
+    }
+  }
+
+  // Покликали «Сюди!» — іде до того, хто кликав.
+  if (rally) {
+    const d = Math.hypot(rally.x - p.x, rally.y - p.y) || 1;
+    if (d > 3) {
+      ax += ((rally.x - p.x) / d) * 2.5;
+      ay += ((rally.y - p.y) / d) * 2.5;
     }
   }
 

@@ -107,6 +107,8 @@ export type ScreenMessage =
       audio: AudioPrefs;
     }
   | { t: 'hurt'; amount: number }
+  /** Напарник покликав «Сюди!»: slot — хто кличе. */
+  | { t: 'pinged'; slot: number }
   /** Підсумок матчу для цього гравця — пульт показує власну картку. */
   | { t: 'results'; summary: MatchSummary; slot: number }
   | { t: 'bought'; item: number; ok: boolean };

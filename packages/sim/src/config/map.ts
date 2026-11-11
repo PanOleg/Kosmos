@@ -357,6 +357,8 @@ export const ICE_MAP: MapDef = {
     { x: 10, y: -18, r: 2.4, mul: 0.6 },
     { x: 12, y: 14, r: 2.6, mul: 0.6 },
   ],
+  // Хуртовина: рідше й коротше за піщану бурю, приціл просідає менше.
+  storm: { every: 60, warn: 3, duration: 8, aimMul: 0.6 },
 };
 
 export const MAPS: Record<MapId, MapDef> = { station: MAP, desert: DESERT_MAP, ice: ICE_MAP };

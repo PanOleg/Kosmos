@@ -259,6 +259,17 @@
         align-items: center;
         justify-content: center;
       }
+      /* Режим для лівші: рух праворуч, здібність ліворуч (перемикач у меню паузи). */
+      body.lefty .zone.left {
+        left: auto;
+        right: 0;
+        border-right: none;
+        border-left: 1px dashed rgba(255, 255, 255, 0.14);
+      }
+      body.lefty .zone.right {
+        right: auto;
+        left: 0;
+      }
       .stick-base {
         position: absolute;
         width: 150px;
@@ -456,6 +467,25 @@
       .pausebtn.hold i {
         height: 100%;
         transition: height 0.5s linear;
+      }
+      .pinged {
+        position: absolute;
+        top: 58px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 8px 16px;
+        border-radius: 99px;
+        background: rgba(255, 204, 64, 0.95);
+        color: #111;
+        font-weight: 800;
+        font-size: 15px;
+        z-index: 4;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.25s;
+      }
+      .pinged.on {
+        opacity: 1;
       }
       .drops {
         position: absolute;
@@ -801,6 +831,7 @@
         <button id="pause" class="pausebtn" aria-label="Пауза"><i></i>⏸</button>
       </div>
       <div id="drops" class="drops"></div>
+      <div id="pinged" class="pinged"></div>
       <div id="left" class="zone left">
         <div id="base" class="stick-base"></div>
         <div id="knob" class="stick-knob"></div>
@@ -883,6 +914,9 @@
           <button data-audio="music">Музика</button>
           <button data-audio="sfx">Звуки</button>
           <button data-audio="voice">Озвучка</button>
+        </div>
+        <div class="audio">
+          <button id="lefty">Рух праворуч (для лівші)</button>
         </div>
       </div>
     </div>

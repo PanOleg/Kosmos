@@ -235,6 +235,9 @@ describe('lobby', () => {
     b.onReliable({ t: 'ping' });
     a.onReliable({ t: 'ping' });
     expect(pings).toEqual([1, 0]);
+    // Інший пульт отримує сповіщення, сам автор — ні.
+    expect(a.last('pinged')?.slot).toBe(1);
+    expect(b.last('pinged')?.slot).toBe(0);
     advance(2000);
     b.onReliable({ t: 'ping' });
     expect(pings).toEqual([1, 0, 1]);

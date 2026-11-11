@@ -117,6 +117,7 @@ function run(room: string): void {
   // Пауза: утримати кнопку 0.5 с, щоб не поставити випадково долонею.
   // «Сюди!»: мітка над своїм персонажем на екрані. Екран приймає не частіше ніж раз на 2 с.
   let pingAt = 0;
+  let pingedTimer = 0;
   $('ping').addEventListener('click', () => {
     if (performance.now() - pingAt < 2000) return;
     pingAt = performance.now();
@@ -149,6 +150,27 @@ function run(room: string): void {
     if (!b) return;
     blip(620, 0.05);
     net.send({ t: 'audio', what: b.dataset.audio as 'music' | 'sfx' | 'voice' });
+  });
+  // Режим для лівші: зони руху й здібності міняються місцями; вибір живе на цьому телефоні.
+  const LEFTY_KEY = 'horizon-lefty';
+  const setLefty = (on: boolean) => {
+    document.body.classList.toggle('lefty', on);
+    $('lefty').classList.toggle('on', on);
+  };
+  try {
+    setLefty(localStorage.getItem(LEFTY_KEY) === '1');
+  } catch {
+    // Приватний режим: просто без збереження.
+  }
+  $('lefty').addEventListener('click', () => {
+    const on = !document.body.classList.contains('lefty');
+    setLefty(on);
+    blip(620, 0.05);
+    try {
+      localStorage.setItem(LEFTY_KEY, on ? '1' : '0');
+    } catch {
+      // Не критично.
+    }
   });
   $('resume').addEventListener('click', () => {
     blip(880, 0.08);
@@ -426,6 +448,16 @@ function run(room: string): void {
       case 'hurt':
         hurt(m.amount);
         break;
+      case 'pinged': {
+        // Напарник кличе: коротка потрійна вібрація й напис на 2,5 с.
+        navigator.vibrate?.([30, 40, 30, 40, 30]);
+        const el = $('pinged');
+        el.textContent = `📣 Гравець ${m.slot + 1} кличе: сюди!`;
+        el.classList.add('on');
+        window.clearTimeout(pingedTimer);
+        pingedTimer = window.setTimeout(() => el.classList.remove('on'), 2500);
+        break;
+      }
       case 'results': {
         // Власна картка гравця; спільна таблиця — на великому екрані.
         const sum = m.summary;

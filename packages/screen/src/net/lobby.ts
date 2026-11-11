@@ -183,6 +183,9 @@ export class LobbyHost {
       if (this.phase === 'match' && now - (this.pingAt.get(s) ?? -Infinity) >= 2000) {
         this.pingAt.set(s, now);
         this.onPing(s.index);
+        // Решта пультів дізнається вібрацією й написом: на екран у бою дивляться не всі.
+        for (const o of this.slots)
+          if (o && o !== s) o.link?.sendReliable({ t: 'pinged', slot: s.index });
       }
       return;
     }

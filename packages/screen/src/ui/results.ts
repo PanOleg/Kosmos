@@ -42,6 +42,8 @@ const css = `
 .res .meta div { font-size: 16px; padding: 6px 14px; border-radius: 99px; background: rgba(255,170,34,.14);
   border: 1px solid rgba(255,170,34,.45); }
 .res .meta b { color: #ffcf6a; }
+.res .next { font-size: 16px; opacity: .9; max-width: 760px; text-align: center; }
+.res .next b { color: #7dffb0; margin-right: 4px; }
 .res .foot { font-size: 15px; opacity: .65; letter-spacing: .04em; }
 `;
 let styleInstalled = false;
@@ -84,6 +86,7 @@ export function showResults(
   sum: MatchSummary,
   presetName: string,
   outcome?: MatchOutcome,
+  hint = '',
 ): ResultsView {
   if (!styleInstalled) {
     const st = document.createElement('style');
@@ -107,6 +110,7 @@ export function showResults(
         : ''
     }
     ${metaBlock(outcome)}
+    ${hint ? `<div class="next"><b>${t.hintLabel}:</b> ${hint}</div>` : ''}
     <div class="foot"></div>`;
   document.body.appendChild(el);
   const foot = el.querySelector<HTMLElement>('.foot')!;

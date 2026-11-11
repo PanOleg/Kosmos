@@ -11,6 +11,7 @@ import {
   unlockedSkins,
   CONTRACTS,
 } from '../src/meta/progress';
+import { nextHint } from '../src/meta/hint';
 
 function pl(o: Partial<PlayerSummary> = {}): PlayerSummary {
   return {
@@ -40,6 +41,22 @@ function sum(o: Partial<MatchSummary> = {}): MatchSummary {
   };
 }
 const ctx = (day = 100, preset = 'normal') => ({ preset, foremanWave: 6, day });
+
+describe('next-step hint', () => {
+  test('one fitting suggestion per outcome', () => {
+    const win = (o: Partial<MatchSummary> = {}) => sum({ won: true, wave: 11, ...o });
+    expect(nextHint(win({ players: [pl({ downs: 0 })] }), 'normal')).toBe('harder');
+    expect(nextHint(win({ players: [pl({ downs: 0 })] }), 'hard')).toBe('tryMods');
+    expect(nextHint(win({ modifiers: ['rush'] }), 'normal')).toBe('tryMap');
+    expect(nextHint(win({ modifiers: ['rush'], map: 'ice' }), 'normal')).toBe('tryEndless');
+    expect(nextHint(sum({ wave: 11 }), 'normal')).toBe('core');
+    expect(nextHint(sum({ wave: 2 }), 'normal')).toBe('easier');
+    expect(nextHint(sum({ wave: 2 }), 'easy')).toBe('together');
+    expect(nextHint(sum({ wave: 7 }), 'normal')).toBe('shop');
+    expect(nextHint(sum({ wave: 7, players: [pl(), pl()] }), 'normal')).toBe('revive');
+    expect(nextHint(sum({ endless: true, wave: 14 }), 'normal')).toBeNull();
+  });
+});
 
 describe('meta progress', () => {
   test('first match unlocks «first», records start without «broken» noise', () => {
@@ -100,6 +117,18 @@ describe('meta progress', () => {
     expect(unlockedSkins(p)).toEqual(expect.arrayContaining(['void', 'cobalt']));
   });
 
+  test('map wins are counted; all three maps unlock «explorer»; three modifiers — «daredevil»', () => {
+    const p = emptyProgress();
+    const win = (map: string, modifiers: string[] = []) =>
+      recordMatch(p, sum({ won: true, wave: 11, map, modifiers }), ctx());
+    expect(win('station').newAchievements).not.toContain('explorer');
+    win('desert');
+    expect(win('ice', ['rush', 'glass', 'ambush']).newAchievements).toEqual(
+      expect.arrayContaining(['explorer', 'daredevil']),
+    );
+    expect(p.records.mapWins).toEqual({ station: 1, desert: 1, ice: 1 });
+  });
+
   test('foreman achievement needs the foreman wave behind', () => {
     const p = emptyProgress();
     expect(recordMatch(p, sum({ wave: 6 }), ctx()).newAchievements).not.toContain('foreman');
@@ -129,7 +158,8 @@ describe('meta progress', () => {
     const great = sum({
       won: true,
       wave: 11,
-      players: [pl({ kills: 200, parts: 400, revives: 4 })],
+      modifiers: ['rush'],
+      players: [pl({ kills: 200, parts: 400, revives: 4, downs: 0 })],
     });
     for (const c of CONTRACTS) expect(c.test(great, ctx())).toBe(true);
   });
