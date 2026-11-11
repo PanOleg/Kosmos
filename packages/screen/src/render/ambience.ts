@@ -42,6 +42,16 @@ const LOOKS: Record<string, Look> = {
     top: 9,
     additive: false,
   },
+  // Ліс: світляки — повільно здіймаються й погойдуються.
+  forest: {
+    count: 240,
+    color: 0xb8ff70,
+    size: 0.13,
+    opacity: 0.9,
+    wind: [0.15, 0.18, 0.1],
+    top: 4.5,
+    additive: true,
+  },
   station: {
     count: 140,
     color: 0xffb070,

@@ -1,5 +1,6 @@
 /**
- * Генеративна музика (DECISIONS.md, п. 50–51) — синтез на Web Audio, без файлів. Дві теми.
+ * Генеративна музика (DECISIONS.md, п. 50–51, 66, 73) — синтез на Web Audio, без файлів.
+ * Чотири теми: пустеля, станція, крига (iceStep) і чарівний ліс (forestStep).
  * Пустеля:
  * Лад — фрігійський домінантовий (хіджаз) від ре: бурдон ре–ля, рамковий барабан і дарбука
  * («дум–тек»), щипкові фрази в ладі, що щоразу інші. Інтенсивність за станом гри: спокій
@@ -11,9 +12,9 @@
  * вентиляції. Рівні й приглушення — ті самі.
  */
 export type MusicLevel = 'calm' | 'fight' | 'boss';
-export type MusicTheme = 'desert' | 'station' | 'ice';
+export type MusicTheme = 'desert' | 'station' | 'ice' | 'forest';
 
-const BPM: Record<MusicTheme, number> = { desert: 96, station: 112, ice: 100 };
+const BPM: Record<MusicTheme, number> = { desert: 96, station: 112, ice: 100, forest: 92 };
 // Хіджаз від D3: D Eb F# G A Bb C (півтони від D).
 const SCALE = [0, 1, 4, 5, 7, 8, 10];
 const D3 = 146.83;
@@ -48,6 +49,55 @@ const ICE_CHORDS: { root: number; tones: number[] }[] = [
   { root: -7, tones: [-7, 0, 7, 9, 14] }, // G(add9)
   { root: -5, tones: [-5, 2, 9, 12, 16] }, // Asus4
 ];
+/** Друга половина форми «Криги»: темніші акорди — щоб чотири такти не ходили по колу. */
+const ICE_CHORDS_B: { root: number; tones: number[] }[] = [
+  { root: -3, tones: [-3, 4, 9, 11, 16] }, // Bm(add11)
+  { root: -7, tones: [-7, 0, 7, 9, 14] }, // G(add9)
+  { root: -10, tones: [-10, -3, 4, 9, 14] }, // Esus4
+  { root: -5, tones: [-5, 2, 9, 12, 16] }, // Asus4
+];
+/** Малюнки арпеджіо «Криги»: індекси тонів акорду на вісім вісімок (−1 — пауза). */
+const ICE_ARPS: number[][] = [
+  [4, 3, 2, 1, 0, 1, 2, 3],
+  [0, 2, 4, 2, 1, 3, 4, -1],
+  [4, -1, 2, 4, -1, 1, 3, -1],
+  [0, 1, 2, 3, 4, 3, 2, 1],
+  [2, 4, 3, -1, 2, 0, 1, -1],
+];
+/**
+ * Чарівний ліс (DECISIONS.md, п. 73): світлий лідійський ре — «чарівний» підвищений IV ступінь,
+ * калімба з луною, ручні барабани на 3+3+2, флейта з фразами, що щоразу інші, цвіркуни фоном.
+ */
+const FOREST_CHORDS: { root: number; tones: number[] }[] = [
+  { root: 0, tones: [0, 4, 7, 11, 14, 18] }, // Dmaj9(#11)
+  { root: -3, tones: [-3, 0, 4, 7, 9, 14] }, // Bm11
+  { root: -7, tones: [-7, -3, 0, 4, 7, 9] }, // Gmaj9
+  { root: -5, tones: [-5, -1, 2, 4, 9, 11] }, // A(add9)
+];
+const FOREST_CHORDS_B: { root: number; tones: number[] }[] = [
+  { root: -10, tones: [-10, -3, 2, 6, 9, 14] }, // Em9
+  { root: -7, tones: [-7, -3, 0, 4, 7, 9] }, // Gmaj9
+  { root: -3, tones: [-3, 0, 4, 7, 9, 14] }, // Bm11
+  { root: -5, tones: [-5, -1, 2, 4, 9, 11] }, // A(add9)
+];
+const FOREST_DRUM: Record<MusicLevel, string> = {
+  calm: 'd.....k.....t...',
+  fight: 'd..d..t.d..k.dt.',
+  boss: 'd.kd.kt.d.dd.ktk',
+};
+/** Ритмічні маски калімби: де звучить нота в такті. */
+const KALIMBA: string[] = [
+  'x..x..x.x..x..x.',
+  'x.x..x.x..x.x...',
+  '..x.x..x.x..x.x.',
+  'x..x.x..x..x.xx.',
+];
+/** Мажорна пентатоніка від ре — мелодія флейти й дзвіночків. */
+const PENTA = [0, 2, 4, 7, 9];
+const penta = (deg: number) => {
+  const n = PENTA.length;
+  return Math.floor(deg / n) * 12 + PENTA[((deg % n) + n) % n]!;
+};
 const semi = (n: number) => D3 * Math.pow(2, n / 12);
 
 export class Music {
@@ -156,6 +206,7 @@ export class Music {
       this.windNodes = this.wind(this.amb);
     } else {
       const ice = this.theme === 'ice';
+      const forest = this.theme === 'forest';
       // Луна для арпеджіо: затримка на крапковану вісімку з затуханням.
       const dl = ctx.createDelay(1);
       dl.delayTime.value = this.stepDur * 3;
@@ -167,7 +218,7 @@ export class Music {
       dl.connect(wet).connect(this.bus);
       this.delay = dl;
       // На кризі замість гулу станції — вітер надворі.
-      this.windNodes = ice ? this.wind(this.amb) : this.hum(this.amb);
+      this.windNodes = ice || forest ? this.wind(this.amb, forest ? 0.4 : 1) : this.hum(this.amb);
     }
     this.nextT = ctx.currentTime + 0.1;
     this.timer = window.setInterval(() => this.schedule(), 25);
@@ -191,8 +242,10 @@ export class Music {
     const ctx = this.ctx;
     if (!ctx) return;
     while (this.nextT < ctx.currentTime + 0.12) {
-      if (this.theme !== 'desert') this.stationStep(this.step, this.nextT);
-      else this.playStep(this.step, this.nextT);
+      if (this.theme === 'desert') this.playStep(this.step, this.nextT);
+      else if (this.theme === 'forest') this.forestStep(this.step, this.nextT);
+      else if (this.theme === 'ice') this.iceStep(this.step, this.nextT);
+      else this.stationStep(this.step, this.nextT);
       this.nextT += this.stepDur;
       this.step = (this.step + 1) % 16;
       if (this.step === 0) this.bar++;
@@ -261,6 +314,225 @@ export class Music {
       if (this.bar % 4 === 3 && s >= 8)
         this.noiseHit(t, 'bandpass', 1800, 1, 0.08, 0.06 + (s - 8) * 0.012);
       if (s === 0 && this.bar % 4 === 0) this.siren(t, st * 32);
+    }
+  }
+
+  // ---------- Крига ----------
+
+  /** Малюнок арпеджіо на поточні два такти й чи звучить мелодія дзвонів. */
+  private iceArp: number[] = ICE_ARPS[0]!;
+
+  /**
+   * Крига: форма на 32 такти з чотирьох частин по вісім — A (світлі акорди, рівна бочка),
+   * A′ (той самий лад, інше арпеджіо, мелодія дзвонів), B (темніші акорди, барабани вдвічі
+   * рідше, перші два такти — без них), C (як A, але на кварту вище). Арпеджіо й мелодія
+   * щоразу інші, тож тема не ходить по колу з чотирьох тактів.
+   */
+  private iceStep(s: number, t: number): void {
+    const lv = this.level;
+    const st = this.stepDur;
+    const section = Math.floor(this.bar / 8) % 4;
+    const up = section === 3 ? 5 : 0;
+    const set = section === 2 ? ICE_CHORDS_B : ICE_CHORDS;
+    const chord = set[Math.floor(this.bar / 2) % set.length]!;
+    const tone = (i: number) => chord.tones[((i % 5) + 5) % 5]! + up;
+    if (s === 0 && this.bar % 2 === 0) {
+      this.pad(
+        chord.tones.map((n) => n + up),
+        t,
+        st * 32,
+      );
+      this.iceArp = ICE_ARPS[Math.floor(this.rand() * ICE_ARPS.length)]!;
+      this.newPentaPhrase(lv === 'calm' ? 0.2 : 0.34);
+    }
+    const breakdown = section === 2 && this.bar % 8 < 2;
+    const half = section === 2;
+    if (lv === 'calm') {
+      if (s === 0) this.kick(t, 0.26);
+      if (s === 0 || s === 8) this.bass(semi(chord.root + up - 12), t, st * 7, 0.15);
+    } else if (!breakdown) {
+      const kick = half ? s === 0 || s === 10 : s % 4 === 0 || (lv === 'boss' && s === 14);
+      if (kick) this.kick(t, 0.48);
+      if (half ? s === 8 : s === 4 || s === 12) this.clap(t, 0.12);
+      if (lv === 'boss' || s % 2 === 1)
+        this.noiseHit(t, 'highpass', 8500, 0.7, 0.04, lv === 'boss' && s % 2 === 0 ? 0.07 : 0.04);
+      if (s % 2 === 0) this.bass(semi(chord.root + up - (s % 8 === 6 ? 0 : 12)), t, st * 1.6, 0.19);
+      // Перехід: дріб наприкінці кожної частини.
+      if (this.bar % 8 === 7 && s >= 10)
+        this.noiseHit(t, 'bandpass', 2200, 1, 0.07, 0.04 + (s - 10) * 0.012);
+    }
+    // Арпеджіо «бурульок»: у бою вісімками за малюнком, на босі ще й шістнадцяті між ними.
+    if (lv !== 'calm' && s % 2 === 0) {
+      const i = this.iceArp[s / 2]!;
+      if (i >= 0) this.plink(semi(tone(i) + 24), t, 0.055);
+    } else if (lv === 'boss' && !breakdown) {
+      this.plink(semi(tone(s) + 12), t, 0.035);
+    }
+    // Мелодія дзвонів: у спокої — рідко, у бою — в частинах A′, B і C.
+    const sing = lv === 'calm' ? this.bar % 4 < 2 : section !== 0;
+    const deg = this.phrase[s];
+    if (sing && deg !== null && deg !== undefined)
+      this.bell(semi(penta(deg) + up + 12), t, lv === 'calm' ? 0.05 : 0.07);
+    if (lv === 'boss' && s === 0 && this.bar % 4 === 0) this.siren(t, st * 32);
+  }
+
+  /** Фраза в пентатоніці на 16 кроків: кроки вгору-вниз, іноді стрибок; density — частка нот. */
+  private newPentaPhrase(density: number): void {
+    let deg = 2 + Math.floor(this.rand() * 5);
+    const out: (number | null)[] = [];
+    for (let i = 0; i < 16; i++) {
+      // Ноти тяжіють до сильних долей, щоб фраза трималася ритму.
+      const p = density * (i % 4 === 0 ? 1.8 : i % 2 === 0 ? 1 : 0.45);
+      if (this.rand() > p) {
+        out.push(null);
+        continue;
+      }
+      const r = this.rand();
+      deg += r < 0.38 ? 1 : r < 0.76 ? -1 : r < 0.88 ? 2 : -2;
+      deg = Math.max(0, Math.min(9, deg));
+      out.push(deg);
+    }
+    this.phrase = out;
+  }
+
+  /** Дзвін: чистий тон із негармонійним призвуком, довгий спад, у луну. */
+  private bell(f: number, t: number, peak: number): void {
+    const ctx = this.ctx!;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+    g.connect(this.bus);
+    if (this.delay) g.connect(this.delay);
+    for (const [mul, amp] of [
+      [1, 1],
+      [2.76, 0.3],
+    ] as const) {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f * mul;
+      const og = ctx.createGain();
+      og.gain.value = amp;
+      o.connect(og).connect(g);
+      o.start(t);
+      o.stop(t + 1.2);
+    }
+  }
+
+  // ---------- Чарівний ліс ----------
+
+  private kalimbaMask = KALIMBA[0]!;
+  private kalimbaAt = 0;
+
+  private forestStep(s: number, t: number): void {
+    const lv = this.level;
+    const st = this.stepDur;
+    // Форма на 16 тактів: вісім світлих, вісім «глибших».
+    const set = Math.floor(this.bar / 8) % 2 ? FOREST_CHORDS_B : FOREST_CHORDS;
+    const chord = set[Math.floor(this.bar / 2) % set.length]!;
+    if (s === 0 && this.bar % 2 === 0) {
+      this.pad(chord.tones.slice(0, 5), t, st * 32);
+      this.kalimbaMask = KALIMBA[Math.floor(this.rand() * KALIMBA.length)]!;
+      this.newPentaPhrase(lv === 'calm' ? 0.22 : lv === 'fight' ? 0.36 : 0.44);
+    }
+    // Ручні барабани.
+    const ch = FOREST_DRUM[lv][s];
+    if (ch === 'd') this.doum(t, lv === 'boss' ? 0.5 : lv === 'fight' ? 0.4 : 0.26);
+    else if (ch === 't') this.tek(t, 0.16);
+    else if (ch === 'k') this.tek(t, 0.07);
+    if (lv !== 'calm' && s % 2 === 1) this.shaker(t, lv === 'boss' ? 0.06 : 0.035);
+    if (lv === 'boss' && (s === 0 || s === 8)) this.kick(t, 0.42);
+    // Бас: м'який, на 3+3+2.
+    if (lv !== 'calm' ? s === 0 || s === 6 || s === 12 : s === 0)
+      this.pluck(semi(chord.root - 12), t, lv === 'calm' ? 0.16 : 0.24, 0.5, 'triangle');
+    // Калімба: блукає тонами акорду, тож малюнок не повторюється.
+    if (this.kalimbaMask[s] === 'x' && (lv !== 'calm' || this.bar % 2 === 0)) {
+      const r = this.rand();
+      this.kalimbaAt += r < 0.45 ? 1 : r < 0.8 ? -1 : 2;
+      const n = chord.tones.length;
+      const i = ((this.kalimbaAt % n) + n) % n;
+      this.kalimba(semi(chord.tones[i]! + 12), t, lv === 'calm' ? 0.07 : 0.1);
+    }
+    // Флейта: у спокої — два такти з чотирьох, у бою — шість із восьми.
+    const sing = lv === 'calm' ? this.bar % 4 >= 2 : this.bar % 8 < 6;
+    const deg = this.phrase[s];
+    if (sing && deg !== null && deg !== undefined) {
+      let len = 1;
+      while (s + len < 16 && this.phrase[s + len] === null && len < 6) len++;
+      this.flute(semi(penta(deg) + 12), t, st * len * 0.95, lv === 'calm' ? 0.05 : 0.065);
+    }
+    if (lv === 'boss' && s === 0 && this.bar % 2 === 0)
+      this.horn(semi(chord.root - 12), t, st * 28, 0.07);
+    // Цвіркуни в тиші між хвилями.
+    if (lv === 'calm' && s % 4 === 2 && this.rand() < 0.3) this.cricket(t);
+  }
+
+  /** Калімба: чистий тон із клацанням язичка, швидкий спад, у луну. */
+  private kalimba(f: number, t: number, peak: number): void {
+    const ctx = this.ctx!;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    g.connect(this.bus);
+    if (this.delay) g.connect(this.delay);
+    for (const [mul, amp, type] of [
+      [1, 1, 'sine'],
+      [3, 0.18, 'triangle'],
+    ] as const) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = f * mul;
+      const og = ctx.createGain();
+      og.gain.value = amp;
+      o.connect(og).connect(g);
+      o.start(t);
+      o.stop(t + 0.5);
+    }
+  }
+
+  /** Флейта: синус із вібрато, що наростає, і подихом (шум у смузі тону). */
+  private flute(f: number, t: number, dur: number, peak: number): void {
+    const ctx = this.ctx!;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = f;
+    const vib = ctx.createOscillator();
+    vib.frequency.value = 5.2;
+    const vg = ctx.createGain();
+    vg.gain.setValueAtTime(0, t);
+    vg.gain.linearRampToValueAtTime(f * 0.012, t + Math.min(dur, 0.35));
+    vib.connect(vg).connect(o.frequency);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.045);
+    g.gain.setValueAtTime(peak, t + Math.max(0.05, dur - 0.06));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.08);
+    o.connect(g).connect(this.bus);
+    if (this.delay) g.connect(this.delay);
+    o.start(t);
+    vib.start(t);
+    o.stop(t + dur + 0.12);
+    vib.stop(t + dur + 0.12);
+    this.noiseHit(t, 'bandpass', f * 2, 3, Math.min(dur, 0.18), peak * 0.35);
+  }
+
+  /** Цвіркун: три короткі високі імпульси; у фон, повз приглушення. */
+  private cricket(t: number): void {
+    const ctx = this.ctx!;
+    const f = 4100 + this.rand() * 700;
+    for (let k = 0; k < 3; k++) {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f;
+      const g = ctx.createGain();
+      const t0 = t + k * 0.055;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.012, t0 + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.035);
+      o.connect(g).connect(this.amb);
+      o.start(t0);
+      o.stop(t0 + 0.05);
     }
   }
 
@@ -576,7 +848,7 @@ export class Music {
   }
 
   /** Вітер: шум крізь смуговий фільтр, частота й гучність повільно «дихають» поривами. */
-  private wind(out: AudioNode): { stop(): void } {
+  private wind(out: AudioNode, level = 1): { stop(): void } {
     const ctx = this.ctx!;
     const t = ctx.currentTime;
     const src = ctx.createBufferSource();
@@ -592,11 +864,11 @@ export class Music {
     fg.gain.value = 280;
     fl.connect(fg).connect(flt.frequency);
     const g = ctx.createGain();
-    g.gain.value = 0.05;
+    g.gain.value = 0.05 * level;
     const gl = ctx.createOscillator();
     gl.frequency.value = 0.07;
     const gg = ctx.createGain();
-    gg.gain.value = 0.035;
+    gg.gain.value = 0.035 * level;
     gl.connect(gg).connect(g.gain);
     src.connect(flt).connect(g).connect(out);
     src.start(t);

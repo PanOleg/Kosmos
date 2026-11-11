@@ -46,7 +46,14 @@ export type ObstacleTag =
   | 'snowbank'
   | 'module'
   | 'pine'
-  | 'sled';
+  | 'sled'
+  // Чарівний ліс (п. 73).
+  | 'boulder'
+  | 'roots'
+  | 'mushroom'
+  | 'tree'
+  | 'log'
+  | 'stump';
 
 export type Obstacle = RectObstacle | CircleObstacle;
 
@@ -57,7 +64,7 @@ export interface SpawnPoint {
   sector: number;
 }
 
-export type MapId = 'station' | 'desert' | 'ice';
+export type MapId = 'station' | 'desert' | 'ice' | 'forest';
 
 /** Зона, де наземні йдуть повільніше (зибучі піски, глибокий сніг); ривок її перетинає. */
 export interface SlowZone {
@@ -361,7 +368,47 @@ export const ICE_MAP: MapDef = {
   storm: { every: 60, warn: 3, duration: 8, aimMul: 0.6 },
 };
 
-export const MAPS: Record<MapId, MapDef> = { station: MAP, desert: DESERT_MAP, ice: ICE_MAP };
+/**
+ * Чарівний ліс (DECISIONS.md, п. 73): скелет пустелі, віддзеркалений північ↔південь, щоб
+ * карта ходилась інакше: гай світних дерев тепер на півночі, каміння — на півдні. Намети —
+ * велетенські гриби, мішки — коріння, джип — повалений стовбур, ящики — пні.
+ * Трясовина сповільнює; бур немає; вороги виходять з усіх боків.
+ */
+function buildForestObstacles(): Obstacle[] {
+  const retag: Partial<Record<ObstacleTag, ObstacleTag>> = {
+    rock: 'boulder',
+    sandbag: 'roots',
+    tent: 'mushroom',
+    palm: 'tree',
+    wreck: 'log',
+    crate: 'stump',
+  };
+  return buildDesertObstacles().map((o) => {
+    const tag = retag[o.tag] ?? o.tag;
+    return o.kind === 'rect' ? { ...o, y: -o.y, rot: -o.rot, tag } : { ...o, y: -o.y, tag };
+  });
+}
+
+export const FOREST_MAP: MapDef = {
+  ...MAP,
+  id: 'forest',
+  obstacles: buildForestObstacles(),
+  slowZones: [
+    { x: -15, y: -9, r: 2.6, mul: 0.55 },
+    { x: -15, y: 9, r: 2.6, mul: 0.55 },
+    { x: 9, y: 17.5, r: 2.2, mul: 0.55 },
+    { x: 13, y: -13.5, r: 2.4, mul: 0.55 },
+    { x: -24, y: 0, r: 2.2, mul: 0.55 },
+  ],
+  scatterSpawns: true,
+};
+
+export const MAPS: Record<MapId, MapDef> = {
+  station: MAP,
+  desert: DESERT_MAP,
+  ice: ICE_MAP,
+  forest: FOREST_MAP,
+};
 
 /** Множник швидкості наземного в точці: найповільніша із зон, що накривають її. */
 export function slowAt(map: MapDef, x: number, y: number): number {

@@ -102,7 +102,7 @@ function saveSettings(s: SessionSettings): void {
 }
 
 const PRESET_ORDER: PresetId[] = ['easy', 'normal', 'hard'];
-const MAP_ORDER: MapId[] = ['station', 'desert', 'ice'];
+const MAP_ORDER: MapId[] = ['station', 'desert', 'ice', 'forest'];
 
 let installed = false;
 

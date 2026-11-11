@@ -129,5 +129,123 @@
     "height": 3.0,
     "scale": 1,
     "static": true
+  },
+  "ice/scout": {
+    "height": 1.27,
+    "scale": 1,
+    "static": true
+  },
+  "ice/gunner": {
+    "height": 1.5,
+    "scale": 1,
+    "static": true
+  },
+  "ice/wasp": {
+    "height": 0.28,
+    "scale": 1,
+    "static": true,
+    "origin": "center"
+  },
+  "ice/kamikaze": {
+    "height": 0.48,
+    "scale": 1,
+    "static": true,
+    "origin": "center"
+  },
+  "ice/sniper": {
+    "height": 0.35,
+    "scale": 1,
+    "static": true,
+    "origin": "center"
+  },
+  "ice/swarm": {
+    "height": 0.26,
+    "scale": 1,
+    "static": true,
+    "origin": "center"
+  },
+  "ice/shell": {
+    "height": 2.68,
+    "scale": 1,
+    "static": true
+  },
+  "ice/spider": {
+    "height": 0.82,
+    "scale": 1,
+    "static": true
+  },
+  "ice/repairer": {
+    "height": 1.44,
+    "scale": 1,
+    "static": true
+  },
+  "ice/turret": {
+    "height": 1.21,
+    "scale": 1,
+    "static": true
+  },
+  "ice/foreman": {
+    "height": 3.08,
+    "scale": 1,
+    "static": true
+  },
+  "forest/scout": {
+    "height": 1.38,
+    "scale": 1,
+    "static": true
+  },
+  "forest/gunner": {
+    "height": 1.41,
+    "scale": 1,
+    "static": true
+  },
+  "forest/wasp": {
+    "height": 0.26,
+    "scale": 1,
+    "static": true,
+    "origin": "center"
+  },
+  "forest/kamikaze": {
+    "height": 0.44,
+    "scale": 1,
+    "static": true,
+    "origin": "center"
+  },
+  "forest/sniper": {
+    "height": 0.39,
+    "scale": 1,
+    "static": true,
+    "origin": "center"
+  },
+  "forest/swarm": {
+    "height": 0.18,
+    "scale": 1,
+    "static": true,
+    "origin": "center"
+  },
+  "forest/shell": {
+    "height": 3.08,
+    "scale": 1,
+    "static": true
+  },
+  "forest/spider": {
+    "height": 0.84,
+    "scale": 1,
+    "static": true
+  },
+  "forest/repairer": {
+    "height": 1.46,
+    "scale": 1,
+    "static": true
+  },
+  "forest/turret": {
+    "height": 1.11,
+    "scale": 1,
+    "static": true
+  },
+  "forest/foreman": {
+    "height": 3.32,
+    "scale": 1,
+    "static": true
   }
 }

@@ -9,7 +9,7 @@ import {
   type Player,
 } from '@horizon/sim';
 import { PALETTE } from './palette';
-import { BOX, CYL, SPHERE, merge, part, seg, type Part } from './mesh';
+import { BOX, CONE4, CYL, SPHERE, merge, part, seg, type Part } from './mesh';
 import { toX, toZ } from './coords';
 
 const P = PALETTE;
@@ -116,6 +116,193 @@ function robotGeo(): Geo {
   return { hull: merge(hull), glow: merge(glow) };
 }
 
+// Чарівний ліс (DECISIONS.md, п. 73): Ядро — велетенський ведмідь-дух. Фази 1–2 — сидить на
+// кам'яному колі, у грудях світиться «серце» (на місці ока Ядра); фаза 3 — встає на задні лапи.
+// Світні частини різнокольорові: колір вершини стає кольором світіння (lumGlow).
+const FUR = 0x2c3266;
+const FUR_DARK = 0x1b1e42;
+const FUR_LIGHT = 0x4a5a94;
+const MOSS = 0x2f6a58;
+const STONE = 0x45555c;
+const CYAN = 0x30f0ff;
+const PINK = 0xff40d0;
+const LIME = 0x90ff40;
+const VIOLET = 0xa060ff;
+
+/** Голова ведмедя з центром у (0, y, z): морда, ніс, вуха; очі й руна на лобі — у glow. */
+function bearHead(hull: Part[], glow: Part[], y: number, z: number, k = 1): void {
+  hull.push(
+    part(SPHERE, FUR, [0, y, z], [2.8 * k, 2.4 * k, 2.6 * k]),
+    part(BOX, FUR_LIGHT, [0, y - 0.4 * k, z + 1.3 * k], [1.2 * k, 0.9 * k, 1.0 * k]),
+    part(BOX, FUR_DARK, [0, y - 0.15 * k, z + 1.8 * k], [0.5 * k, 0.35 * k, 0.22 * k]),
+  );
+  for (const sx of [1, -1]) {
+    hull.push(
+      part(
+        SPHERE,
+        FUR_DARK,
+        [1.1 * sx * k, y + 1.1 * k, z - 0.2 * k],
+        [0.95 * k, 0.95 * k, 0.5 * k],
+      ),
+    );
+    glow.push(
+      part(SPHERE, PINK, [1.1 * sx * k, y + 1.1 * k, z + 0.02 * k], [0.5 * k, 0.5 * k, 0.2 * k]),
+      part(
+        SPHERE,
+        CYAN,
+        [0.62 * sx * k, y + 0.25 * k, z + 1.14 * k],
+        [0.36 * k, 0.3 * k, 0.24 * k],
+      ),
+      // Смуги на щоках.
+      part(
+        BOX,
+        LIME,
+        [1.2 * sx * k, y - 0.25 * k, z + 0.75 * k],
+        [0.12 * k, 0.6 * k, 0.5 * k],
+        [0, 0, 0.5 * sx],
+      ),
+    );
+  }
+  glow.push(
+    part(BOX, VIOLET, [0, y + 0.95 * k, z + 0.82 * k], [0.22 * k, 0.6 * k, 0.3 * k], [0.5, 0, 0]),
+  );
+}
+
+function bearSitGeo(): Geo {
+  const hull: Part[] = [
+    part(CYL, STONE, [0, 0.55, 0], [6, 1.1, 6]),
+    part(CYL, MOSS, [0, 1.13, 0], [5.4, 0.1, 5.4]),
+    part(SPHERE, FUR, [0, 3.4, -0.3], [4.8, 4.8, 3.8]),
+    part(SPHERE, FUR_LIGHT, [0, 3.2, 0.85], [3.3, 3.5, 2.2]),
+  ];
+  const glow: Part[] = [
+    // «Серце» в грудях — туди й треба стріляти.
+    part(SPHERE, PINK, [0, 4.0, 1.8], [1.4, 1.4, 0.7]),
+  ];
+  for (const sx of [1, -1]) {
+    hull.push(
+      part(SPHERE, FUR, [1.9 * sx, 1.9, 0.5], [2.4, 2.2, 3.0]),
+      part(SPHERE, FUR_DARK, [1.7 * sx, 1.45, 2.1], [1.4, 1.1, 1.8]),
+      seg(BOX, FUR, [2.0 * sx, 4.9, 0.1], [2.5 * sx, 2.9, 1.3], 1.3),
+      part(SPHERE, FUR_DARK, [2.5 * sx, 2.6, 1.6], [1.5, 1.1, 1.6]),
+    );
+    for (let k = 0; k < 3; k++) {
+      glow.push(
+        part(CONE4, CYAN, [(2.1 + k * 0.4) * sx, 2.35, 2.35], [0.22, 0.5, 0.22], [1.9, 0, 0]),
+        // Смуги на плечах і стегнах.
+        part(
+          BOX,
+          LIME,
+          [2.55 * sx, 4.4 - k * 0.55, 0.55 + k * 0.3],
+          [0.14, 0.34, 1.0],
+          [0.5, 0, 0.25 * sx],
+        ),
+        part(BOX, VIOLET, [(2.75 - k * 0.05) * sx, 2.1, -0.3 + k * 0.5], [0.14, 1.1, 0.3]),
+      );
+    }
+  }
+  // Візерунок на спині й світні плями на животі.
+  for (let k = 0; k < 5; k++)
+    glow.push(
+      part(
+        BOX,
+        CYAN,
+        [0, 5.6 - k * 0.55, -1.85 - Math.sin(k * 0.6) * 0.25],
+        [0.9 - k * 0.1, 0.22, 0.2],
+      ),
+    );
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2;
+    glow.push(
+      part(
+        SPHERE,
+        k % 2 ? CYAN : LIME,
+        [Math.cos(a) * 1.05, 4.0 + Math.sin(a) * 1.05, 1.72],
+        [0.22, 0.22, 0.16],
+      ),
+    );
+  }
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    glow.push(
+      part(
+        CONE4,
+        [CYAN, PINK, LIME, VIOLET][k % 4]!,
+        [Math.cos(a) * 2.95, 1.0, Math.sin(a) * 2.95],
+        [0.36, 0.9, 0.36],
+      ),
+    );
+  }
+  bearHead(hull, glow, 6.1, 0.7);
+  return { hull: merge(hull), glow: merge(glow) };
+}
+
+function bearStandGeo(): Geo {
+  const hull: Part[] = [
+    part(SPHERE, FUR, [0, 4.7, 0], [4.3, 4.6, 3.1]),
+    part(SPHERE, FUR_LIGHT, [0, 4.4, 0.85], [2.9, 3.2, 1.7]),
+    // Ліва лапа занесена для удару, права простягнута вперед.
+    seg(BOX, FUR, [-2.0, 5.9, 0], [-3.2, 7.1, 1.0], 1.15),
+    part(SPHERE, FUR_DARK, [-3.4, 7.5, 1.3], [1.5, 1.3, 1.5]),
+    seg(BOX, FUR, [2.0, 5.7, 0], [3.0, 4.5, 1.8], 1.15),
+    part(SPHERE, FUR_DARK, [3.1, 4.2, 2.2], [1.5, 1.2, 1.6]),
+  ];
+  const glow: Part[] = [part(SPHERE, PINK, [0, 4.75, 1.42], [1.2, 1.2, 0.6])];
+  for (const sx of [1, -1]) {
+    hull.push(
+      seg(BOX, FUR, [1.1 * sx, 3.3, 0], [1.45 * sx, 0.5, 0.2], 1.4),
+      part(SPHERE, FUR_DARK, [1.5 * sx, 0.35, 0.5], [1.6, 0.7, 2.1]),
+    );
+    for (let k = 0; k < 3; k++)
+      glow.push(
+        part(BOX, LIME, [2.25 * sx, 5.3 - k * 0.6, 0.4], [0.14, 0.34, 1.2], [0, 0, 0.3 * sx]),
+        part(BOX, VIOLET, [1.9 * sx, 2.6 - k * 0.6, 0.55], [0.5, 0.2, 0.3]),
+        part(CONE4, CYAN, [(1.15 + k * 0.35) * sx, 0.3, 1.6], [0.22, 0.5, 0.22], [1.6, 0, 0]),
+      );
+  }
+  for (let k = 0; k < 3; k++)
+    glow.push(
+      part(CONE4, CYAN, [-3.8 + k * 0.4, 8.1, 1.6], [0.24, 0.7, 0.24], [0.5, 0, 0]),
+      part(CONE4, CYAN, [2.7 + k * 0.4, 3.9, 3.0], [0.24, 0.7, 0.24], [1.6, 0, 0]),
+    );
+  for (let k = 0; k < 5; k++)
+    glow.push(
+      part(
+        BOX,
+        CYAN,
+        [0, 6.6 - k * 0.6, -1.5 - Math.sin(k * 0.6) * 0.2],
+        [0.9 - k * 0.1, 0.22, 0.2],
+      ),
+    );
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2;
+    glow.push(
+      part(
+        SPHERE,
+        k % 2 ? CYAN : LIME,
+        [Math.cos(a) * 0.95, 4.75 + Math.sin(a) * 0.95, 1.4],
+        [0.2, 0.2, 0.16],
+      ),
+    );
+  }
+  bearHead(hull, glow, 7.6, 0.5, 0.9);
+  return { hull: merge(hull), glow: merge(glow) };
+}
+
+/** Світіння кольором вершини: сила — як у звичайного ока, колір — з моделі. */
+function lumGlow(mat: THREE.MeshStandardMaterial): void {
+  mat.vertexColors = true;
+  mat.color.setHex(0xffffff);
+  mat.emissive.setHex(0xffffff);
+  mat.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= vColor.rgb * 0.28;',
+    );
+  };
+  mat.customProgramCacheKey = () => 'lumGlow';
+}
+
 const GRID_POOL = 18;
 const STREAKS = 60;
 
@@ -168,8 +355,15 @@ export class BossRenderer {
     private readonly scene: THREE.Scene,
     private readonly map: MapDef,
   ) {
-    const d = shellGeo();
-    const r = robotGeo();
+    const bear = map.id === 'forest';
+    const d = bear ? bearSitGeo() : shellGeo();
+    const r = bear ? bearStandGeo() : robotGeo();
+    if (bear) {
+      lumGlow(this.glowMat);
+      this.hullMat.metalness = 0.05;
+      this.hullMat.roughness = 0.85;
+      this.eyeLight.color.setHex(PINK);
+    }
     const mk = (g: Geo, group: THREE.Group) => {
       const h = new THREE.Mesh(g.hull, this.hullMat);
       h.castShadow = true;

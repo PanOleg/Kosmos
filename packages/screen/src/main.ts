@@ -602,7 +602,9 @@ function handleMatchEvents(m: Match): void {
     const def = g.config.waves[e.a];
     const desert = g.config.map.id === 'desert';
     if (e.type === 'wavePause' && def) {
-      m.hud.announce(def.name, t.stationSignal, 2.5);
+      // Бос карти має своє ім'я (у лісі — Вовк і Ведмідь).
+      const bossName = def.boss ? t.enemyNameByMap[g.config.map.id]?.[def.boss] : undefined;
+      m.hud.announce(bossName ? bossName.toUpperCase() : def.name, t.stationSignal, 2.5);
       sfx.stationSignal();
       voice.say(
         def.boss === 'foreman' ? 'foreman' : def.boss === 'core' ? 'core' : `wave${e.a + 1}`,

@@ -412,6 +412,8 @@ const DRONE_GEO = {
  * як механічні тварини — моделі public/models/<набір>/<тип>.glb. Немає моделі — звичайна.
  */
 let enemySet = '';
+/** Набори з різнокольоровим світінням: колір світної частини береться з моделі. */
+const LUM_SETS = new Set(['forest', 'ice']);
 export function setEnemySet(set: string): void {
   enemySet = set;
 }
@@ -547,7 +549,7 @@ export function buildEnemyVisual(type: EnemyType, instanced = false): EnemyVisua
  * Емісія на інстанс: атрибут instanceEmissive додається до totalEmissiveRadiance. Так спалах
  * влучання й світіння ока лишаються індивідуальними, а тип ворога малюється одним викликом.
  */
-function withInstanceEmissive<M extends THREE.Material>(mat: M, legs = false): M {
+function withInstanceEmissive<M extends THREE.Material>(mat: M, legs = false, lum = false): M {
   // Крок (п. 59): вершини нижче стегна зсуваються вперед-назад і трохи вгору, ліва й права
   // ноги — у протифазі. instanceAnim = (фаза, розмах, висота стегна, мін. |x| ноги).
   const walk = legs
@@ -572,10 +574,14 @@ transformed.y += max(0.0, legS * cos(instanceAnim.x)) * instanceAnim.y * 0.4 * l
       .replace('#include <common>', '#include <common>\nvarying vec3 vInstEm;')
       .replace(
         '#include <emissivemap_fragment>',
-        '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vInstEm;',
+        // Світні набори (ліс, крига): колір світіння — колір вершини моделі, сила — як у ока;
+        // замах атаки (сила > 2) додає червоного, щоб попередження лишалось помітним.
+        lum
+          ? '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vColor.rgb * vInstEm.r * 0.42 + vec3(1.0, 0.12, 0.08) * max(0.0, vInstEm.r - 2.0) * 0.6;'
+          : '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vInstEm;',
       );
   };
-  mat.customProgramCacheKey = () => (legs ? 'instEmLegs' : 'instEm');
+  mat.customProgramCacheKey = () => (legs ? 'instEmLegs' : lum ? 'instEmLum' : 'instEm');
   return mat;
 }
 
@@ -609,6 +615,24 @@ const WALK_SETS: Record<string, typeof WALK> = {
     foreman: { hip: 0.95, amp: 0.26, xMin: 0.55, rate: 1.4 },
     spider: { hip: 0.78, amp: 0.13, xMin: 0.3, rate: 5 },
   },
+  // Ліс: усі чотирилапі; у Дикобраза короткі задні лапи.
+  forest: {
+    scout: { hip: 0.55, amp: 0.2, xMin: 0, rate: 3 },
+    gunner: { hip: 0.36, amp: 0.1, xMin: 0, rate: 2.4 },
+    repairer: { hip: 0.38, amp: 0.1, xMin: 0, rate: 2.6 },
+    shell: { hip: 1.2, amp: 0.3, xMin: 0, rate: 1.3 },
+    foreman: { hip: 1.25, amp: 0.28, xMin: 0, rate: 1.3 },
+    spider: { hip: 0.78, amp: 0.13, xMin: 0.3, rate: 5 },
+  },
+  // Крига: у Мамонта хобот висить нижче стегна — xMin лишає його нерухомим; Пінгвін дрібоче.
+  ice: {
+    scout: { hip: 0.38, amp: 0.16, xMin: 0, rate: 3 },
+    gunner: { hip: 0.19, amp: 0.07, xMin: 0, rate: 3 },
+    repairer: { hip: 0.36, amp: 0.1, xMin: 0, rate: 2.6 },
+    shell: { hip: 1.15, amp: 0.3, xMin: 0.2, rate: 1.3 },
+    foreman: { hip: 1.25, amp: 0.26, xMin: 0.45, rate: 1.3 },
+    spider: { hip: 0.8, amp: 0.12, xMin: 0.44, rate: 5 },
+  },
 };
 function walkOf(type: EnemyType): (typeof WALK)[EnemyType] {
   const set = WALK_SETS[enemySet];
@@ -630,9 +654,13 @@ class EnemyInstances {
     }),
     true,
   );
-  private readonly glowMat = withInstanceEmissive(
-    new THREE.MeshStandardMaterial({ color: 0xffb0a0, emissive: 0x000000 }),
-  );
+  private readonly glowMat = LUM_SETS.has(enemySet)
+    ? withInstanceEmissive(
+        new THREE.MeshStandardMaterial({ vertexColors: true, emissive: 0x000000 }),
+        false,
+        true,
+      )
+    : withInstanceEmissive(new THREE.MeshStandardMaterial({ color: 0xffb0a0, emissive: 0x000000 }));
   private nShadow = 0;
   private readonly counts = new Map<THREE.InstancedMesh, number>();
 

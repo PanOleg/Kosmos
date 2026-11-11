@@ -73,9 +73,42 @@ const ICE: typeof DESERT = {
   slow: 0xf6fafc,
   slowRing: 0xbcd0e0,
 };
+/**
+ * Чарівний ліс (п. 73): ніч, темний мох і кора; світяться рослини, гриби й кристали — їх малює
+ * окремий світний меш різними кольорами (LUM).
+ */
+const FOREST: typeof DESERT = {
+  rock: [0x4a5a62, 0x3e4e58, 0x56666c, 0x445460],
+  dune: [0x1f5a48, 0x1a4e44, 0x266a50],
+  canvas: 0x8a4ab0,
+  canvasDark: 0x5e3288,
+  pole: 0xd8cfe6,
+  rust: 0x5a4034,
+  rustDark: 0x33241e,
+  tire: 0x2a1e1a,
+  wood: 0x6a4c3a,
+  woodDark: 0x3c2a22,
+  bag: 0x6a4a38,
+  bagDark: 0x4a3226,
+  trunk: 0x3a2c40,
+  leaf: [0x1f7a6a, 0x5a3a9a, 0x2a6a8a],
+  steel: 0x4a3a30,
+  steelDark: 0x2e2420,
+  hazard: 0x38c8b8,
+  bush: [0x2a7a58, 0x227050, 0x348a60],
+  pebble: [0x55666c, 0x48585e, 0x62747a],
+  track: 0x2a6a58,
+  island: 0x245848,
+  islandTop: 0x2f7a5c,
+  slow: 0x0e3e4a,
+  slowRing: 0x38d8c8,
+};
+/** Кольори світіння лісу; у світному меші множаться на ~3, тож тут — помірні. */
+const LUM = [0x1fa8b8, 0xb02a90, 0x62b02a, 0x7040c8, 0xb87a20];
 let C = DESERT;
 let ICY = false;
-const G = { red: 0xff3a2a, amber: 0xffa830, core: 0xff6a2a };
+let WOOD = false;
+let G = { red: 0xff3a2a, amber: 0xffa830, core: 0xff6a2a };
 
 function rng(seed: number): () => number {
   let s = seed >>> 0;
@@ -109,9 +142,15 @@ function sandTexture(): THREE.CanvasTexture {
       const ripple = Math.sin((y + Math.sin(x * 0.05) * 9) * 0.32) * 10;
       const v = 214 + ripple + (r() - 0.5) * 22;
       const i = (y * 256 + x) * 4;
-      img.data[i] = ICY ? v * 0.94 : v;
-      img.data[i + 1] = ICY ? v * 0.98 : v * 0.86;
-      img.data[i + 2] = ICY ? v * 1.04 : v * 0.64;
+      // Ліс: плями моху замість брижів — темніші й світліші латки.
+      const moss = WOOD
+        ? 178 +
+          Math.sin(x * 0.049 + Math.sin(y * 0.031) * 2.2) * Math.cos(y * 0.043 + x * 0.012) * 24 +
+          (r() - 0.5) * 30
+        : 0;
+      img.data[i] = WOOD ? moss * 0.82 : ICY ? v * 0.94 : v;
+      img.data[i + 1] = WOOD ? moss : ICY ? v * 0.98 : v * 0.86;
+      img.data[i + 2] = WOOD ? moss * 0.92 : ICY ? v * 1.04 : v * 0.64;
       img.data[i + 3] = 255;
     }
   ctx.putImageData(img, 0, 0);
@@ -149,12 +188,18 @@ const SAME_AS: Record<string, string> = {
   module: 'tent',
   pine: 'palm',
   sled: 'wreck',
+  boulder: 'rock',
+  roots: 'sandbag',
 };
 
 export function buildDesertArena(map: MapDef): ArenaView {
   ICY = map.id === 'ice';
-  C = ICY ? ICE : DESERT;
-  SAND = ICY ? 0xe6eef6 : 0xe2bd86;
+  WOOD = map.id === 'forest';
+  C = WOOD ? FOREST : ICY ? ICE : DESERT;
+  SAND = WOOD ? 0x2c6652 : ICY ? 0xe6eef6 : 0xe2bd86;
+  G = WOOD
+    ? { red: 0xb02a90, amber: 0x1fa8b8, core: 0x62b02a }
+    : { red: 0xff3a2a, amber: 0xffa830, core: 0xff6a2a };
   const g = new THREE.Group();
   const R = map.radius;
   const r = rng(4242);
@@ -184,7 +229,30 @@ export function buildDesertArena(map: MapDef): ArenaView {
     const d = R + 1.2 + r() * 2.5;
     const x = Math.cos(a) * d;
     const y = Math.sin(a) * d;
-    if (rockSide) stone(solid, C.rock[i % 4]!, x, y, 3 + r() * 2.5, 2.6 + r() * 2.2, r);
+    if (WOOD) {
+      // Узлісся: темні ялини щільною стіною, на кожній третій — світна верхівка.
+      const h = 5 + r() * 4;
+      solid.push(part(CYL, C.trunk, P(x, y, 0.6), [0.6, 1.2, 0.6]));
+      for (let k = 0; k < 3; k++)
+        solid.push(
+          part(
+            CONE4,
+            C.dune[(i + k) % 3]!,
+            P(x, y, 1.2 + k * h * 0.24 + h * 0.2),
+            [4.2 - k * 1.1, h * 0.5, 4.2 - k * 1.1],
+            [0, k * 0.7 + a, 0],
+          ),
+        );
+      if (i % 3 === 0)
+        glow.push(part(SPHERE, LUM[i % LUM.length]!, P(x, y, 1.6 + h * 0.95), [0.5, 0.5, 0.5]));
+      solid.push(
+        part(LOW, C.dune[i % 3]!, P(x - Math.cos(a) * 1.6, y - Math.sin(a) * 1.6, 0), [
+          3 + r() * 2,
+          1.2 + r(),
+          3 + r() * 2,
+        ]),
+      );
+    } else if (rockSide) stone(solid, C.rock[i % 4]!, x, y, 3 + r() * 2.5, 2.6 + r() * 2.2, r);
     else
       solid.push(
         part(
@@ -208,7 +276,7 @@ export function buildDesertArena(map: MapDef): ArenaView {
       ]),
     );
   }
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 9 && !WOOD; i++) {
     const a = (i / 9) * Math.PI * 2 + 0.3;
     const d = R + 70 + r() * 30;
     const x = Math.cos(a) * d;
@@ -262,11 +330,34 @@ export function buildDesertArena(map: MapDef): ArenaView {
   for (const src of map.obstacles) {
     const o = { ...src, tag: (SAME_AS[src.tag] ?? src.tag) as string };
     if (o.tag === 'core' && o.kind === 'circle') {
-      reactor = drillRig(o.r, o.height);
+      reactor = WOOD ? crystalAltar(o.r, o.height) : drillRig(o.r, o.height);
       g.add(reactor);
       continue;
     }
+    if (WOOD && o.kind === 'circle' && o.tag === 'tree') {
+      glowTree(solid, glow, o.x, o.y, o.r, r);
+      continue;
+    }
+    if (WOOD && o.kind === 'rect' && o.tag !== 'rock' && o.tag !== 'sandbag' && o.tag !== 'rim') {
+      const c = Math.cos(o.rot);
+      const s = Math.sin(o.rot);
+      const L = (u: number, v: number, h: number): V3 =>
+        P(o.x + u * c - v * s, o.y + u * s + v * c, h);
+      if (o.tag === 'mushroom') {
+        giantMushrooms(solid, glow, L, o.hw, o.hh, o.height, r);
+        continue;
+      }
+      if (o.tag === 'log') {
+        fallenLog(solid, glow, L, o.hw, o.hh, o.height);
+        continue;
+      }
+      if (o.tag === 'stump') {
+        stumps(solid, glow, L, o.hw, o.hh, o.height, r);
+        continue;
+      }
+    }
     if (o.kind === 'circle') {
+      if (WOOD) glow.push(...crystals(o.x, o.y, o.r, r));
       if (o.tag === 'palm') (ICY ? pineIsland : palmIsland)(solid, o.x, o.y, o.r, r);
       else {
         // Брила: велика центральна й кілька менших довкола.
@@ -419,7 +510,14 @@ export function buildDesertArena(map: MapDef): ArenaView {
     const x = Math.cos(a) * d;
     const y = Math.sin(a) * d;
     if (!free(x, y, 0.3)) continue;
-    if (r() < 0.6) stone(solid, C.pebble[n % 3]!, x, y, 0.15 + r() * 0.2, 0.08 + r() * 0.08, r);
+    if (WOOD && n % 5 < 2) {
+      // Світні квіти й грибочки: стебельце і крапля світла.
+      const col = LUM[n % LUM.length]!;
+      const h = 0.18 + r() * 0.22;
+      solid.push(part(CYL, C.trunk, P(x, y, h / 2), [0.04, h, 0.04]));
+      glow.push(part(SPHERE, col, P(x, y, h + 0.05), [0.16, n % 2 ? 0.1 : 0.16, 0.16]));
+    } else if (r() < 0.6)
+      stone(solid, C.pebble[n % 3]!, x, y, 0.15 + r() * 0.2, 0.08 + r() * 0.08, r);
     else
       for (let k = 0; k < 4; k++)
         solid.push(
@@ -438,7 +536,7 @@ export function buildDesertArena(map: MapDef): ArenaView {
     [-0.9, 0.7, 24],
     [3.6, 4.6, 23],
   ] as const)
-    for (const off of [-0.8, 0.8])
+    for (const off of WOOD ? [] : [-0.8, 0.8])
       for (let k = 0; k < 20; k++) {
         const t0 = a0 + ((a1 - a0) * k) / 20;
         const t1 = a0 + ((a1 - a0) * (k + 1)) / 20;
@@ -470,7 +568,7 @@ export function buildDesertArena(map: MapDef): ArenaView {
     merge(glow),
     new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(3.2, 3.2, 3.2) }),
   );
-  g.add(solidMesh, glowMesh, contactShadows(map, ICY ? 0.3 : 0.42, 1.4));
+  g.add(solidMesh, glowMesh, contactShadows(map, WOOD ? 0.5 : ICY ? 0.3 : 0.42, 1.4));
 
   // Зони сповільнення (зибучі піски / замети): пляма іншого тону з кільцем-попередженням.
   if (map.slowZones?.length) {
@@ -514,15 +612,16 @@ export function buildDesertArena(map: MapDef): ArenaView {
   }
 
   // ---------- Світло: яскравий день (пустеля) або полярні сутінки (крижана база) ----------
-  const HEMI = ICY ? 1.25 : 1.7;
-  const SUN = ICY ? 2.1 : 3.2;
+  const HEMI = WOOD ? 1.5 : ICY ? 1.25 : 1.7;
+  const SUN = WOOD ? 1.7 : ICY ? 2.1 : 3.2;
   const hemi = new THREE.HemisphereLight(
-    ICY ? 0xbcd4f0 : 0xfff2dc,
-    ICY ? 0x6a7c98 : 0xb08a5a,
+    WOOD ? 0x7a9cff : ICY ? 0xbcd4f0 : 0xfff2dc,
+    WOOD ? 0x1f5a48 : ICY ? 0x6a7c98 : 0xb08a5a,
     HEMI,
   );
   g.add(hemi);
-  const sun = new THREE.DirectionalLight(ICY ? 0xd8e6ff : 0xfff0d6, SUN);
+  // У лісі «сонце» — місяць: холодне світло згори, тіні дерев лишаються.
+  const sun = new THREE.DirectionalLight(WOOD ? 0xb0d0ff : ICY ? 0xd8e6ff : 0xfff0d6, SUN);
   sun.position.set(-25, 45, 18);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
@@ -539,30 +638,42 @@ export function buildDesertArena(map: MapDef): ArenaView {
   let dark = 0;
   return {
     group: g,
-    sky: ICY
+    sky: WOOD
       ? {
-          background: 0x18284a,
-          fog: 0xb8cce0,
-          fogDensity: 0.0048,
-          env: 0.7,
-          exposure: 0.95,
-          bloom: [1.9, 0.45],
-          grade: { shadowTint: 0x0a1a40, contrast: 1.15, saturation: 1.1, vignette: 0.4 },
-          // На снігу — майже чорна сталь.
-          enemyTint: 0x5a5f6c,
+          background: 0x060a1e,
+          fog: 0x0e2e3a,
+          fogDensity: 0.0075,
+          env: 0.5,
+          exposure: 1.1,
+          bloom: [1.0, 0.6],
+          grade: { shadowTint: 0x180a40, contrast: 1.12, saturation: 1.3, vignette: 0.5 },
+          // Звірі розфарбовані самі: множник не потрібен.
+          enemyTint: 0xffffff,
         }
-      : {
-          background: 0xc9dcea,
-          fog: 0xe8d6b8,
-          fogDensity: 0.0042,
-          env: 0.85,
-          exposure: 1.0,
-          bloom: [2.4, 0.4],
-          // Холодні сині тіні проти теплого піску, більше контрасту, слабша віньєтка.
-          grade: { shadowTint: 0x05103a, contrast: 1.2, saturation: 1.18, vignette: 0.3 },
-          // Темна сталь: світло-сірі роботи на світлому піску губились.
-          enemyTint: 0x6f7480,
-        },
+      : ICY
+        ? {
+            background: 0x18284a,
+            fog: 0xb8cce0,
+            fogDensity: 0.0048,
+            env: 0.7,
+            exposure: 0.95,
+            bloom: [1.9, 0.45],
+            grade: { shadowTint: 0x0a1a40, contrast: 1.15, saturation: 1.1, vignette: 0.4 },
+            // Звірі криги розфарбовані під сніг самі (п. 73) — лише трохи притемнюємо.
+            enemyTint: 0xc4c8d2,
+          }
+        : {
+            background: 0xc9dcea,
+            fog: 0xe8d6b8,
+            fogDensity: 0.0042,
+            env: 0.85,
+            exposure: 1.0,
+            bloom: [2.4, 0.4],
+            // Холодні сині тіні проти теплого піску, більше контрасту, слабша віньєтка.
+            grade: { shadowTint: 0x05103a, contrast: 1.2, saturation: 1.18, vignette: 0.3 },
+            // Темна сталь: світло-сірі роботи на світлому піску губились.
+            enemyTint: 0x6f7480,
+          },
     setDarkness(k: number) {
       dark = k;
     },
@@ -700,6 +811,212 @@ function drillRig(rad: number, h: number): THREE.Object3D {
   const gm = new THREE.Mesh(
     merge(glowParts),
     new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(3.4, 3.4, 3.4) }),
+  );
+  grp.add(m, gm);
+  grp.userData.dynamic = true;
+  return grp;
+}
+
+const ICO = new THREE.IcosahedronGeometry(0.5, 0);
+
+/** Світне дерево: темний стовбур, пласка крона з трьох «хмар» і ліхтарики-плоди під нею. */
+function glowTree(
+  out: Part[],
+  glow: Part[],
+  x: number,
+  y: number,
+  rad: number,
+  r: () => number,
+): void {
+  out.push(part(LOW, C.island, P(x, y, 0), [rad * 2.2, 0.5, rad * 2.2]));
+  const n = 1 + Math.round(rad);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + r();
+    const bx = x + Math.cos(a) * rad * 0.3;
+    const by = y + Math.sin(a) * rad * 0.3;
+    // Невисокі, як пальми оази: крона не ховає бій під собою.
+    const h = 1.9 + r() * 0.7;
+    const col = LUM[Math.floor(r() * LUM.length)]!;
+    out.push(seg(CYL, C.trunk, P(bx, by, 0), P(bx, by, h), 0.26));
+    out.push(part(CONE4, C.trunk, P(bx, by, 0.25), [0.7, 0.5, 0.7], [0, r() * 3, 0]));
+    // Світні жилки на корі.
+    for (let k = 0; k < 3; k++) {
+      const va = r() * 6.28;
+      glow.push(
+        part(
+          BOX,
+          col,
+          P(bx + Math.cos(va) * 0.14, by + Math.sin(va) * 0.14, 0.5 + k * 0.45),
+          [0.05, 0.3, 0.05],
+        ),
+      );
+    }
+    const w = Math.min(1.9, 0.9 + rad * 0.6);
+    for (let k = 0; k < 3; k++) {
+      const ca = (k / 3) * Math.PI * 2 + r();
+      out.push(
+        part(
+          ICO,
+          C.leaf[(i + k) % 3]!,
+          P(bx + Math.cos(ca) * w * 0.28, by + Math.sin(ca) * w * 0.28, h + 0.15 + k * 0.12),
+          [w, 0.55, w],
+          [0, r() * 3, 0],
+        ),
+      );
+    }
+    for (let k = 0; k < 4; k++) {
+      const fa = (k / 4) * Math.PI * 2 + r();
+      glow.push(
+        part(
+          SPHERE,
+          k % 2 ? col : LUM[(i + k) % LUM.length]!,
+          P(bx + Math.cos(fa) * w * 0.42, by + Math.sin(fa) * w * 0.42, h - 0.18 - r() * 0.2),
+          [0.16, 0.22, 0.16],
+        ),
+      );
+    }
+  }
+}
+
+/** Велетенські гриби на місці наметів: один великий і два менші, на шапках — світні плями. */
+function giantMushrooms(
+  out: Part[],
+  glow: Part[],
+  L: (u: number, v: number, h: number) => V3,
+  hw: number,
+  hh: number,
+  height: number,
+  r: () => number,
+): void {
+  const spots: [number, number, number, number][] = [
+    [0, 0, 1, height],
+    [-hw * 0.55, hh * 0.35, 0.55, height * 0.6],
+    [hw * 0.55, -hh * 0.3, 0.6, height * 0.7],
+  ];
+  spots.forEach(([u, v, k, h], i) => {
+    const capW = Math.min(hw, hh) * 2 * k;
+    const col = LUM[(i + Math.floor(r() * 3)) % LUM.length]!;
+    const [bx, , bz] = L(u, v, 0);
+    out.push(part(CYL, C.pole, [bx, h * 0.45, bz], [capW * 0.22, h * 0.9, capW * 0.22]));
+    out.push(part(LOW, i ? C.canvasDark : C.canvas, [bx, h * 0.9, bz], [capW, h * 0.42, capW]));
+    // Світна «спідничка» під шапкою й плями зверху — їх видно з висоти камери.
+    glow.push(part(CYL, col, [bx, h * 0.84, bz], [capW * 0.62, 0.05, capW * 0.62]));
+    for (let j = 0; j < 5; j++) {
+      const a = (j / 5) * Math.PI * 2 + r();
+      const d = capW * 0.26;
+      glow.push(
+        part(
+          SPHERE,
+          col,
+          [bx + Math.cos(a) * d, h * 1.06, bz + Math.sin(a) * d],
+          [capW * 0.16, 0.08, capW * 0.16],
+        ),
+      );
+    }
+  });
+}
+
+/** Повалений порожній стовбур із мохом і світними грибами на корі. */
+function fallenLog(
+  out: Part[],
+  glow: Part[],
+  L: (u: number, v: number, h: number) => V3,
+  hw: number,
+  hh: number,
+  height: number,
+): void {
+  const rad = Math.min(hh, height * 0.6);
+  out.push(seg(CYL, C.wood, L(-hw, 0, rad), L(hw, 0, rad), rad * 2));
+  out.push(seg(CYL, C.woodDark, L(-hw - 0.02, 0, rad), L(-hw + 0.1, 0, rad), rad * 1.5));
+  out.push(seg(CYL, C.woodDark, L(hw - 0.1, 0, rad), L(hw + 0.02, 0, rad), rad * 1.5));
+  out.push(
+    seg(BOX, C.islandTop, L(-hw * 0.5, 0, rad * 1.95), L(hw * 0.3, 0, rad * 1.95), 0.5, 0.08),
+  );
+  for (let k = 0; k < 4; k++) {
+    const u = (k / 3 - 0.5) * hw * 1.5;
+    glow.push(part(SPHERE, LUM[k % LUM.length]!, L(u, rad * 0.8, rad * 1.3), [0.22, 0.12, 0.22]));
+  }
+}
+
+/** Пні з річними кільцями; на зрізі — світний мох. */
+function stumps(
+  out: Part[],
+  glow: Part[],
+  L: (u: number, v: number, h: number) => V3,
+  hw: number,
+  hh: number,
+  height: number,
+  r: () => number,
+): void {
+  const n = Math.max(1, Math.round(Math.max(hw, hh) / Math.min(hw, hh)));
+  const along = hw >= hh;
+  const rad = Math.min(hw, hh);
+  for (let k = 0; k < n; k++) {
+    const t = n === 1 ? 0 : (k / (n - 1) - 0.5) * 2 * (Math.max(hw, hh) - rad);
+    const p = along ? L(t, 0, 0) : L(0, t, 0);
+    const h = height * (0.8 + r() * 0.3);
+    out.push(part(CYL, C.wood, [p[0], h / 2, p[2]], [rad * 2, h, rad * 2], [0, r() * 3, 0]));
+    out.push(part(CYL, C.woodDark, [p[0], 0.12, p[2]], [rad * 2.5, 0.24, rad * 2.5]));
+    out.push(part(CYL, 0x9a7a5a, [p[0], h + 0.01, p[2]], [rad * 1.7, 0.02, rad * 1.7]));
+    glow.push(
+      part(CYL, LUM[(k + 2) % LUM.length]!, [p[0], h + 0.03, p[2]], [rad * 0.7, 0.02, rad * 0.7]),
+    );
+  }
+}
+
+/** Кілька світних кристалів біля підніжжя брили. */
+function crystals(x: number, y: number, rad: number, r: () => number): Part[] {
+  const out: Part[] = [];
+  const col = LUM[Math.floor(r() * LUM.length)]!;
+  for (let k = 0; k < 3; k++) {
+    const a = r() * Math.PI * 2;
+    const h = 0.5 + r() * 0.6;
+    out.push(
+      part(
+        CONE4,
+        col,
+        P(x + Math.cos(a) * rad * 1.05, y + Math.sin(a) * rad * 1.05, h / 2),
+        [0.22, h, 0.22],
+        [(r() - 0.5) * 0.6, r() * 3, (r() - 0.5) * 0.6],
+      ),
+    );
+  }
+  return out;
+}
+
+/** Серце лісу на місці бурової: кам'яне коло з рунами й великий кристал; повільно обертається. */
+function crystalAltar(rad: number, h: number): THREE.Object3D {
+  const parts: Part[] = [];
+  const glowParts: Part[] = [];
+  parts.push(part(CYL, C.rock[0]!, [0, 0.3, 0], [rad * 2, 0.6, rad * 2]));
+  parts.push(part(CYL, C.islandTop, [0, 0.62, 0], [rad * 1.7, 0.06, rad * 1.7]));
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2;
+    const x = Math.cos(a) * rad * 0.82;
+    const z = Math.sin(a) * rad * 0.82;
+    parts.push(part(BOX, C.rock[k % 4]!, [x, 1.3, z], [0.6, 1.6, 0.4], [0, -a, 0.08]));
+    glowParts.push(
+      part(BOX, LUM[k % LUM.length]!, [x * 1.03, 1.4, z * 1.03], [0.16, 0.7, 0.44], [0, -a, 0.08]),
+    );
+  }
+  const top = h + 1.2;
+  glowParts.push(part(CONE4, LUM[0]!, [0, 0.6 + top * 0.55, 0], [1.3, top, 1.3]));
+  glowParts.push(part(CONE4, LUM[3]!, [0.7, 1.5, 0.3], [0.6, 2, 0.6], [0.3, 0.5, -0.35]));
+  glowParts.push(part(CONE4, LUM[1]!, [-0.6, 1.3, -0.4], [0.5, 1.6, 0.5], [-0.3, 1, 0.4]));
+  const grp = new THREE.Group();
+  const m = new THREE.Mesh(
+    merge(parts),
+    new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.9,
+      metalness: 0.05,
+      flatShading: true,
+    }),
+  );
+  m.castShadow = true;
+  const gm = new THREE.Mesh(
+    merge(glowParts),
+    new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(2.2, 2.2, 2.2) }),
   );
   grp.add(m, gm);
   grp.userData.dynamic = true;

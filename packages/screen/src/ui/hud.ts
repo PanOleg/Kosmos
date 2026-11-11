@@ -329,7 +329,10 @@ export class Hud {
         w.phase === 'pause'
           ? `${Math.ceil(w.timer / TICKS_PER_SEC)} с<small>${t.untilWave}</small>`
           : `${left}<small>${t.enemiesWord}</small>`;
-      topText = `<div class="wv">${def.name}</div><div class="pb"><i style="width:${Math.round(prog * 100)}%"></i></div><div class="big">${big}</div>`;
+      // Бос карти має своє ім'я (у лісі — Вовк і Ведмідь).
+      const title =
+        (def.boss && t.enemyNameByMap[game.config.map.id]?.[def.boss]?.toUpperCase()) || def.name;
+      topText = `<div class="wv">${title}</div><div class="pb"><i style="width:${Math.round(prog * 100)}%"></i></div><div class="big">${big}</div>`;
       // У паузі — хто йде наступною хвилею: можна готуватися й купувати під склад.
       if (w.phase === 'pause') {
         if (this.previewFor !== w.index) {
