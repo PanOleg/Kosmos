@@ -6,6 +6,8 @@
  * Вбудований TURN PeerJS не відповідає, тому його не використовуємо.
  * Копія — у screen/src/net/ice.ts і controller/src/ice.ts (симуляція без браузерного коду).
  */
+import { logErr, logNet } from '../diag';
+
 let cached: Promise<RTCIceServer[]> | null = null;
 
 export function iceServers(): Promise<RTCIceServer[]> {
@@ -16,13 +18,20 @@ export function iceServers(): Promise<RTCIceServer[]> {
 async function load(): Promise<RTCIceServer[]> {
   const base: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
   const url = import.meta.env.VITE_TURN_URL as string | undefined;
-  if (!url) return base;
+  if (!url) {
+    logNet('TURN не заданий: лише STUN (працює тільки в одній мережі)');
+    return base;
+  }
   try {
     const r = await fetch(url);
-    if (r.ok) return [...base, ...((await r.json()) as RTCIceServer[])];
-    console.warn('[net] TURN credentials', r.status);
+    if (r.ok) {
+      const turn = (await r.json()) as RTCIceServer[];
+      logNet(`TURN: отримано ${turn.length} серверів`);
+      return [...base, ...turn];
+    }
+    logNet(`TURN: сервер облікових даних відповів ${r.status}`);
   } catch (e) {
-    console.warn('[net] TURN credentials', e);
+    logErr('TURN', e);
   }
   return base;
 }

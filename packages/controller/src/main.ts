@@ -20,6 +20,7 @@ import { LocalNet } from './localNet';
 import type { ClientTransport } from './transport';
 import { Joystick } from './joystick';
 import { ClassSelect, CLASS_META } from './classSelect';
+import { diag, onDiag, watchPage } from './diag';
 import { blip, hurt, lockPage, onUserGesture, setPlayerColor } from './feedback';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -36,9 +37,49 @@ lockPage();
 document.addEventListener('pointerdown', () => void onUserGesture(), { capture: true });
 
 type View = 'join' | 'connecting' | 'lobby' | 'match' | 'results' | 'full';
+let view: View | '' = '';
 function show(v: View): void {
+  if (v !== view) diag.add('пульт', `екран пульта: ${v}`);
+  view = v;
   for (const el of document.querySelectorAll('.view'))
     el.classList.toggle('on', el.id === `v-${v}`);
+  syncDiagButton();
+}
+
+// Журнал зв'язку (DECISIONS.md, п. 69): кнопка — там, де гравець застряг, і в паузі.
+watchPage('пульт');
+function syncDiagButton(): void {
+  const stuck =
+    view === 'join' ||
+    view === 'connecting' ||
+    view === 'full' ||
+    view === 'lobby' ||
+    $('reconnect').classList.contains('on') ||
+    $('paused').classList.contains('on');
+  document.body.classList.toggle('diag-btn', stuck);
+}
+{
+  const pre = $('diag-text');
+  const render = () => {
+    pre.textContent = diag.text();
+    pre.scrollTop = pre.scrollHeight;
+  };
+  $('diag-open').addEventListener('click', () => {
+    $('diag').classList.add('on');
+    render();
+  });
+  $('diag-close').addEventListener('click', () => $('diag').classList.remove('on'));
+  $('diag-copy').addEventListener('click', () => {
+    const done = (ok: boolean) =>
+      ($('diag-copy').textContent = ok ? 'Скопійовано ✓' : 'Виділіть текст вручну');
+    if (navigator.clipboard)
+      navigator.clipboard.writeText(diag.text()).then(
+        () => done(true),
+        () => done(false),
+      );
+    else done(false);
+  });
+  onDiag(() => $('diag').classList.contains('on') && render());
 }
 
 const params = new URLSearchParams(location.search);
@@ -78,8 +119,11 @@ function run(room: string): void {
   let ghostUsed = false;
 
   const classSelect = new ClassSelect($('classes'), (c) => {
-    blip(660, 0.06);
-    net.send({ t: 'class', classId: c });
+    // Дотик по своїй картці знімає роль: клас звільняється для іншого гравця.
+    const drop = c === classId;
+    blip(drop ? 440 : 660, 0.06);
+    diag.add('пульт', drop ? `знімаю роль ${c}` : `прошу роль ${c}`);
+    net.send({ t: 'class', classId: drop ? null : c });
   });
   $('again').addEventListener('click', () => {
     blip(880, 0.08);
@@ -194,6 +238,7 @@ function run(room: string): void {
     const el = $('paused');
     el.classList.toggle('on', !!p || counting);
     el.classList.toggle('count', counting);
+    syncDiagButton();
     $('resume').hidden = !p;
     $('audio').hidden = !p;
     for (const b of document.querySelectorAll<HTMLElement>('#audio button'))
@@ -371,6 +416,7 @@ function run(room: string): void {
   }, 8000);
   net.onState = (s) => {
     $('reconnect').classList.toggle('on', s === 'lost');
+    syncDiagButton();
     if (s === 'connecting') show('connecting');
     if (s === 'open') {
       window.clearTimeout(slowHint);
@@ -381,10 +427,13 @@ function run(room: string): void {
   net.onMessage = (m: ScreenMessage) => {
     switch (m.t) {
       case 'welcome':
+        diag.add('пульт', `екран прийняв: гравець ${m.slot + 1}`);
+        flushLog();
         slot = m.slot;
         sessionStorage.setItem(tokenKey, m.token);
         break;
       case 'full':
+        diag.add('пульт', `екран відмовив: ${m.reason}`);
         show('full');
         $('full-msg').textContent =
           m.reason === 'inMatch'
@@ -404,7 +453,10 @@ function run(room: string): void {
           $('ready').textContent = ready ? 'Готовий ✓' : 'Готовий';
         }
         classSelect.render(slot, m.slots);
-        $('lobby-title').textContent = `Гравець ${slot + 1} · оберіть клас`;
+        $('lobby-title').textContent = me?.classId
+          ? `Гравець ${slot + 1} · ${CLASS_META[me.classId].name} — торкніться ще раз, щоб зняти роль`
+          : `Гравець ${slot + 1} · оберіть клас`;
+        $<HTMLButtonElement>('ready').disabled = !me?.classId;
         break;
       }
       case 'status': {
@@ -502,6 +554,15 @@ function run(room: string): void {
       }
     }
   };
+
+  // Свій журнал — екрану: там видно обидва боки одним списком. Після кожного повернення
+  // зв'язку й далі раз на 5 с, якщо назбиралося нове.
+  const flushLog = () => {
+    if (net.state !== 'open') return;
+    const lines = diag.drain();
+    if (lines.length) net.send({ t: 'log', lines });
+  };
+  window.setInterval(flushLog, 5000);
 
   const pong = new DataView(new ArrayBuffer(PING_PACKET_SIZE));
   net.onPacket = (v) => {

@@ -19,6 +19,8 @@ import { emptyInput } from '@horizon/sim/protocol';
 import { buildArena, type ArenaView } from './render/arena';
 import { createAmbience, type Ambience } from './render/ambience';
 import { HelpOverlay } from './ui/help';
+import { DiagView } from './ui/diagView';
+import { diag, logErr, logNet, watchPage } from './diag';
 import { nextHint } from './meta/hint';
 import { buildDesertArena } from './render/desertArena';
 import { Music, type MusicLevel } from './audio/music';
@@ -137,6 +139,10 @@ const lobby = new LobbyHost(
 );
 const lobbyView = new LobbyView(lobby);
 const help = new HelpOverlay();
+watchPage('екран');
+const diagView = new DiagView();
+lobby.log = (text) => diag.add('лобі', text);
+lobby.onLog = (slot, lines) => diag.addForeign(`П${slot + 1}`, lines);
 
 /** Арена вибраної в лобі карти: своє небо, серпанок і світло (DECISIONS.md, п. 49). */
 let envBase = 0.32;
@@ -216,11 +222,14 @@ async function openRoom(): Promise<void> {
   for (;;) {
     const code = roomCode();
     try {
+      logNet(`відкриваю кімнату ${code}${LOCAL_NET ? ' (локальна мережа вкладок)' : ''}`);
       await transport.start(code);
       lobbyView.setRoom(roomQuery(code), code, controllerUrl);
       return;
     } catch (err) {
       // Код зайнятий — інший; сервер недоступний — повтор за кілька секунд.
+      if (err instanceof RoomTakenError) logNet(`код ${code} зайнятий — беру інший`);
+      else logErr('кімната не відкрилась, повтор за 3 с', err);
       if (!(err instanceof RoomTakenError)) {
         lobbyView.setRoom('', null, controllerUrl, t.roomError);
         await new Promise((r) => setTimeout(r, 3000));
@@ -371,6 +380,7 @@ function startMatch(): void {
   };
   lobbyView.show(false);
   help.setButtonVisible(false);
+  diagView.setButtonVisible(false);
   if (DEBUG) {
     (window as unknown as { game: Game }).game = game;
     // window.spawn('kamikaze', 3) — будь-який ворог біля випадкового люка/шлюзу.
@@ -452,6 +462,7 @@ function endMatch(): void {
   lobby.backToLobby();
   lobbyView.show(true);
   help.setButtonVisible(true);
+  diagView.setButtonVisible(true);
 }
 
 // ---------- Клавіатура лобі ----------
@@ -468,6 +479,12 @@ window.addEventListener('keydown', (e) => {
     toggleAudio(ch);
     return;
   }
+  // Журнал зв'язку — будь-коли: збій найчастіше видно саме в матчі.
+  if ((e.code === 'KeyL' && !e.repeat) || (diagView.open && e.code === 'Escape')) {
+    diagView.toggle();
+    return;
+  }
+  if (diagView.open) return;
   // Довідка «Як грати» — лише в лобі; поки відкрита, інші клавіші лобі не діють.
   if (!match && (e.code === 'KeyH' || (help.open && e.code === 'Escape'))) {
     help.toggle();

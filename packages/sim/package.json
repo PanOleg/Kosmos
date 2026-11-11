@@ -11,6 +11,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./protocol": "./src/protocol.ts"
+    "./protocol": "./src/protocol.ts",
+    "./diag": "./src/diag.ts"
   }
 }

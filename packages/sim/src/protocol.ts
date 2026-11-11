@@ -54,7 +54,8 @@ export interface LobbySlotInfo {
 /** Пульт → екран. */
 export type ControllerMessage =
   | { t: 'hello'; v: number; token: string }
-  | { t: 'class'; classId: ClassId }
+  /** null — зняти роль: клас звільняється для інших. */
+  | { t: 'class'; classId: ClassId | null }
   | { t: 'ready'; ready: boolean }
   /** Наступне відкрите забарвлення броні. */
   | { t: 'skin' }
@@ -67,7 +68,9 @@ export type ControllerMessage =
   /** Перемкнути музику / звуки / озвучку (пауза на пульті). */
   | { t: 'audio'; what: keyof AudioPrefs }
   /** «Сюди!» — мітка над гравцем на екрані, щоб покликати напарників. */
-  | { t: 'ping' };
+  | { t: 'ping' }
+  /** Рядки журналу діагностики пульта — екран додає їх до свого. */
+  | { t: 'log'; lines: string[] };
 
 /** Екран → пульт. */
 export type ScreenMessage =

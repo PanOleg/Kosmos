@@ -68,6 +68,69 @@ describe('lobby', () => {
     expect(host.slots[1]!.classId).toBe('medic');
   });
 
+  test('a role can be dropped: the class is free again and «ready» is cleared', () => {
+    const { host, join } = setup();
+    const a = join('a');
+    const b = join('b');
+    a.onReliable({ t: 'ready', ready: true });
+    a.onReliable({ t: 'class', classId: null });
+    expect(host.slots[0]).toMatchObject({ classId: null, ready: false });
+    expect(host.canStart()).toBe(false);
+    b.onReliable({ t: 'class', classId: 'assault' });
+    expect(host.slots[1]!.classId).toBe('assault');
+    // Сміття з мережі клас не змінює.
+    b.onReliable({ t: 'class', classId: 'wizard' as never });
+    expect(host.slots[1]!.classId).toBe('assault');
+  });
+
+  test('a phone takes a class from a bot or an offline phone, never from a live player', () => {
+    const { host, join } = setup();
+    const a = join('a');
+    const bot = host.addLocal('bot')!;
+    expect(bot.classId).toBe('engineer');
+    a.onReliable({ t: 'class', classId: 'engineer' });
+    expect(host.slots[0]!.classId).toBe('engineer');
+    expect(bot.classId).toBe('assault');
+    const c = join('c');
+    expect(host.slots[2]!.classId).toBe('medic');
+    c.onReliable({ t: 'class', classId: 'engineer' });
+    expect(host.slots[2]!.classId).toBe('medic');
+    c.close();
+    a.onReliable({ t: 'class', classId: 'medic' });
+    expect(host.slots[0]!.classId).toBe('medic');
+    expect(host.slots[2]!.classId).toBe('engineer');
+  });
+
+  test('a reloaded controller starts input numbering from zero and still steers', () => {
+    const { host, join } = setup();
+    const a = join('a');
+    const token = a.last('welcome')!.token;
+    const v = new DataView(new ArrayBuffer(INPUT_PACKET_SIZE));
+    encodeInput(v, 5000, { move: { x: 1, y: 0 }, ability: false, dash: false, buy: 0 });
+    a.onUnreliable(v);
+    const again = join('a2', token);
+    expect(again.last('welcome')?.slot).toBe(0);
+    expect(host.slots[0]!.input.move.x).toBe(0);
+    encodeInput(v, 0, { move: { x: -1, y: 0 }, ability: false, dash: false, buy: 0 });
+    again.onUnreliable(v);
+    expect(host.slots[0]!.input.move.x).toBe(-1);
+  });
+
+  test('host reports refusals and losses; controller log lines are passed on', () => {
+    const { host, join } = setup();
+    const log: string[] = [];
+    host.log = (t) => log.push(t);
+    const got: unknown[] = [];
+    host.onLog = (slot, lines) => got.push([slot, lines]);
+    const a = join('a');
+    a.onReliable({ t: 'log', lines: ['x'] });
+    expect(got).toEqual([[0, ['x']]]);
+    for (const id of ['b', 'c', 'd', 'e']) join(id);
+    a.close();
+    expect(log.some((l) => l.includes('місця зайняті'))).toBe(true);
+    expect(log.some((l) => l.startsWith('P1:') && l.includes('утрачено'))).toBe(true);
+  });
+
   test('fifth player is rejected', () => {
     const { join } = setup();
     for (const id of ['a', 'b', 'c', 'd']) join(id);

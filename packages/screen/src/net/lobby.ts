@@ -98,6 +98,10 @@ export class LobbyHost {
   /** Гравець покликав напарників («Сюди!»): індекс гравця в матчі. */
   onPing: (slot: number) => void = () => {};
   private readonly pingAt = new Map<Slot, number>();
+  /** Подія для журналу діагностики (main.ts): хто прийшов, кому відмовили, хто зник. */
+  log: (text: string) => void = () => {};
+  /** Пульт надіслав рядки свого журналу. */
+  onLog: (slot: number, lines: unknown) => void = () => {};
   /** Підсумок останнього матчу: пульт, що перепідключився на екрані результатів, теж його отримає. */
   private summary: MatchSummary | null = null;
 
@@ -115,6 +119,7 @@ export class LobbyHost {
       if (!s) return;
       s.link = null;
       s.lostAt = this.now();
+      this.log(`P${s.index + 1}: зв'язок із пультом утрачено (фаза ${this.phase})`);
       s.input = emptyInput();
       this.markDirty();
     };
@@ -134,26 +139,37 @@ export class LobbyHost {
     if (m.t === 'hello') {
       if (m.v !== PROTOCOL_VERSION) {
         link.sendReliable({ t: 'full', reason: 'version' });
+        this.log(`відмова пульту: версія протоколу ${String(m.v)}, потрібна ${PROTOCOL_VERSION}`);
         return;
       }
       // Повернення в свій слот за токеном: клас, колір, деталі й стан лишаються.
       let slot = this.slots.find((s) => s && s.kind === 'phone' && s.token === m.token) ?? null;
       if (slot) {
+        this.log(
+          `P${slot.index + 1}: пульт повернувся у свій слот${slot.link ? ' (стара лінія ще була відкрита)' : ''}`,
+        );
         slot.link?.close();
       } else {
         if (this.phase !== 'lobby') {
           link.sendReliable({ t: 'full', reason: 'inMatch' });
+          this.log(`відмова пульту: матч уже йде, а токен ${m.token ? 'не знайдено' : 'порожній'}`);
           return;
         }
         const free = this.slots.findIndex((s) => s === null);
         if (free < 0) {
           link.sendReliable({ t: 'full', reason: 'full' });
+          this.log('відмова пульту: усі чотири місця зайняті');
           return;
         }
         slot = this.createSlot(free, 'phone', m.token || this.newToken());
+        this.log(`P${slot.index + 1}: новий пульт, клас ${slot.classId ?? '—'}`);
       }
       slot.link = link;
       slot.lostAt = null;
+      // Оновлена сторінка пульта рахує пакети вводу знову з нуля: без скидання всі вони
+      // здавалися б «старішими за прийнятий» і керування мовчки не працювало б.
+      slot.lastSeq = -1;
+      slot.input = emptyInput();
       slot.forceBot = false;
       this.unwait(slot.index);
       link.sendReliable({ t: 'welcome', slot: slot.index, token: slot.token });
@@ -164,6 +180,10 @@ export class LobbyHost {
     }
     const s = this.slotOf(link);
     if (!s) return;
+    if (m.t === 'log') {
+      this.onLog(s.index, m.lines);
+      return;
+    }
     if (m.t === 'pause') {
       if (m.on) this.requestPause(s.index);
       else this.resume();
@@ -195,8 +215,12 @@ export class LobbyHost {
     }
     if (this.phase !== 'lobby') return;
     if (m.t === 'skin') this.cycleSkin(s);
-    else if (m.t === 'class') this.pickClass(s, m.classId);
-    else if (m.t === 'ready') {
+    else if (m.t === 'class') {
+      // Вхід із мережі: приймаємо лише відомий клас або null.
+      const c = m.classId === null || CLASS_IDS.includes(m.classId) ? m.classId : undefined;
+      if (c === undefined || !this.pickClass(s, c, true))
+        this.log(`P${s.index + 1}: клас ${String(m.classId)} не видано — зайнятий або невідомий`);
+    } else if (m.t === 'ready') {
       s.ready = m.ready && s.classId !== null;
       this.markDirty();
     }
@@ -210,6 +234,7 @@ export class LobbyHost {
       // Пакети невпорядковані: старіший за прийнятий відкидаємо.
       const seq = v.getUint16(1);
       if (s.lastSeq >= 0 && !seqNewer(seq, s.lastSeq)) return;
+      if (s.lastSeq < 0) this.log(`P${s.index + 1}: пішов ввід із пульта (пакет ${seq})`);
       s.lastSeq = decodeInput(v, s.input);
     } else if (type === PKT_PING) {
       // Пульт міряє свою затримку: відповідаємо тим самим id.
@@ -250,9 +275,27 @@ export class LobbyHost {
     return CLASS_IDS.filter((c) => !this.slots.some((s) => s && s !== except && s.classId === c));
   }
 
-  /** Класи унікальні (DECISIONS.md, п. 22): зайнятий іншим — відмова. */
-  pickClass(s: Slot, classId: ClassId | null): boolean {
-    if (classId !== null && !this.freeClasses(s).includes(classId)) return false;
+  /**
+   * Класи унікальні (DECISIONS.md, п. 22): зайнятий іншим — відмова. null знімає роль.
+   * takeover — гравець із пультом важливіший за бота й за пульт без зв'язку: у лобі він
+   * забирає їхній клас, а вони отримують його попередній (або перший вільний).
+   */
+  pickClass(s: Slot, classId: ClassId | null, takeover = false): boolean {
+    const holder =
+      classId === null
+        ? null
+        : (this.slots.find((o) => o && o !== s && o.classId === classId) ?? null);
+    if (holder) {
+      const weak = holder.kind === 'bot' || (holder.kind === 'phone' && holder.link === null);
+      if (!takeover || !weak || this.phase !== 'lobby') return false;
+      const prev = s.classId;
+      s.classId = classId;
+      holder.classId = prev ?? this.freeClasses(holder)[0] ?? null;
+      if (holder.kind === 'phone') holder.ready = false;
+      this.log(`P${s.index + 1} забрав клас ${String(classId)} у P${holder.index + 1}`);
+      this.markDirty();
+      return true;
+    }
     s.classId = classId;
     if (classId === null) s.ready = false;
     this.markDirty();
@@ -314,6 +357,9 @@ export class LobbyHost {
     this.game = game;
     this.phase = 'match';
     order.forEach((s, i) => (s.index = i));
+    this.log(
+      `матч почато: ${order.map((s) => `P${s.index + 1} ${s.kind} ${String(s.classId)}`).join(', ')}`,
+    );
     for (let i = 0; i < MAX_SLOTS; i++) this.slots[i] = order[i] ?? null;
     this.markDirty();
   }
@@ -324,6 +370,7 @@ export class LobbyHost {
     if (summary)
       for (const s of this.slots) s?.link?.sendReliable({ t: 'results', summary, slot: s.index });
     this.phase = 'results';
+    this.log('матч завершено');
     this.clearPause();
     this.markDirty();
   }

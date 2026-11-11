@@ -2,6 +2,7 @@ import Peer, { type DataConnection } from 'peerjs';
 import type { ControllerMessage, ScreenMessage } from '@horizon/sim/protocol';
 import { RoomTakenError, type HostTransport, type Link } from './transport';
 import { iceServers } from './ice';
+import { logErr, logNet, watchPeer } from '../diag';
 
 export const PEER_PREFIX = 'horizon-room-';
 /** Узгоджений канал вводу: той самий id на обох кінцях, без нового обміну SDP. */
@@ -24,9 +25,11 @@ export class PeerJsHost implements HostTransport {
       let opened = false;
       peer.on('open', () => {
         opened = true;
+        logNet(`кімнату ${roomCode} зареєстровано на сервері сигналінгу`);
         resolve();
       });
       peer.on('error', (err) => {
+        logErr(opened ? 'сигналінг' : `реєстрація кімнати ${roomCode}`, err);
         if (!opened) {
           peer.destroy();
           reject(
@@ -34,10 +37,11 @@ export class PeerJsHost implements HostTransport {
               ? new RoomTakenError(roomCode)
               : err,
           );
-        } else console.warn('[net] peer error', err);
+        }
       });
       // Втрата сигналінг-сервера не рве вже встановлені з'єднання; лише нові не прийдуть.
       peer.on('disconnected', () => {
+        logNet('сервер сигналінгу від’єднався: нові пульти не зайдуть, поки не повернеться');
         if (!peer.destroyed) setTimeout(() => peer.reconnect(), 1000);
       });
       peer.on('connection', (conn) => this.accept(conn));
@@ -45,6 +49,9 @@ export class PeerJsHost implements HostTransport {
   }
 
   private accept(conn: DataConnection): void {
+    const who = `пульт ${conn.peer.slice(0, 6)}`;
+    logNet(`${who}: вхідне з'єднання`);
+    if (conn.peerConnection) watchPeer(conn.peerConnection, who);
     exposeLanCandidates(conn.peerConnection);
     let unreliable: RTCDataChannel | null = null;
     let closed = false;
@@ -66,13 +73,15 @@ export class PeerJsHost implements HostTransport {
         conn.close();
       },
     };
-    const finish = () => {
+    const finish = (why: string) => {
       if (closed) return;
       closed = true;
+      logNet(`${who}: лінію закрито — ${why}`);
       unreliable?.close();
       link.onClose();
     };
     conn.on('open', () => {
+      logNet(`${who}: канал відкрито`);
       unreliable = conn.peerConnection.createDataChannel('input', {
         negotiated: true,
         id: INPUT_CHANNEL_ID,
@@ -81,16 +90,21 @@ export class PeerJsHost implements HostTransport {
       });
       unreliable.binaryType = 'arraybuffer';
       unreliable.onmessage = (e) => link.onUnreliable(new DataView(e.data as ArrayBuffer));
+      unreliable.onopen = () => logNet(`${who}: канал вводу відкрито`);
+      unreliable.onerror = (e) => logErr(`${who}: канал вводу`, (e as RTCErrorEvent).error);
       // Телефон, що заснув, не закриває канал — ICE падає в disconnected/failed.
       conn.peerConnection.addEventListener('iceconnectionstatechange', () => {
         const s = conn.peerConnection.iceConnectionState;
-        if (s === 'failed' || s === 'closed') finish();
+        if (s === 'failed' || s === 'closed') finish(`ICE ${s}`);
       });
       this.onLink(link);
     });
     conn.on('data', (d) => link.onReliable(d as ControllerMessage));
-    conn.on('close', finish);
-    conn.on('error', finish);
+    conn.on('close', () => finish('канал закрився'));
+    conn.on('error', (err) => {
+      logErr(who, err);
+      finish('помилка каналу');
+    });
   }
 
   stop(): void {

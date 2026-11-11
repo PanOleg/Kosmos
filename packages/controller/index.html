@@ -188,6 +188,69 @@
         border-color: #fff;
         transform: scale(1.04);
       }
+      /* Журнал зв'язку: кнопка видима там, де гравець застряг (під'єднання, відмова, втрата
+         зв'язку) і в паузі; у бою її немає, щоб не зачепити пальцем. */
+      .diag-open {
+        position: fixed;
+        left: max(10px, env(safe-area-inset-left));
+        bottom: max(10px, env(safe-area-inset-bottom));
+        z-index: 60;
+        display: none;
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(0, 0, 0, 0.45);
+        color: var(--fg);
+        font-size: 13px;
+        opacity: 0.75;
+      }
+      body.diag-btn .diag-open {
+        display: block;
+      }
+      .diag {
+        position: fixed;
+        inset: 0;
+        z-index: 70;
+        display: none;
+        flex-direction: column;
+        gap: 8px;
+        padding: max(10px, env(safe-area-inset-top)) 12px max(10px, env(safe-area-inset-bottom));
+        background: rgba(6, 8, 14, 0.97);
+      }
+      .diag.on {
+        display: flex;
+      }
+      .diag-head {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .diag-head b {
+        flex: 1;
+      }
+      .diag-head button {
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--fg);
+        font-size: 14px;
+      }
+      .diag pre {
+        flex: 1;
+        margin: 0;
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+        font:
+          11px/1.45 ui-monospace,
+          Menlo,
+          monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+        user-select: text;
+        -webkit-user-select: text;
+        touch-action: pan-y;
+      }
       .cls.taken {
         opacity: 0.25;
       }
@@ -203,6 +266,9 @@
         font-size: 22px;
         padding: 18px 30px;
         background: rgba(255, 255, 255, 0.18);
+      }
+      .ready:disabled {
+        opacity: 0.35;
       }
       .ready.on {
         background: #3fd45a;
@@ -925,6 +991,15 @@
         <h1>Зв'язок утрачено</h1>
         <div class="muted">Перепідключення…</div>
       </div>
+    </div>
+    <button id="diag-open" class="diag-open" aria-label="Журнал зв'язку">≡ журнал</button>
+    <div id="diag" class="diag">
+      <div class="diag-head">
+        <b>Журнал зв'язку</b>
+        <button id="diag-copy">Скопіювати</button>
+        <button id="diag-close">Закрити</button>
+      </div>
+      <pre id="diag-text"></pre>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
