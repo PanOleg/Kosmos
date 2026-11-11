@@ -77,4 +77,31 @@ describe('desert map', () => {
     // І при цьому таки наблизився до напарника (обійшов), а не застиг перед зоною.
     expect(Math.hypot(bot.x - mate.x, bot.y - mate.y)).toBeLessThan(8.5);
   });
+  test('desert scatters a group across several gates; the station keeps one', () => {
+    const gates = (map: 'desert' | 'station') => {
+      const g = createGame(buildConfig({ ...DEFAULT_SETTINGS, map }), 1, [{ classId: 'assault' }]);
+      const inputs = [emptyInput()];
+      while (!g.state.enemies.some((e) => e.alive)) step(g, inputs);
+      const set = new Set<string>();
+      for (const e of g.state.enemies)
+        if (e.alive)
+          set.add(Math.abs(e.x) > Math.abs(e.y) ? (e.x > 0 ? 'E' : 'W') : e.y > 0 ? 'N' : 'S');
+      return set.size;
+    };
+    expect(gates('station')).toBe(1);
+    expect(gates('desert')).toBeGreaterThan(1);
+  });
+
+  test('lone palms keep gates, player spawns and slow zones clear', () => {
+    const d = MAPS.desert;
+    const palms = d.obstacles.filter((o) => o.kind === 'circle' && o.tag === 'palm');
+    expect(palms.length).toBeGreaterThanOrEqual(18);
+    for (const o of palms) {
+      // Лише нові поодинокі пальми; острівці оази стояли біля пісків і раніше.
+      if (o.kind !== 'circle' || o.r !== 0.7) continue;
+      for (const a of d.airlocks) expect(Math.hypot(a.x - o.x, a.y - o.y)).toBeGreaterThan(6);
+      for (const z of d.slowZones ?? [])
+        expect(Math.hypot(z.x - o.x, z.y - o.y)).toBeGreaterThan(z.r + o.r + 1);
+    }
+  });
 });

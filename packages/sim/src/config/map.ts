@@ -81,6 +81,8 @@ export interface MapDef {
   id: MapId;
   slowZones?: SlowZone[];
   storm?: StormDef;
+  /** Групи ворогів діляться між кількома точками появи, а не виходять з однієї. */
+  scatterSpawns?: boolean;
   radius: number;
   obstacles: Obstacle[];
   airlocks: SpawnPoint[];
@@ -292,6 +294,22 @@ function buildDesertObstacles(): Obstacle[] {
   for (const [x, y, r] of palms) o.push(circle(x, y, r, 'palm', 1));
   o.push(rect(-12, -14, 1, 4, 'sandbag', { rot: -0.6, height: 0.8 }));
   o.push(rect(12, -14, 1, 4, 'sandbag', { rot: 0.6, height: 0.8 }));
+  // Поодинокі пальми по всьому аванпосту (на «Кризі» — ялини): тонкі укриття поза оазою,
+  // осторонь воріт, старту гравців і зон сповільнення.
+  const lonePalms: [number, number][] = [
+    [-20, 13],
+    [-21, -12.5],
+    [-18, -4.5],
+    [-26, 6],
+    [25.5, 9],
+    [17, -12],
+    [12, 8.5],
+    [-12.5, 19.5],
+    [12.5, 21],
+    [-14, -21],
+    [14, -22],
+  ];
+  for (const [x, y] of lonePalms) o.push(circle(x, y, 0.7, 'palm', 1));
   // Захід: дюни — лише кілька каменів біля краю, простір для старту лишається вільним.
   o.push(circle(-22, 9, 1.0, 'rock', 1.2));
   o.push(circle(-24, -7, 1.2, 'rock', 1.4));
@@ -311,6 +329,7 @@ export const DESERT_MAP: MapDef = {
     { x: -24, y: 0, r: 2.2, mul: 0.5 },
   ],
   storm: { every: 50, warn: 3, duration: 9, aimMul: 0.55 },
+  scatterSpawns: true,
 };
 
 /**

@@ -1,3 +1,4 @@
+import { randInt } from '../rng';
 import { PICKUPS, PLAYER_COUNT_MUL } from '../config/waves';
 import { AIR_TYPES, SWARM } from '../config/enemies';
 import { SWARM_GROUPS } from './enemies';
@@ -203,7 +204,22 @@ function spawnGroup(
   // Наземні — зі шлюзів, дрони — з вентиляційних люків у стелі (PROMPT, «Сетинг»).
   const points = air ? game.config.map.vents : game.config.map.airlocks;
   const idx = airlock === 'any' ? w.airlockCursor++ % points.length : airlock % points.length;
-  const a = points[idx]!;
+  // Розосереджена поява (DECISIONS.md, п. 64): групу ділимо на частини, кожна виходить з іншої
+  // точки — щоб хвилю не можна було перестріляти в одному проході.
+  if (game.config.map.scatterSpawns && count > 1) {
+    const chunk = type === 'swarm' ? 1 : count <= 6 ? Math.ceil(count / 2) : 3;
+    let at = idx;
+    for (let left = count; left > 0; left -= chunk) {
+      spawnAt(game, type, Math.min(chunk, left), points[at]!);
+      at = (at + randInt(game.state.rng, 1, points.length - 1)) % points.length;
+    }
+    return;
+  }
+  spawnAt(game, type, count, points[idx]!);
+}
+
+function spawnAt(game: Game, type: EnemyTypeArg, count: number, a: { x: number; y: number }): void {
+  const w = game.state.wave;
   const add = (x: number, y: number, group = -1) => {
     const e = spawnEnemy(game, type, x, y, group);
     if (e >= 0) {
