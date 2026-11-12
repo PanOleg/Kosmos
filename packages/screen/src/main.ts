@@ -130,6 +130,14 @@ if (DEBUG) {
   };
 }
 
+/** Репліки за картою; чого ще не записано — замінює запасна (audio/voice.ts). */
+const MAP_VOICE: Record<string, { start: string; victory: string; foreman: string; core: string }> =
+  {
+    desert: { start: 'startDesert', victory: 'victoryDesert', foreman: 'scorpion', core: 'sphinx' },
+    ice: { start: 'startIce', victory: 'victoryIce', foreman: 'sabretooth', core: 'yeti' },
+    forest: { start: 'startForest', victory: 'victoryForest', foreman: 'wolf', core: 'bear' },
+  };
+
 // ---------- Лобі й мережа ----------
 
 const lobby = new LobbyHost(
@@ -405,7 +413,7 @@ function startMatch(): void {
   const first = game.config.waves[0];
   if (first) {
     match.hud.announce(first.name, t.stationSignal, 2.5);
-    voice.say(game.config.map.id === 'station' ? 'start' : 'startDesert', 2);
+    voice.say(MAP_VOICE[game.config.map.id]?.start ?? 'start', 2);
     const active = lobbyView.settings.modifiers ?? [];
     if (active.length || lobbyView.settings.endless)
       window.setTimeout(
@@ -607,7 +615,11 @@ function handleMatchEvents(m: Match): void {
       m.hud.announce(bossName ? bossName.toUpperCase() : def.name, t.stationSignal, 2.5);
       sfx.stationSignal();
       voice.say(
-        def.boss === 'foreman' ? 'foreman' : def.boss === 'core' ? 'core' : `wave${e.a + 1}`,
+        def.boss === 'foreman'
+          ? (MAP_VOICE[g.config.map.id]?.foreman ?? 'foreman')
+          : def.boss === 'core'
+            ? (MAP_VOICE[g.config.map.id]?.core ?? 'core')
+            : `wave${e.a + 1}`,
         def.boss ? 3 : 2,
       );
     } else if (e.type === 'revived' && e.b >= 0) {
@@ -626,7 +638,16 @@ function handleMatchEvents(m: Match): void {
       voice.say('cleared', 1);
     } else if (e.type === 'bossPhase') {
       m.hud.announce(t.bossPhase(e.b), e.b === 1 ? t.lightsOut : '', 2.2);
-      voice.say(e.b === 1 ? (desert ? 'sandstorm' : 'lightsOut') : `phase${e.b}`, 3);
+      voice.say(
+        e.b === 1
+          ? desert
+            ? 'sandstorm'
+            : 'lightsOut'
+          : g.config.map.id === 'station'
+            ? `phase${e.b}`
+            : `beastPhase${e.b}`,
+        3,
+      );
     } else if (e.type === 'airlockWarn') {
       m.hud.announce(t.airlockAlert, '', 1.5);
       voice.say(desert ? 'airlockDesert' : 'airlock', 3);
@@ -638,6 +659,7 @@ function handleMatchEvents(m: Match): void {
         // Фраза записана лише про піщану бурю — на «Кризі» хуртовину оголошує тільки напис.
         m.hud.announce(desert ? t.stormOn : t.blizzardOn, '', 2);
         if (desert) voice.say('sandstorm', 3);
+        else voice.say('blizzard', 3);
         sfx.airlockOpen(0);
       } else m.hud.announce(t.stormOff, '', 1.5);
     } else if (e.type === 'playerDown' && g.state.players.length > 1) {
@@ -750,10 +772,7 @@ function frameMatch(m: Match, now: number, dt: number): void {
       outcome,
       hint ? (t.nextHint[hint] ?? '') : '',
     );
-    voice.say(
-      summary.won ? (g.config.map.id === 'station' ? 'victory' : 'victoryDesert') : 'defeat',
-      3,
-    );
+    voice.say(summary.won ? (MAP_VOICE[g.config.map.id]?.victory ?? 'victory') : 'defeat', 3);
     if (outcome.newAchievements.length) voice.say('achievement', 1);
     else if (outcome.newRecords.length) voice.say('record', 1);
     if (outcome.contractDone) voice.say('contract', 1);

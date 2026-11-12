@@ -214,3 +214,27 @@ describe('forest bosses behave like beasts', () => {
     expect(station.paw).toBe(0);
   });
 });
+
+describe('forest fairy rings', () => {
+  test('standing inside heals slowly; outside or on other maps nothing changes', () => {
+    const at = (map: 'forest' | 'desert', x: number, y: number) => {
+      const g = createGame(buildConfig({ ...DEFAULT_SETTINGS, map }), 2, [{ classId: 'assault' }]);
+      g.config = { ...g.config, waves: [] };
+      g.state.wave.phase = 'done';
+      const p = g.state.players[0]!;
+      p.x = p.px = x;
+      p.y = p.py = y;
+      p.hp = p.maxHp / 2;
+      for (let i = 0; i < 60 * 5; i++) step(g, [emptyInput()]);
+      return p.hp - p.maxHp / 2;
+    };
+    const z = MAPS.forest.healZones![0]!;
+    expect(at('forest', z.x, z.y)).toBeCloseTo(z.rate * 5, 0);
+    expect(at('forest', z.x + z.r + 1, z.y)).toBe(0);
+    expect(at('desert', z.x, z.y)).toBe(0);
+    // Кола не стоять у перешкодах.
+    for (const h of MAPS.forest.healZones!)
+      for (const o of MAPS.forest.obstacles)
+        expect(clearance(o, h.x, h.y)).toBeGreaterThan(h.r * 0.6);
+  });
+});

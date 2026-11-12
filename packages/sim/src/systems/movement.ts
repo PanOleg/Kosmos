@@ -31,6 +31,13 @@ export function updatePlayers(game: Game, inputs: readonly PlayerInput[]): void 
       continue;
     }
 
+    // Відьмині кола лісу: живий гравець усередині повільно відновлює здоров'я.
+    const heal = game.config.map.healZones;
+    if (heal && p.hp < p.maxHp)
+      for (const z of heal)
+        if ((p.x - z.x) ** 2 + (p.y - z.y) ** 2 < z.r * z.r)
+          p.hp = Math.min(p.maxHp, p.hp + z.rate * DT);
+
     let mx = inp.move.x;
     let my = inp.move.y;
     const ml = Math.sqrt(mx * mx + my * my);

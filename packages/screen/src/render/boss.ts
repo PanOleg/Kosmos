@@ -120,15 +120,119 @@ function robotGeo(): Geo {
 // Чарівний ліс (DECISIONS.md, п. 73): Ядро — велетенський ведмідь-дух. Фази 1–2 — сидить на
 // кам'яному колі, у грудях світиться «серце» (на місці ока Ядра); фаза 3 — встає на задні лапи.
 // Світні частини різнокольорові: колір вершини стає кольором світіння (lumGlow).
-const FUR = 0x2c3266;
-const FUR_DARK = 0x1b1e42;
-const FUR_LIGHT = 0x4a5a94;
-const MOSS = 0x2f6a58;
-const STONE = 0x45555c;
-const CYAN = 0x30f0ff;
-const PINK = 0xff40d0;
-const LIME = 0x90ff40;
-const VIOLET = 0xa060ff;
+// Те саме тіло з іншою шкурою й головою — Єті на кризі та Сфінкс у пустелі (п. 77).
+let FUR = 0x2c3266;
+let FUR_DARK = 0x1b1e42;
+let FUR_LIGHT = 0x4a5a94;
+let MOSS = 0x2f6a58;
+let STONE = 0x45555c;
+let CYAN = 0x30f0ff;
+let PINK = 0xff40d0;
+let LIME = 0x90ff40;
+let VIOLET = 0xa060ff;
+type BeastId = 'forest' | 'ice' | 'desert';
+let BEAST: BeastId = 'forest';
+/** Сила світіння: уночі в лісі — слабша, удень на снігу й піску — сильніша. */
+const BEAST_GLOW: Record<BeastId, number> = { forest: 0.28, ice: 0.5, desert: 0.55 };
+
+function setBeast(id: BeastId): void {
+  BEAST = id;
+  if (id === 'ice') {
+    [FUR, FUR_DARK, FUR_LIGHT, MOSS, STONE] = [0x6884b2, 0x46608a, 0xb4c8e0, 0xdfeaf4, 0x8fb4d2];
+    [CYAN, PINK, LIME, VIOLET] = [0x60e8ff, 0x4080ff, 0x60ffb0, 0xb090ff];
+  } else if (id === 'desert') {
+    [FUR, FUR_DARK, FUR_LIGHT, MOSS, STONE] = [0xb8894e, 0x7a5632, 0xe0b878, 0xd4a96e, 0x8f5e3e];
+    [CYAN, PINK, LIME, VIOLET] = [0x30d8c8, 0xff6a20, 0xffc030, 0x2d6ad8];
+  } else {
+    [FUR, FUR_DARK, FUR_LIGHT, MOSS, STONE] = [0x2c3266, 0x1b1e42, 0x4a5a94, 0x2f6a58, 0x45555c];
+    [CYAN, PINK, LIME, VIOLET] = [0x30f0ff, 0xff40d0, 0x90ff40, 0xa060ff];
+  }
+}
+
+/** Єті: кругла голова без морди, два роги назад, широка паща з іклами. */
+function yetiHead(hull: Part[], glow: Part[], y: number, z: number, k = 1): void {
+  hull.push(
+    part(SPHERE, FUR, [0, y, z], [2.9 * k, 2.5 * k, 2.6 * k]),
+    part(BOX, FUR_DARK, [0, y - 0.55 * k, z + 1.05 * k], [1.5 * k, 0.6 * k, 0.6 * k]),
+    part(SPHERE, FUR_LIGHT, [0, y + 0.9 * k, z - 0.2 * k], [2.2 * k, 1.2 * k, 2.2 * k]),
+  );
+  for (const sx of [1, -1]) {
+    hull.push(
+      seg(
+        BOX,
+        FUR_LIGHT,
+        [1.1 * sx * k, y + 0.7 * k, z],
+        [2.0 * sx * k, y + 1.9 * k, z - 0.9 * k],
+        0.5 * k,
+      ),
+      part(
+        CONE4,
+        0xf0f6fa,
+        [0.45 * sx * k, y - 0.75 * k, z + 1.3 * k],
+        [0.24 * k, 0.6 * k, 0.24 * k],
+        [Math.PI, 0, 0],
+      ),
+    );
+    glow.push(
+      part(SPHERE, CYAN, [0.62 * sx * k, y + 0.2 * k, z + 1.16 * k], [0.4 * k, 0.3 * k, 0.24 * k]),
+      part(
+        CONE4,
+        PINK,
+        [2.05 * sx * k, y + 2.1 * k, z - 1.0 * k],
+        [0.34 * k, 0.8 * k, 0.34 * k],
+        [-0.6, 0, -0.5 * sx],
+      ),
+    );
+  }
+  glow.push(part(BOX, VIOLET, [0, y + 1.0 * k, z + 0.95 * k], [0.9 * k, 0.16 * k, 0.3 * k]));
+}
+
+/** Сфінкс: кам'яне обличчя, смугаста хустка-немес із «крилами», борідка. */
+function sphinxHead(hull: Part[], glow: Part[], y: number, z: number, k = 1): void {
+  hull.push(
+    part(BOX, FUR_LIGHT, [0, y, z + 0.3 * k], [1.7 * k, 2.1 * k, 1.7 * k]),
+    part(BOX, FUR, [0, y - 0.2 * k, z + 1.2 * k], [0.4 * k, 0.7 * k, 0.3 * k]),
+    part(BOX, FUR_DARK, [0, y - 1.35 * k, z + 0.95 * k], [0.4 * k, 0.9 * k, 0.35 * k]),
+    part(BOX, VIOLET, [0, y + 1.0 * k, z + 0.1 * k], [2.3 * k, 0.7 * k, 2.2 * k]),
+  );
+  for (const sx of [1, -1]) {
+    hull.push(
+      seg(
+        BOX,
+        VIOLET,
+        [1.1 * sx * k, y + 0.8 * k, z],
+        [1.7 * sx * k, y - 1.5 * k, z + 0.5 * k],
+        0.9 * k,
+        0.5 * k,
+      ),
+    );
+    for (let j = 0; j < 4; j++)
+      hull.push(
+        part(
+          BOX,
+          LIME,
+          [(1.2 + j * 0.15) * sx * k, y + (0.45 - j * 0.55) * k, z + (0.35 + j * 0.1) * k],
+          [0.94 * k, 0.16 * k, 0.56 * k],
+          [0, 0, -0.26 * sx],
+        ),
+      );
+    glow.push(
+      part(BOX, CYAN, [0.42 * sx * k, y + 0.25 * k, z + 1.17 * k], [0.42 * k, 0.18 * k, 0.1 * k]),
+    );
+  }
+  for (let j = 0; j < 3; j++)
+    hull.push(
+      part(BOX, LIME, [0, y + 1.38 * k, z + (0.8 - j * 0.7) * k], [2.34 * k, 0.06 * k, 0.24 * k]),
+    );
+  // Урей на чолі.
+  glow.push(part(CONE4, PINK, [0, y + 1.6 * k, z + 1.15 * k], [0.3 * k, 0.7 * k, 0.3 * k]));
+}
+
+function beastHead(hull: Part[], glow: Part[], y: number, z: number, k = 1): void {
+  if (BEAST === 'ice') yetiHead(hull, glow, y, z, k);
+  else if (BEAST === 'desert') sphinxHead(hull, glow, y, z, k);
+  else bearHead(hull, glow, y, z, k);
+}
 
 /** Голова ведмедя з центром у (0, y, z): морда, ніс, вуха; очі й руна на лобі — у glow. */
 function bearHead(hull: Part[], glow: Part[], y: number, z: number, k = 1): void {
@@ -234,7 +338,7 @@ function bearSitGeo(): Geo {
       ),
     );
   }
-  bearHead(hull, glow, 6.1, 0.7);
+  beastHead(hull, glow, 6.1, 0.7);
   return { hull: merge(hull), glow: merge(glow) };
 }
 
@@ -286,7 +390,7 @@ function bearStandGeo(): Geo {
       ),
     );
   }
-  bearHead(hull, glow, 7.6, 0.5, 0.9);
+  beastHead(hull, glow, 7.6, 0.5, 0.9);
   return { hull: merge(hull), glow: merge(glow) };
 }
 
@@ -298,10 +402,11 @@ function lumGlow(mat: THREE.MeshStandardMaterial): void {
   mat.onBeforeCompile = (sh) => {
     sh.fragmentShader = sh.fragmentShader.replace(
       '#include <emissivemap_fragment>',
-      '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= vColor.rgb * 0.28;',
+      `#include <emissivemap_fragment>\ntotalEmissiveRadiance *= vColor.rgb * ${BEAST_GLOW[BEAST].toFixed(2)};`,
     );
   };
-  mat.customProgramCacheKey = () => 'lumGlow';
+  const key = `lumGlow-${BEAST}`;
+  mat.customProgramCacheKey = () => key;
 }
 
 const GRID_POOL = 18;
@@ -356,7 +461,9 @@ export class BossRenderer {
     private readonly scene: THREE.Scene,
     private readonly map: MapDef,
   ) {
-    const bear = map.id === 'forest';
+    // Станція лишає Ядро-машину; на решті карт головний бос — звір цієї карти.
+    const bear = map.id !== 'station';
+    if (bear) setBeast(map.id as BeastId);
     const d = bear ? bearSitGeo() : shellGeo();
     const r = bear ? bearStandGeo() : robotGeo();
     if (bear) {

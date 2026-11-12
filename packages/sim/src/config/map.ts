@@ -75,6 +75,14 @@ export interface SlowZone {
   mul: number;
 }
 
+/** Відьмине коло: rate — здоров'я за секунду для кожного, хто стоїть усередині. */
+export interface HealZone {
+  x: number;
+  y: number;
+  r: number;
+  rate: number;
+}
+
 /** Буря (DECISIONS.md, п. 60): раз на every секунд бою — warn с попередження, duration с бурі. */
 export interface StormDef {
   every: number;
@@ -95,6 +103,8 @@ export interface MapDef {
    * головний у першій фазі б'є лапами по гравцях замість лазерної сітки.
    */
   beasts?: boolean;
+  /** Цілющі місця (ліс, п. 77): хто стоїть усередині, повільно відновлює здоров'я. */
+  healZones?: HealZone[];
   radius: number;
   obstacles: Obstacle[];
   airlocks: SpawnPoint[];
@@ -515,6 +525,11 @@ export const FOREST_MAP: MapDef = {
   ],
   scatterSpawns: true,
   beasts: true,
+  // Відьмині кола: далеко від центру, біля воріт і точок дронів — лікування з ризиком.
+  healZones: [
+    { x: -1, y: 21.5, r: 2.2, rate: 4 },
+    { x: 17, y: -9.5, r: 2.2, rate: 4 },
+  ],
 };
 
 export const MAPS: Record<MapId, MapDef> = {

@@ -127,8 +127,10 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'endless30', test: (s) => s.endless && s.wave >= 30 },
   {
     id: 'explorer',
-    test: (_s, _c, p) => ['station', 'desert', 'ice'].every((m) => (p.records.mapWins[m] ?? 0) > 0),
+    test: (_s, _c, p) =>
+      ['station', 'desert', 'ice', 'forest'].every((m) => (p.records.mapWins[m] ?? 0) > 0),
   },
+  { id: 'forestWin', test: (s) => s.beatCore && s.map === 'forest' },
   { id: 'daredevil', test: (s) => s.beatCore && s.modifiers.length >= 3 },
 ];
 

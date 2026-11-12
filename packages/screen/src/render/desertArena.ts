@@ -611,6 +611,37 @@ export function buildDesertArena(map: MapDef): ArenaView {
     g.add(zm);
   }
 
+  // Відьмині кола (ліс): кільце світних грибів — тут здоров'я повільно відновлюється.
+  if (map.healZones?.length) {
+    const hp: Part[] = [];
+    const hg: Part[] = [];
+    for (const z of map.healZones) {
+      hg.push(part(CYL, 0x2a8a3a, P(z.x, z.y, 0.012), [z.r * 2, 0.012, z.r * 2]));
+      const n = Math.round(z.r * 7);
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * Math.PI * 2;
+        const x = z.x + Math.cos(a) * z.r;
+        const y = z.y + Math.sin(a) * z.r;
+        const h = 0.3 + (k % 3) * 0.12;
+        hp.push(part(CYL, 0xe8e0f0, P(x, y, h / 2), [0.1, h, 0.1]));
+        hg.push(part(SPHERE, 0x58c83a, P(x, y, h + 0.04), [0.34, 0.16, 0.34]));
+      }
+      // Хрест посередині — «лікує».
+      hg.push(part(BOX, 0x7ae850, P(z.x, z.y, 0.03), [1.1, 0.02, 0.3]));
+      hg.push(part(BOX, 0x7ae850, P(z.x, z.y, 0.03), [0.3, 0.02, 1.1]));
+    }
+    g.add(
+      new THREE.Mesh(
+        merge(hp),
+        new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true }),
+      ),
+      new THREE.Mesh(
+        merge(hg),
+        new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.6, 1.6, 1.6) }),
+      ),
+    );
+  }
+
   // ---------- Світло: яскравий день (пустеля) або полярні сутінки (крижана база) ----------
   const HEMI = WOOD ? 1.5 : ICY ? 1.25 : 1.7;
   const SUN = WOOD ? 1.7 : ICY ? 2.1 : 3.2;

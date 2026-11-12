@@ -13,6 +13,25 @@ interface Queued {
   prio: number;
 }
 
+/**
+ * Запасні фрази (п. 77): нові репліки карт і босів записуються окремо; поки запису немає,
+ * звучить стара спільна.
+ */
+export const VOICE_FALLBACK: Record<string, string> = {
+  startIce: 'startDesert',
+  startForest: 'startDesert',
+  victoryIce: 'victoryDesert',
+  victoryForest: 'victoryDesert',
+  wolf: 'foreman',
+  sabretooth: 'foreman',
+  scorpion: 'foreman',
+  bear: 'core',
+  yeti: 'core',
+  sphinx: 'core',
+  beastPhase2: 'phase2',
+  beastPhase3: 'phase3',
+};
+
 export class Voice {
   private buffers = new Map<string, AudioBuffer | Promise<AudioBuffer | null>>();
   private theme: VoiceTheme = 'station';
@@ -48,6 +67,8 @@ export class Voice {
    */
   say(id: string, prio = 2): void {
     if (!this.enabled) return;
+    // Фрази ще немає в записі — звучить запасна (стара спільна), а не тиша.
+    while (this.missing.has(id) && VOICE_FALLBACK[id]) id = VOICE_FALLBACK[id]!;
     const a = this.getAudio();
     if (!a) return;
     const now = a.ctx.currentTime;
@@ -79,6 +100,8 @@ export class Voice {
     this.onSpeaking(false);
   }
 
+  private readonly missing = new Set<string>();
+
   private load(ctx: AudioContext, id: string): Promise<AudioBuffer | null> {
     const have = this.buffers.get(id);
     if (have) return Promise.resolve(have);
@@ -92,6 +115,7 @@ export class Voice {
       .catch((e) => {
         console.warn('[voice]', id, e);
         this.buffers.delete(id);
+        this.missing.add(id);
         return null;
       });
     this.buffers.set(id, p);
@@ -102,6 +126,7 @@ export class Voice {
     const a = this.getAudio();
     if (!a) return;
     const buf = await this.load(a.ctx, id);
+    if (!buf && VOICE_FALLBACK[id]) return this.play(VOICE_FALLBACK[id]!, prio);
     if (!buf || !this.enabled || (this.playing && this.playing.prio >= prio)) return;
     const ctx = a.ctx;
     const input = this.chain(ctx, a.out);

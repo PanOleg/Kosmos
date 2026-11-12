@@ -117,16 +117,17 @@ describe('meta progress', () => {
     expect(unlockedSkins(p)).toEqual(expect.arrayContaining(['void', 'cobalt']));
   });
 
-  test('map wins are counted; all three maps unlock «explorer»; three modifiers — «daredevil»', () => {
+  test('map wins are counted; all four maps unlock «explorer»; three modifiers — «daredevil»', () => {
     const p = emptyProgress();
     const win = (map: string, modifiers: string[] = []) =>
       recordMatch(p, sum({ won: true, wave: 11, map, modifiers }), ctx());
     expect(win('station').newAchievements).not.toContain('explorer');
     win('desert');
-    expect(win('ice', ['rush', 'glass', 'ambush']).newAchievements).toEqual(
-      expect.arrayContaining(['explorer', 'daredevil']),
+    expect(win('ice').newAchievements).not.toContain('explorer');
+    expect(win('forest', ['rush', 'glass', 'ambush']).newAchievements).toEqual(
+      expect.arrayContaining(['explorer', 'daredevil', 'forestWin']),
     );
-    expect(p.records.mapWins).toEqual({ station: 1, desert: 1, ice: 1 });
+    expect(p.records.mapWins).toEqual({ station: 1, desert: 1, ice: 1, forest: 1 });
   });
 
   test('foreman achievement needs the foreman wave behind', () => {
