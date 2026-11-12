@@ -249,6 +249,10 @@ export const FOREMAN = {
   /** Раз на summonEvery — summonCount Скаутів. */
   summonEvery: 12,
   summonCount: 3,
+  /** Звір (ліс): стрибок на гравця раз на leapEvery, якщо той далі за leapMin; зграя з воріт. */
+  leapEvery: 7,
+  leapMin: 6,
+  packCount: 4,
   /** Стіна-укриття, яку він ставить. */
   wallLength: 3,
   wallThick: 0.6,
@@ -297,6 +301,12 @@ export const CORE = {
   gridSpacing: 4.5,
   gridHalfWidth: 0.55,
   gridDamage: 25,
+  /** Звір (ліс): у першій фазі — серія ударів лапами по гравцях замість сітки. */
+  pawEvery: 5,
+  pawWarn: 1.1,
+  pawRadius: 3,
+  pawDamage: 22,
+  pawCombo: 2,
   // Фаза 2: шлюзи.
   airlockEvery: 10,
   airlockOpen: 4,

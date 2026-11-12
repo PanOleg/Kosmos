@@ -1,4 +1,4 @@
-import { CORE_CRANE, CORE_LASER, gridDistance } from './core';
+import { CORE_CRANE, CORE_LASER, coreZone, gridDistance } from './core';
 import { CORE, FOREMAN, KAMIKAZE, SNIPER, SPIDER } from '../config/enemies';
 import { FOREMAN_STRIKE } from './foreman';
 import { SPIDER_FLIGHT, SPIDER_WINDUP } from './spider';
@@ -141,7 +141,7 @@ export function botInput(
     }
     // Підсвічені зони ударів: вийти за край, а з глибини — ривком.
     let zr = 0;
-    if (e.type === 'foreman' && e.ai === FOREMAN_STRIKE) zr = FOREMAN.strikeRadius;
+    if (e.type === 'foreman' && e.ai >= FOREMAN_STRIKE) zr = FOREMAN.strikeRadius;
     else if (e.type === 'spider' && (e.ai === SPIDER_WINDUP || e.ai === SPIDER_FLIGHT))
       zr = SPIDER.landRadius;
     if (zr > 0) {
@@ -202,14 +202,15 @@ export function botInput(
   // Бос: від відкритого шлюзу — геть (до центру), з променя сітки — убік, у проміжок.
   const boss = s.boss;
   // Удар краном і лазер Ядра третьої фази: та сама логіка зон.
-  if (boss.phase === 3 && boss.attackState === 1 && boss.attack === CORE_CRANE) {
+  if (boss.phase > 0 && boss.attackState === 1 && boss.attack === CORE_CRANE) {
     const zx = p.x - boss.tx;
     const zy = p.y - boss.ty;
     const zd = Math.hypot(zx, zy) || 0.01;
-    if (zd < CORE.craneRadius + 1) {
+    const zr = coreZone(boss).radius;
+    if (zd < zr + 1) {
       ax += (zx / zd) * 5;
       ay += (zy / zd) * 5;
-      if (zd < CORE.craneRadius) danger = true;
+      if (zd < zr) danger = true;
     }
   }
   if (boss.phase === 3 && boss.attackState === 1 && boss.attack === CORE_LASER) {

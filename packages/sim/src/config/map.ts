@@ -90,6 +90,11 @@ export interface MapDef {
   storm?: StormDef;
   /** Групи ворогів діляться між кількома точками появи, а не виходять з однієї. */
   scatterSpawns?: boolean;
+  /**
+   * Боси-звірі (ліс, п. 76): перший бос не будує, а стрибає на гравця й кличе зграю з воріт;
+   * головний у першій фазі б'є лапами по гравцях замість лазерної сітки.
+   */
+  beasts?: boolean;
   radius: number;
   obstacles: Obstacle[];
   airlocks: SpawnPoint[];
@@ -509,6 +514,7 @@ export const FOREST_MAP: MapDef = {
     { x: -14.5, y: -11, r: 2.0, mul: 0.55 },
   ],
   scatterSpawns: true,
+  beasts: true,
 };
 
 export const MAPS: Record<MapId, MapDef> = {

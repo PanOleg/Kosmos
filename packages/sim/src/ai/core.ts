@@ -154,7 +154,51 @@ export function gridDistance(b: Game['state']['boss'], x: number, y: number): nu
   return Math.min(m, sp - m);
 }
 
+/**
+ * Звір (ліс): замість лазерної сітки — серія ударів лапами. Зона під гравцем підсвічується
+ * pawWarn секунд, потім удар; одразу за ним — ще один по іншому гравцеві (pawCombo разів).
+ * Стан зони — той самий, що в крана третьої фази (attack/attackState/tx/ty): екран малює,
+ * а боти ухиляються тим самим кодом.
+ */
+function pawPhase(game: Game, e: Enemy, index: number): void {
+  const b = game.state.boss;
+  const aggr = game.config.mods.aggression;
+  b.attackT++;
+  if (b.attackState === 0) {
+    // scoutT — скільки ударів серії вже було; між серіями — пауза pawEvery.
+    const wait = b.scoutT > 0 ? 0.35 : CORE.pawEvery / aggr;
+    if (b.attackT < secToTicks(wait)) return;
+    const p = pick(game);
+    if (!p) return;
+    b.attack = CORE_CRANE;
+    b.attackState = 1;
+    b.attackT = 0;
+    b.tx = p.x;
+    b.ty = p.y;
+    emit(game.events, 'craneWarn', p.x, p.y, 0, 0, index, 1, CORE.pawWarn);
+    return;
+  }
+  if (b.attackT < secToTicks(CORE.pawWarn)) return;
+  const r2 = CORE.pawRadius * CORE.pawRadius;
+  for (const o of game.state.players)
+    if (!o.down && (o.x - b.tx) ** 2 + (o.y - b.ty) ** 2 <= r2)
+      damagePlayer(game, o, CORE.pawDamage * game.config.mods.enemyDamage, b.tx, b.ty);
+  emit(game.events, 'craneHit', b.tx, b.ty, 0, 0, index, 1, CORE.pawRadius);
+  b.attackState = 0;
+  b.attackT = 0;
+  b.scoutT = b.scoutT + 1 >= CORE.pawCombo ? 0 : b.scoutT + 1;
+  void e;
+}
+
+/** Радіус і тривалість попередження зони удару Ядра: лапа першої фази або кран третьої. */
+export function coreZone(b: Game['state']['boss']): { radius: number; warn: number } {
+  return b.phase === 1
+    ? { radius: CORE.pawRadius, warn: CORE.pawWarn }
+    : { radius: CORE.craneRadius, warn: CORE.craneWarn };
+}
+
 function phase1(game: Game, e: Enemy, index: number): void {
+  if (game.config.map.beasts) return pawPhase(game, e, index);
   const b = game.state.boss;
   const aggr = game.config.mods.aggression;
   b.gridT++;

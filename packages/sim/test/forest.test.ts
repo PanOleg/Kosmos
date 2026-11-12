@@ -7,6 +7,8 @@ import {
   emptyInput,
   DEFAULT_SETTINGS,
   MAPS,
+  spawnEnemy,
+  FOREMAN_LEAP,
   type ClassId,
   type Obstacle,
   type PlayerInput,
@@ -129,4 +131,86 @@ describe('forest map', () => {
     },
     120000,
   );
+});
+
+describe('forest bosses behave like beasts', () => {
+  const idle = (): PlayerInput => emptyInput();
+  function arena(px: number, py: number) {
+    const g = createGame(buildConfig({ ...DEFAULT_SETTINGS, map: 'forest' }), 9, [
+      { classId: 'assault' },
+    ]);
+    g.config = { ...g.config, waves: [] };
+    g.state.wave.phase = 'done';
+    const c = g.config.classes.assault;
+    g.config = {
+      ...g.config,
+      classes: { ...g.config.classes, assault: { ...c, weapon: { ...c.weapon, range: 0 } } },
+    };
+    const p = g.state.players[0]!;
+    p.x = p.px = px;
+    p.y = p.py = py;
+    p.hp = p.maxHp = 1e6;
+    return g;
+  }
+
+  test('the wolf leaps onto a distant player, calls a pack from the gates and never builds', () => {
+    const g = arena(-20, 0);
+    const wolf = spawnEnemy(g, 'foreman', 3, 6.5);
+    let leaped = false;
+    let landedNear = 0;
+    let howls = 0;
+    let pack = 0;
+    let farthest = 0;
+    for (let i = 0; i < 60 * 30; i++) {
+      const e = g.state.enemies[wolf]!;
+      const was = e.ai;
+      step(g, [idle()]);
+      for (const ev of g.events.list.slice(0, g.events.count)) {
+        if (ev.type === 'enemyWindup' && ev.b === 7) howls++;
+        if (ev.type === 'spawn' && g.state.enemies[ev.a]?.type === 'scout') {
+          pack++;
+          farthest = Math.max(farthest, Math.hypot(ev.x, ev.y));
+        }
+      }
+      if (was === FOREMAN_LEAP && e.ai !== FOREMAN_LEAP) {
+        leaped = true;
+        landedNear = Math.hypot(e.x - e.tx, e.y - e.ty);
+      }
+    }
+    expect(leaped).toBe(true);
+    expect(landedNear).toBeLessThan(2);
+    expect(howls).toBeGreaterThanOrEqual(2);
+    expect(pack).toBeGreaterThanOrEqual(8);
+    // Зграя вибігає від воріт, а не з'являється біля Вовка.
+    expect(farthest).toBeGreaterThan(20);
+    expect(g.state.enemies.some((e) => e.alive && e.type === 'turret')).toBe(false);
+    expect(g.state.props.some((p) => p.alive)).toBe(false);
+  });
+
+  test('the bear slams paws in phase 1 instead of the laser grid; the station core keeps the grid', () => {
+    const run = (map: 'forest' | 'station') => {
+      const g = createGame(buildConfig({ ...DEFAULT_SETTINGS, map }), 4, [{ classId: 'assault' }]);
+      g.state.wave.index = g.config.waves.length - 1;
+      g.state.wave.phase = 'pause';
+      g.state.wave.timer = 1;
+      g.state.players[0]!.hp = g.state.players[0]!.maxHp = 1e9;
+      const seen = { paw: 0, grid: 0, hurt: 0 };
+      for (let i = 0; i < 60 * 25 && g.state.boss.phase <= 1; i++) {
+        step(g, [idle()]);
+        for (const e of g.events.list.slice(0, g.events.count)) {
+          if (e.type === 'craneWarn') seen.paw++;
+          if (e.type === 'gridWarn') seen.grid++;
+          if (e.type === 'craneHit') seen.hurt++;
+        }
+      }
+      return seen;
+    };
+    const forest = run('forest');
+    expect(forest.grid).toBe(0);
+    expect(forest.paw).toBeGreaterThanOrEqual(4);
+    expect(forest.hurt).toBeGreaterThanOrEqual(3);
+    const station = run('station');
+    expect(station.grid).toBeGreaterThan(0);
+    expect(station.paw).toBe(0);
+  });
 });

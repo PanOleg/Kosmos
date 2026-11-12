@@ -3,6 +3,7 @@ import {
   CORE,
   CORE_CRANE,
   CORE_LASER,
+  coreZone,
   type BossState,
   type Enemy,
   type MapDef,
@@ -618,12 +619,14 @@ export class BossRenderer {
   }
 
   private updateAttack(boss: BossState, e: Enemy, time: number): void {
-    const winding = boss.phase === 3 && boss.attackState === 1;
+    // Зона удару: кран третьої фази або лапа Ведмедя в першій (ліс) — той самий стан.
+    const winding = boss.phase > 0 && boss.attackState === 1;
     const crane = winding && boss.attack === CORE_CRANE;
     this.zone.visible = this.zoneFill.visible = crane;
     if (crane) {
-      const k = Math.min(1, boss.attackT / (CORE.craneWarn * 60));
-      const r = CORE.craneRadius;
+      const z = coreZone(boss);
+      const k = Math.min(1, boss.attackT / (z.warn * 60));
+      const r = z.radius;
       this.zone.position.set(toX(boss.tx), 0.04, toZ(boss.ty));
       this.zoneFill.position.set(toX(boss.tx), 0.035, toZ(boss.ty));
       this.zone.scale.set(r, 1, r);

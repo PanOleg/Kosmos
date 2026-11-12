@@ -952,7 +952,8 @@ export class EnemyRenderer {
       }
       if (e.type === 'foreman') {
         // Зона удару кранами: велике кільце, що наливається червоним до удару; стріли піднімаються.
-        const strike = e.ai === FOREMAN_STRIKE;
+        // Удар або стрибок Вовка (ліс): та сама зона.
+        const strike = e.ai >= FOREMAN_STRIKE;
         v.ring.visible = strike;
         if (strike) {
           const kp = Math.min(1, e.aiT / craneWarnTicks);

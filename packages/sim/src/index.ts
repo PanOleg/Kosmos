@@ -134,9 +134,16 @@ export {
 } from './ai/spider';
 export type { Rocket } from './entities/rocket';
 export type { Prop } from './entities/prop';
-export { FOREMAN_STRIKE } from './ai/foreman';
+export { FOREMAN_STRIKE, FOREMAN_LEAP } from './ai/foreman';
 export { TURRET_WINDUP, TURRET_BURST } from './ai/turret';
-export { CORE_ROCKETS, CORE_LASER, CORE_SWARM, CORE_CRANE, gridDistance } from './ai/core';
+export {
+  CORE_ROCKETS,
+  CORE_LASER,
+  CORE_SWARM,
+  CORE_CRANE,
+  coreZone,
+  gridDistance,
+} from './ai/core';
 export type { BossState } from './entities/boss';
 export { abilityReadiness, ABILITY_CLASS_INDEX } from './systems/abilities';
 export { shopOpen, upgradePrice, wholeParts } from './systems/upgrades';
