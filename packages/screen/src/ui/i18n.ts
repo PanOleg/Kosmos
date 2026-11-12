@@ -45,7 +45,7 @@ const uk = {
   untilWave: 'до хвилі',
   shopTitle: (s: number) => `Покращення · ${s} с до хвилі`,
   shopHint: 'Телефон — кнопки праворуч · клавіатура — 1–4',
-  medkit: 'Аптечка',
+  medkit: 'Лікування',
   extraLife: 'Друге дихання',
   downFor: (s: number) => `ВПАВ · ${s} С`,
   outUntilWave: 'ВИБУВ ДО ХВИЛІ',

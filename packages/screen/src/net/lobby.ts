@@ -588,6 +588,7 @@ export class LobbyHost {
                     upgradePrice(p, 'ability'),
                   ],
                   medkit: p.medkitBought ? null : UPGRADES.medkit.price,
+                  medkitHeal: UPGRADES.medkit.heal,
                   life: g.state.players.length === 1 && !p.lifeBought ? REVIVE.soloLifePrice : null,
                 }
               : null,

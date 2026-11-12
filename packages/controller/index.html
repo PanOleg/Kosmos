@@ -799,6 +799,58 @@
         font-weight: 800;
         font-size: 15px;
       }
+      /* Лікування між хвилями (п. 78): окремий зелений рядок угорі магазину з поясненням,
+         скільки поверне; пульсує, коли гравець поранений і має на нього деталі. */
+      .heal {
+        flex: 1.15;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 12px;
+        padding: 0 18px;
+        border-radius: 16px;
+        border: 2px solid rgba(63, 212, 90, 0.7);
+        background: rgba(63, 212, 90, 0.22);
+        color: #d8ffe0;
+        font-size: 20px;
+        font-weight: 800;
+        text-align: left;
+      }
+      .heal[hidden] {
+        display: none;
+      }
+      .heal .bi {
+        font-size: 26px;
+        color: #5cf07a;
+      }
+      .heal small {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        opacity: 0.85;
+      }
+      .heal:disabled {
+        opacity: 0.4;
+        border-color: transparent;
+      }
+      .heal.want {
+        animation: healpulse 1s ease-in-out infinite;
+      }
+      .heal.press {
+        transform: scale(0.96);
+      }
+      @keyframes healpulse {
+        50% {
+          background: rgba(63, 212, 90, 0.5);
+          box-shadow: 0 0 18px rgba(63, 212, 90, 0.6);
+        }
+      }
+      .hp-num {
+        font-size: 13px;
+        font-weight: 700;
+        opacity: 0.85;
+        min-width: 3.2em;
+      }
       .medkit[hidden] {
         display: none;
       }
@@ -888,8 +940,8 @@
       <div class="top">
         <span>❤</span>
         <div class="hp"><i id="hp"></i></div>
+        <span id="hp-num" class="hp-num"></span>
         <span class="sp"></span>
-        <button id="medkit" class="medkit" hidden>✚ <span id="medkit-price">8</span></button>
         <button id="life" class="medkit life" hidden>♥ <span id="life-price">40</span></button>
         <span>⚙ <span id="parts">0</span></span
         ><span class="sep">|</span><span id="cls"></span>
@@ -939,6 +991,11 @@
         </div>
         <div id="shop" class="shop" hidden>
           <div class="shop-head">Покращення · <span id="shop-time">10</span> с</div>
+          <button id="medkit" class="heal" hidden>
+            <span class="bi">✚</span
+            ><span class="bn">Лікування<small id="medkit-note">+50 ❤</small></span
+            ><span class="bp" id="medkit-price">⚙ 8</span>
+          </button>
           <button class="buy" data-item="1">
             <span class="bi">⦿</span><span class="bn">Зброя</span><span class="pips"></span
             ><span class="bp"></span>

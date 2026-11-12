@@ -178,6 +178,8 @@ export interface ShopInfo {
   prices: [number | null, number | null, number | null];
   /** Ціна аптечки; null — уже куплена в цій паузі. */
   medkit: number | null;
+  /** Скільки здоров'я повертає аптечка. */
+  medkitHeal: number;
   /** Соло: ціна додаткового життя; null — не соло або вже куплено. */
   life: number | null;
 }

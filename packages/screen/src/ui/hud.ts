@@ -57,6 +57,11 @@ const css = `
 @keyframes shopflash { 0% { background: rgba(255,255,255,.35); } 100% { background: rgba(255,255,255,.05); } }
 .shop .nm { display: flex; justify-content: space-between; font-weight: 700; }
 .shop .ln { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; opacity: .9; }
+/* Лікування: зелений рядок із поточним здоров'ям; підсвічений, коли гравець поранений. */
+.shop .ln.heal { color: #8ff0a4; margin-top: 3px; padding: 2px 6px; margin-left: -6px; margin-right: -6px; border-radius: 6px; }
+.shop .ln.heal { white-space: nowrap; }
+.shop .ln.heal .hpv { font-size: .85em; opacity: .9; }
+.shop .ln.heal.want { background: rgba(63,212,90,.2); opacity: 1; box-shadow: inset 0 0 0 1px rgba(63,212,90,.55); }
 .shop .pp { display: inline-flex; gap: 3px; }
 .shop .pp i { width: 8px; height: 8px; border-radius: 2px; border: 1.5px solid currentColor; }
 .shop .pp i.on { background: currentColor; }
@@ -238,7 +243,8 @@ export class Hud {
     const sig =
       s.players
         .map(
-          (p) => `${p.upg.weapon}${p.upg.armor}${p.upg.ability}${wholeParts(p)}${p.medkitBought}`,
+          (p) =>
+            `${p.upg.weapon}${p.upg.armor}${p.upg.ability}${wholeParts(p)}${p.medkitBought}${Math.ceil(p.hp)}`,
         )
         .join('|') + Math.ceil(s.wave.timer / TICKS_PER_SEC);
     if (sig === this.shopSig) return;
@@ -255,7 +261,7 @@ export class Hud {
               `<div class="ln"><span>${i + 1} · ${t.upgradeName[id]}</span>${pips(p.upg[id])}<span class="pr">${price(upgradePrice(p, id))}</span></div>`,
           )
           .join('');
-        return `<div class="col" data-slot="${p.slot}" style="border-color:${color}"><div class="nm"><span style="color:${color}">P${p.slot + 1} ${t.className[p.classId]}</span><span class="pr">⚙ ${wholeParts(p)}</span></div>${rows}<div class="ln"><span>4 · ${t.medkit}</span><span></span><span class="pr">${p.medkitBought ? '✓' : price(UPGRADES.medkit.price)}</span></div>${s.players.length === 1 ? `<div class="ln"><span>5 · ${t.extraLife}</span><span></span><span class="pr">${p.lifeBought ? '✓' : price(REVIVE.soloLifePrice)}</span></div>` : ''}</div>`;
+        return `<div class="col" data-slot="${p.slot}" style="border-color:${color}"><div class="nm"><span style="color:${color}">P${p.slot + 1} ${t.className[p.classId]}</span><span class="pr">⚙ ${wholeParts(p)}</span></div>${rows}<div class="ln heal${!p.medkitBought && p.hp < p.maxHp ? ' want' : ''}"><span>4 · ✚ ${t.medkit}</span><span class="hpv">+${UPGRADES.medkit.heal} ❤</span><span class="pr">${p.medkitBought ? '✓' : price(UPGRADES.medkit.price)}</span></div>${s.players.length === 1 ? `<div class="ln"><span>5 · ${t.extraLife}</span><span></span><span class="pr">${p.lifeBought ? '✓' : price(REVIVE.soloLifePrice)}</span></div>` : ''}</div>`;
       })
       .join('');
     const flashing = [...this.shop.querySelectorAll('.col.flash')].map(

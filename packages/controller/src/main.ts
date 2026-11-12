@@ -271,7 +271,8 @@ function run(room: string): void {
       : '';
   };
 
-  const renderShop = (shop: ShopInfo | null, parts: number, fullHp: boolean) => {
+  const renderShop = (shop: ShopInfo | null, parts: number, hp: number, maxHp: number) => {
+    const fullHp = hp >= maxHp;
     const open = shop !== null;
     shopEl.hidden = !open;
     ability.style.display = open ? 'none' : '';
@@ -293,8 +294,20 @@ function run(room: string): void {
       b.disabled = price === null || parts < price;
     });
     // Аптечка при повному здоров'ї не потрібна — симуляція її однаково відхилить.
-    medkitBtn.disabled = shop.medkit === null || parts < shop.medkit || fullHp;
-    $('medkit-price').textContent = shop.medkit === null ? '✓' : String(shop.medkit);
+    const used = shop.medkit === null;
+    const poor = !used && parts < shop.medkit!;
+    medkitBtn.disabled = used || poor || fullHp;
+    // Зрозуміло, що буде й чому не можна: скільки поверне, або причина відмови.
+    const gain = Math.min(shop.medkitHeal ?? 50, Math.max(0, maxHp - hp));
+    $('medkit-note').textContent = used
+      ? 'вже використано в цій паузі'
+      : fullHp
+        ? 'здоров’я повне'
+        : poor
+          ? `+${gain} ❤ · бракує деталей`
+          : `+${gain} ❤ · зараз ${hp} із ${maxHp}`;
+    $('medkit-price').textContent = used ? '✓' : `⚙ ${shop.medkit}`;
+    medkitBtn.classList.toggle('want', !medkitBtn.disabled && hp < maxHp * 0.6);
   };
 
   // Навчання (DECISIONS.md, п. 56): підказки по одній у першому матчі на цьому телефоні;
@@ -336,7 +349,7 @@ function run(room: string): void {
     else if (m.revive && !tipsSeen.has('revive'))
       text = 'Напарник упав поруч: тримайте праву кнопку, щоб підняти';
     else if (m.shop && !tipsSeen.has('shop'))
-      text = 'Пауза між хвилями: витрачайте ⚙ на покращення праворуч';
+      text = 'Пауза між хвилями: зелена кнопка лікує, решта — покращення за ⚙';
     else if (!tipsSeen.has('aim')) {
       text = 'Зброя стріляє сама в найближчого ворога — ви рухаєтесь і ховаєтесь';
       if (shownFor('aim') > 7000) learn('aim');
@@ -494,7 +507,8 @@ function run(room: string): void {
             : '';
         const ring = rv ? rv.progress : m.ability;
         $('ring').setAttribute('stroke-dasharray', `${Math.round(ring * 100)} 100`);
-        renderShop(m.shop, m.parts, m.hp >= m.maxHp);
+        renderShop(m.shop, m.parts, m.hp, m.maxHp);
+        $('hp-num').textContent = m.maxHp > 0 ? `${m.hp}/${m.maxHp}` : '';
         renderPause(m);
         renderTip(m);
         haptics(m);
