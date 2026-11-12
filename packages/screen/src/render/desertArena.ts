@@ -132,21 +132,29 @@ function inside(o: Obstacle, x: number, y: number, m: number): boolean {
 
 /** Пісок: теплий шум і хвилясті брижі вітру. */
 function sandTexture(): THREE.CanvasTexture {
+  // Безшовна плитка: усі хвилі мають ціле число періодів на сторону, тож край плитки
+  // продовжує протилежний і на землі не видно квадратів. Плитка велика (≈13 м), а поверх
+  // брижів — повільні плями, щоб повтор не впадав в око.
+  const W = 512;
+  const k = (Math.PI * 2) / W;
   const cv = document.createElement('canvas');
-  cv.width = cv.height = 256;
+  cv.width = cv.height = W;
   const ctx = cv.getContext('2d')!;
-  const img = ctx.createImageData(256, 256);
+  const img = ctx.createImageData(W, W);
   const r = rng(7);
-  for (let y = 0; y < 256; y++)
-    for (let x = 0; x < 256; x++) {
-      const ripple = Math.sin((y + Math.sin(x * 0.05) * 9) * 0.32) * 10;
-      const v = 214 + ripple + (r() - 0.5) * 22;
-      const i = (y * 256 + x) * 4;
+  for (let y = 0; y < W; y++)
+    for (let x = 0; x < W; x++) {
+      const ripple =
+        Math.sin(k * 26 * y + 1.4 * Math.sin(k * 3 * x) + 0.8 * Math.sin(k * (2 * x + y))) * 9;
+      const blotch = Math.sin(k * (x + 2 * y) + 1) * Math.sin(k * (2 * x - y)) * 6;
+      const v = 214 + ripple + blotch + (r() - 0.5) * 20;
+      const i = (y * W + x) * 4;
       // Ліс: плями моху замість брижів — темніші й світліші латки.
       const moss = WOOD
         ? 178 +
-          Math.sin(x * 0.049 + Math.sin(y * 0.031) * 2.2) * Math.cos(y * 0.043 + x * 0.012) * 24 +
-          (r() - 0.5) * 30
+          Math.sin(k * (3 * x + y) + 2.2 * Math.sin(k * 2 * y)) * Math.cos(k * (2 * y - x)) * 22 +
+          Math.sin(k * (5 * x - 3 * y)) * 9 +
+          (r() - 0.5) * 26
         : 0;
       img.data[i] = WOOD ? moss * 0.82 : ICY ? v * 0.94 : v;
       img.data[i + 1] = WOOD ? moss : ICY ? v * 0.98 : v * 0.86;
@@ -157,6 +165,7 @@ function sandTexture(): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(cv);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
   return tex;
 }
 
@@ -210,7 +219,7 @@ export function buildDesertArena(map: MapDef): ArenaView {
 
   // ---------- Земля: пісок до горизонту ----------
   const sand = sandTexture();
-  sand.repeat.set(60, 60);
+  sand.repeat.set(26, 26);
   const ground = new THREE.Mesh(
     new THREE.CircleGeometry(R + 140, 64).rotateX(-Math.PI / 2),
     new THREE.MeshStandardMaterial({ color: SAND, map: sand, roughness: 0.95, metalness: 0 }),
