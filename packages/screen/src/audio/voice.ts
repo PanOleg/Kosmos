@@ -32,10 +32,16 @@ export const VOICE_FALLBACK: Record<string, string> = {
   beastPhase3: 'phase3',
 };
 
+/** Фраза, що звучить або ось-ось зазвучить (src ще немає, поки файл вантажиться). */
+interface Playing {
+  src: AudioBufferSourceNode | null;
+  prio: number;
+}
+
 export class Voice {
   private buffers = new Map<string, AudioBuffer | Promise<AudioBuffer | null>>();
   private theme: VoiceTheme = 'station';
-  private playing: { src: AudioBufferSourceNode; prio: number } | null = null;
+  private playing: Playing | null = null;
   private queue: Queued[] = [];
   private lastSaid = new Map<string, number>();
   private chainIn: AudioNode | null = null;
@@ -64,6 +70,8 @@ export class Voice {
   /**
    * Сказати фразу. prio: 1 — дрібне (піднявся), 2 — звичайне (хвиля), 3 — тривога (бос, шлюз).
    * Те саме не повторюється частіше ніж раз на 4 с; черга — не довша за дві фрази.
+   * Фрази ніколи не звучать одночасно (п. 79): «зайнято» стає одразу, ще до завантаження
+   * файла, — раніше дві фрази, сказані в один кадр, могли накластися одна на одну.
    */
   say(id: string, prio = 2): void {
     if (!this.enabled) return;
@@ -80,24 +88,75 @@ export class Voice {
         this.queue = [];
         this.stop();
       } else {
+        // Рівні за важливістю лишаються в порядку надходження.
         this.queue.push({ id, prio });
         this.queue.sort((x, y) => y.prio - x.prio);
         this.queue.length = Math.min(this.queue.length, 2);
         return;
       }
     }
-    void this.play(id, prio);
+    this.start(id, prio);
   }
 
   stop(): void {
     const p = this.playing;
     this.playing = null;
     try {
-      p?.src.stop();
+      p?.src?.stop();
     } catch {
       /* уже зупинено */
     }
     this.onSpeaking(false);
+  }
+
+  /** Наступна з черги після короткої паузи, щоб фрази не зливалися. */
+  private next(me: Playing): void {
+    if (this.playing !== me) return;
+    const n = this.queue.shift();
+    if (!n) {
+      this.playing = null;
+      this.onSpeaking(false);
+      return;
+    }
+    const gap: Playing = { src: null, prio: n.prio };
+    this.playing = gap;
+    window.setTimeout(() => {
+      if (this.playing === gap) this.start(n.id, n.prio);
+    }, 280);
+  }
+
+  private start(id: string, prio: number): void {
+    const a = this.getAudio();
+    if (!a) return;
+    const me: Playing = { src: null, prio };
+    this.playing = me;
+    this.onSpeaking(true);
+    void this.load(a.ctx, id).then((buf) => {
+      if (this.playing !== me) return;
+      if (!buf) {
+        if (VOICE_FALLBACK[id]) this.start(VOICE_FALLBACK[id]!, prio);
+        else this.next(me);
+        return;
+      }
+      if (!this.enabled) {
+        this.stop();
+        return;
+      }
+      const ctx = a.ctx;
+      const input = this.chain(ctx, a.out);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(input);
+      // Музика й звуки встигають стихнути до першого слова.
+      const t = ctx.currentTime + 0.12;
+      if (this.theme === 'desert') {
+        this.squelch(ctx, input, t - 0.06);
+        this.squelch(ctx, input, t + buf.duration);
+      }
+      src.start(t);
+      me.src = src;
+      src.onended = () => this.next(me);
+    });
   }
 
   private readonly missing = new Set<string>();
@@ -122,70 +181,48 @@ export class Voice {
     return p;
   }
 
-  private async play(id: string, prio: number): Promise<void> {
-    const a = this.getAudio();
-    if (!a) return;
-    const buf = await this.load(a.ctx, id);
-    if (!buf && VOICE_FALLBACK[id]) return this.play(VOICE_FALLBACK[id]!, prio);
-    if (!buf || !this.enabled || (this.playing && this.playing.prio >= prio)) return;
-    const ctx = a.ctx;
-    const input = this.chain(ctx, a.out);
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(input);
-    const t = ctx.currentTime + 0.05;
-    if (this.theme === 'desert') {
-      this.squelch(ctx, input, t - 0.04);
-      this.squelch(ctx, input, t + buf.duration);
-    }
-    src.start(t);
-    const me = { src, prio };
-    this.playing = me;
-    this.onSpeaking(true);
-    src.onended = () => {
-      if (this.playing !== me) return;
-      this.playing = null;
-      const next = this.queue.shift();
-      if (next) void this.play(next.id, next.prio);
-      else this.onSpeaking(false);
-    };
-  }
-
   /** Обробка голосу під карту; будується раз на тему й контекст. */
   private chain(ctx: AudioContext, out: AudioNode): AudioNode {
     if (this.chainIn && this.chainCtx === ctx) return this.chainIn;
     this.chainCtx = ctx;
     const desert = this.theme === 'desert';
+    // Розбірливість понад «ефект» (п. 79): широка смуга, підйом приголосних біля 3 кГц,
+    // ледь помітне перевантаження й компресор, що вирівнює гучність фраз. Характер карти
+    // лишається: на станції — коротка тиха луна, надворі — трохи вужча смуга й шипіння рації.
     const hp = ctx.createBiquadFilter();
     hp.type = 'highpass';
-    hp.frequency.value = desert ? 450 : 260;
+    hp.frequency.value = desert ? 300 : 170;
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = desert ? 2900 : 4200;
+    lp.frequency.value = desert ? 5200 : 7500;
     const peak = ctx.createBiquadFilter();
     peak.type = 'peaking';
-    peak.frequency.value = desert ? 1600 : 1900;
-    peak.gain.value = 5;
-    // Легке перевантаження: «динамік», а не студія.
+    peak.frequency.value = 3000;
+    peak.Q.value = 0.9;
+    peak.gain.value = 4;
     const shaper = ctx.createWaveShaper();
-    const k = desert ? 8 : 3;
+    const k = desert ? 1.6 : 0.8;
     const curve = new Float32Array(1024);
     for (let i = 0; i < curve.length; i++) {
       const x = (i / (curve.length - 1)) * 2 - 1;
       curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
     }
     shaper.curve = curve;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -20;
+    comp.ratio.value = 3.5;
+    comp.attack.value = 0.004;
+    comp.release.value = 0.18;
     const g = ctx.createGain();
-    g.gain.value = desert ? 0.5 : 0.62;
-    hp.connect(lp).connect(peak).connect(shaper).connect(g).connect(out);
+    g.gain.value = desert ? 1.0 : 1.05;
+    hp.connect(lp).connect(peak).connect(shaper).connect(comp).connect(g).connect(out);
     if (!desert) {
-      // Коротка луна металевого відсіку.
+      // Одне тихе відлуння металевого відсіку — без повторів, що змазують слова.
       const d = ctx.createDelay(0.5);
-      d.delayTime.value = 0.11;
-      const fb = ctx.createGain();
-      fb.gain.value = 0.22;
-      g.connect(d).connect(fb).connect(d);
-      fb.connect(out);
+      d.delayTime.value = 0.09;
+      const wet = ctx.createGain();
+      wet.gain.value = 0.1;
+      g.connect(d).connect(wet).connect(out);
     }
     this.chainIn = hp;
     return hp;
@@ -202,7 +239,7 @@ export class Voice {
     src.buffer = this.noise;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.18, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.07, t + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
     src.connect(g).connect(into);
     src.start(t);

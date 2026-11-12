@@ -177,7 +177,7 @@ export class Music {
 
   private targetGain(): number {
     if (this.muted) return 0;
-    return (this.muffled ? 0.1 : 0.22) * (this.ducked ? 0.4 : 1);
+    return (this.muffled ? 0.1 : 0.22) * (this.ducked ? 0.25 : 1);
   }
 
   /** Раз на кадр: запускає все, щойно з'явився аудіоконтекст (перший дотик). */

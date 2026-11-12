@@ -94,7 +94,10 @@ const cam = new GameCamera(window.innerWidth / window.innerHeight);
 const sfx = new Sfx();
 const music = new Music(() => sfx.audio());
 const voice = new Voice(() => sfx.audio());
-voice.onSpeaking = (on) => music.setDucked(on);
+voice.onSpeaking = (on) => {
+  music.setDucked(on);
+  sfx.setDucked(on);
+};
 
 // Музика / звуки / озвучка окремо (DECISIONS.md, п. 53): пульт на паузі, N / J / V, лобі.
 const audioPrefs = loadAudioPrefs();
@@ -413,7 +416,13 @@ function startMatch(): void {
   const first = game.config.waves[0];
   if (first) {
     match.hud.announce(first.name, t.stationSignal, 2.5);
-    voice.say(MAP_VOICE[game.config.map.id]?.start ?? 'start', 2);
+    // Спершу сигнал, потім голос: привітання й одразу за ним номер хвилі — по черзі, не разом.
+    const startLine = MAP_VOICE[game.config.map.id]?.start ?? 'start';
+    window.setTimeout(() => {
+      if (!match) return;
+      voice.say(startLine, 2);
+      voice.say('wave1', 2);
+    }, 1100);
     const active = lobbyView.settings.modifiers ?? [];
     if (active.length || lobbyView.settings.endless)
       window.setTimeout(
@@ -430,7 +439,6 @@ function startMatch(): void {
           ),
         2700,
       );
-    voice.say('wave1', 1);
     sfx.stationSignal();
     // Особливості карти — у перших трьох матчах на ній (лічильник на цьому екрані).
     const tips = t.mapTip[game.config.map.id];

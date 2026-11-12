@@ -14,9 +14,23 @@ export class Sfx {
   theme: 'station' | 'desert' = 'station';
 
   /** Звуки подій увімк./вимк. (музика й озвучка — окремо). */
+  private ducked = false;
+
+  /** Поки звучить озвучка, звуки бою тихішають, щоб слова було чути. */
+  setDucked(d: boolean): void {
+    this.ducked = d;
+    if (this.ctx && this.fxOn)
+      this.master.gain.setTargetAtTime(d ? 0.45 : 1, this.ctx.currentTime, d ? 0.06 : 0.35);
+  }
+
   setEnabled(on: boolean): void {
     this.fxOn = on;
-    if (this.ctx) this.master.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.05);
+    if (this.ctx)
+      this.master.gain.setTargetAtTime(
+        on ? (this.ducked ? 0.45 : 1) : 0,
+        this.ctx.currentTime,
+        0.05,
+      );
   }
 
   /** Спільний контекст і вихід для музики; null — ще не було жесту користувача. */
