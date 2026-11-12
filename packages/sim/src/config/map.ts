@@ -339,19 +339,82 @@ export const DESERT_MAP: MapDef = {
   scatterSpawns: true,
 };
 
+/** Низька дуга (мішки, замети, коріння): тримає тіла, але не кулі; a0..a1 — кути, рад. */
+function arc(o: Obstacle[], tag: ObstacleTag, radius: number, a0: number, a1: number): void {
+  const n = Math.max(1, Math.round(((a1 - a0) * radius) / 2));
+  for (let k = 0; k < n; k++) {
+    const b0 = a0 + ((a1 - a0) * k) / n;
+    const b1 = a0 + ((a1 - a0) * (k + 1)) / n;
+    const am = (b0 + b1) / 2;
+    const len = 2 * radius * Math.sin((b1 - b0) / 2) + 0.12;
+    o.push(
+      rect(Math.cos(am) * radius, Math.sin(am) * radius, len, 0.5, tag, {
+        rot: am + Math.PI / 2,
+        height: 0.7,
+        blocksShots: false,
+      }),
+    );
+  }
+}
+
 /**
- * Крижана база (DECISIONS.md, п. 61): той самий скелет; північ — крижані брили, схід — модулі
- * бази й снігохід, південь — ялини, захід — рівний сніг зі стартом. Замети сповільнюють.
+ * Крижана база (DECISIONS.md, п. 61, 75): власна розкладка. Північний захід — модулі бази зі
+ * снігоходом і ящиками; схід — поле крижаних брил; південь — ялиновий гай; три крижані
+ * хребти замість діагональних перегородок; замети-дуги довкола центру відкриті на захід.
+ * Центр, точки появи ворогів і старт гравців — ті самі, що на станції.
  */
 function buildIceObstacles(): Obstacle[] {
-  const retag: Partial<Record<ObstacleTag, ObstacleTag>> = {
-    rock: 'ice',
-    sandbag: 'snowbank',
-    tent: 'module',
-    palm: 'pine',
-    wreck: 'sled',
-  };
-  return buildDesertObstacles().map((o) => ({ ...o, tag: retag[o.tag] ?? o.tag }));
+  const o: Obstacle[] = [];
+  o.push(circle(0, 0, 2.6, 'core', 4));
+  for (let i = 0; i < 4; i++) {
+    const a = Math.PI / 4 + (i * Math.PI) / 2;
+    o.push(rect(Math.cos(a) * 6.5, Math.sin(a) * 6.5, 1.4, 0.7, 'crate', { rot: a, height: 1 }));
+  }
+  // Замети: велика дуга зі сходу (з проходом навпроти східних воріт) і дві короткі із заходу.
+  arc(o, 'snowbank', 9.5, 0.24, 1.15);
+  arc(o, 'snowbank', 9.5, -1.15, -0.24);
+  arc(o, 'snowbank', 9.5, 2.1, 2.6);
+  arc(o, 'snowbank', 9.5, 3.68, 4.18);
+  // Крижані хребти: високі стіни, за які чіпляється Краб.
+  o.push(rect(0, 15, 9, 1.2, 'ice', { height: 3 }));
+  o.push(rect(12.5, -16, 8, 1.2, 'ice', { rot: -0.6, height: 3 }));
+  o.push(rect(-14, -17, 8, 1.2, 'ice', { rot: 0.6, height: 3 }));
+  // Північний захід: база — три модулі літерою «Г», снігохід, ящики.
+  o.push(rect(-14, 14, 3.2, 2.4, 'module', { height: 2 }));
+  o.push(rect(-18.5, 10.5, 3.2, 2.4, 'module', { height: 2, rot: Math.PI / 2 }));
+  o.push(rect(-10, 19.5, 3.2, 2.4, 'module', { height: 1.9, rot: 0.3 }));
+  o.push(rect(-12.5, 8.5, 3.2, 1.6, 'sled', { height: 1.4, rot: 0.5 }));
+  o.push(rect(-17.5, 16.5, 1.2, 1.2, 'crate', { height: 1.1, rot: 0.2 }));
+  o.push(rect(-7.5, 14.5, 1.2, 1.2, 'crate', { height: 1.1, rot: -0.3 }));
+  o.push(rect(-20.5, 5.5, 1.1, 2.6, 'crate', { height: 0.9 }));
+  // Схід: поле крижаних брил.
+  const blocks: [number, number, number][] = [
+    [15, 5, 1.4],
+    [20, 9, 1.2],
+    [22, -4.5, 1.3],
+    [16, -6, 1.5],
+    [11.5, 11.5, 1.2],
+    [21, 14, 1.3],
+    [24.5, 6, 1.0],
+  ];
+  for (const [x, y, r] of blocks) o.push(circle(x, y, r, 'ice', 2.4));
+  // Південь: ялиновий гай і поодинокі ялини по краях.
+  const pines: [number, number, number][] = [
+    [-5, -14, 1.5],
+    [3, -13, 1.3],
+    [-2.5, -17.5, 1.6],
+    [7, -21, 1.4],
+    [-8.5, -22, 1.2],
+    [-11, -11.5, 1.3],
+    [22, -11, 0.7],
+    [-24, -6, 0.7],
+    [-23.5, 8, 0.7],
+    [6, 22, 0.7],
+    [-4, 23, 0.7],
+    [18, -20, 0.7],
+  ];
+  for (const [x, y, r] of pines) o.push(circle(x, y, r, 'pine', 1));
+  return o;
 }
 
 export const ICE_MAP: MapDef = {
@@ -359,34 +422,79 @@ export const ICE_MAP: MapDef = {
   id: 'ice',
   obstacles: buildIceObstacles(),
   slowZones: [
-    { x: -16, y: 8, r: 3, mul: 0.6 },
-    { x: -16, y: -8, r: 3, mul: 0.6 },
-    { x: 10, y: -18, r: 2.4, mul: 0.6 },
-    { x: 12, y: 14, r: 2.6, mul: 0.6 },
+    { x: 9.5, y: -9.5, r: 2.6, mul: 0.6 },
+    { x: -16.5, y: -5, r: 2.4, mul: 0.6 },
+    { x: 9, y: 19, r: 2.6, mul: 0.6 },
+    { x: -21, y: -13, r: 2.2, mul: 0.6 },
+    { x: 23, y: 1, r: 1.8, mul: 0.6 },
   ],
   // Хуртовина: рідше й коротше за піщану бурю, приціл просідає менше.
   storm: { every: 60, warn: 3, duration: 8, aimMul: 0.6 },
 };
 
 /**
- * Чарівний ліс (DECISIONS.md, п. 73): скелет пустелі, віддзеркалений північ↔південь, щоб
- * карта ходилась інакше: гай світних дерев тепер на півночі, каміння — на півдні. Намети —
- * велетенські гриби, мішки — коріння, джип — повалений стовбур, ящики — пні.
- * Трясовина сповільнює; бур немає; вороги виходять з усіх боків.
+ * Чарівний ліс (DECISIONS.md, п. 73, 75): власна розкладка без кільця й діагональних стін.
+ * Довкола серця лісу — три нерівні дуги коріння; далі — великі світні дерева колом, повалені
+ * стовбури як стіни, грибні галявини на півночі й сході, брили на півдні. Трясовина — окремими
+ * плесами. Центр, точки появи ворогів і старт гравців — ті самі, що на станції.
  */
 function buildForestObstacles(): Obstacle[] {
-  const retag: Partial<Record<ObstacleTag, ObstacleTag>> = {
-    rock: 'boulder',
-    sandbag: 'roots',
-    tent: 'mushroom',
-    palm: 'tree',
-    wreck: 'log',
-    crate: 'stump',
-  };
-  return buildDesertObstacles().map((o) => {
-    const tag = retag[o.tag] ?? o.tag;
-    return o.kind === 'rect' ? { ...o, y: -o.y, rot: -o.rot, tag } : { ...o, y: -o.y, tag };
-  });
+  const o: Obstacle[] = [];
+  o.push(circle(0, 0, 2.6, 'core', 4));
+  const stumps: [number, number][] = [
+    [0.6, 6.2],
+    [2.2, 6.8],
+    [3.75, 6.6],
+    [4.9, 7.0],
+    [5.7, 6.0],
+  ];
+  for (const [a, r] of stumps)
+    o.push(rect(Math.cos(a) * r, Math.sin(a) * r, 1.3, 1.3, 'stump', { rot: a, height: 1 }));
+  // Коріння: низькі дуги, відкриті на схід, північ і широко на захід (старт гравців).
+  arc(o, 'roots', 11, 0.38, 1.22);
+  arc(o, 'roots', 11, 2.0, 2.7);
+  arc(o, 'roots', 11, 3.95, 5.25);
+  // Великі дерева нерівним колом.
+  const trees: [number, number, number][] = [
+    [9, 12.5, 1.6],
+    [-4, 15.5, 1.4],
+    [-13.5, 10, 1.5],
+    [15.5, -6, 1.7],
+    [4.5, -15, 1.5],
+    [-9, -13.5, 1.6],
+    [-17, -6, 1.3],
+    // Поодинокі тонкі дерева.
+    [-24, 7, 0.7],
+    [-24.5, -8.5, 0.7],
+    [8, 18, 0.7],
+    [-2.5, -17.5, 0.7],
+    [19, -2.8, 0.7],
+    [-12, 19.5, 0.7],
+    [24, -3.5, 0.7],
+  ];
+  for (const [x, y, r] of trees) o.push(circle(x, y, r, 'tree', 1));
+  // Повалені стовбури: високі стіни, за які чіпляється Павук.
+  o.push(rect(16, 9.5, 7, 1.4, 'log', { rot: 0.5, height: 1.4 }));
+  o.push(rect(-6.5, -20.5, 7, 1.4, 'log', { rot: -0.3, height: 1.4 }));
+  o.push(rect(-17, 15.5, 7, 1.4, 'log', { rot: 2.2, height: 1.4 }));
+  o.push(rect(10.5, -21, 7, 1.4, 'log', { rot: 0.9, height: 1.4 }));
+  // Велетенські гриби: галявини на півночі й сході.
+  o.push(rect(-8, 21.5, 3.2, 2.4, 'mushroom', { height: 2 }));
+  o.push(rect(6, 23, 3.2, 2.4, 'mushroom', { height: 1.9, rot: 0.2 }));
+  o.push(rect(17, 17, 3.2, 2.4, 'mushroom', { height: 2, rot: 0.4 }));
+  o.push(rect(21.5, 5.5, 3.2, 2.4, 'mushroom', { height: 2 }));
+  o.push(rect(22, -7.5, 3.2, 2.4, 'mushroom', { height: 1.9, rot: -0.3 }));
+  // Брили з кристалами — південь і південний захід.
+  const boulders: [number, number, number][] = [
+    [-14.5, -19, 1.4],
+    [-20, -12.5, 1.2],
+    [2.5, -22.5, 1.3],
+    [18, -14.5, 1.5],
+    [23, -11, 1.1],
+    [-20.5, 3.5, 1.0],
+  ];
+  for (const [x, y, r] of boulders) o.push(circle(x, y, r, 'boulder', 2.4));
+  return o;
 }
 
 export const FOREST_MAP: MapDef = {
@@ -394,11 +502,11 @@ export const FOREST_MAP: MapDef = {
   id: 'forest',
   obstacles: buildForestObstacles(),
   slowZones: [
-    { x: -15, y: -9, r: 2.6, mul: 0.55 },
-    { x: -15, y: 9, r: 2.6, mul: 0.55 },
-    { x: 9, y: 17.5, r: 2.2, mul: 0.55 },
-    { x: 13, y: -13.5, r: 2.4, mul: 0.55 },
-    { x: -24, y: 0, r: 2.2, mul: 0.55 },
+    { x: 6, y: 7.5, r: 2.2, mul: 0.55 },
+    { x: -7, y: -7.5, r: 2.2, mul: 0.55 },
+    { x: 13, y: -17, r: 2.2, mul: 0.55 },
+    { x: -20.5, y: 12, r: 2.4, mul: 0.55 },
+    { x: -14.5, y: -11, r: 2.0, mul: 0.55 },
   ],
   scatterSpawns: true,
 };
