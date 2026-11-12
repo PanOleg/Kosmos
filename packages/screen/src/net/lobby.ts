@@ -154,20 +154,28 @@ export class LobbyHost {
         );
         slot.link?.close();
       } else {
-        if (this.phase !== 'lobby') {
+        // Посеред матчу пульт без токена (нова вкладка, інший браузер, приватний режим)
+        // сідає на місце гравця, чий пульт зараз без зв'язку: найімовірніше, це він і є.
+        if (this.phase !== 'lobby') slot = this.orphan();
+        if (slot) {
+          this.log(`P${slot.index + 1}: пульт без токена зайняв місце без зв'язку`);
+          // Новий токен: колишній пульт цього місця вже не відбере його назад.
+          slot.token = this.newToken();
+        } else if (this.phase !== 'lobby') {
           link.sendReliable({ t: 'full', reason: 'inMatch' });
           this.log(`відмова пульту: матч уже йде, а токен ${m.token ? 'не знайдено' : 'порожній'}`);
           return;
+        } else {
+          let free = this.slots.findIndex((s) => s === null);
+          if (free < 0) free = this.evictForNewcomer();
+          if (free < 0) {
+            link.sendReliable({ t: 'full', reason: 'full' });
+            this.log('відмова пульту: усі чотири місця зайняті');
+            return;
+          }
+          slot = this.createSlot(free, 'phone', m.token || this.newToken());
+          this.log(`P${slot.index + 1}: новий пульт, клас ${slot.classId ?? '—'}`);
         }
-        let free = this.slots.findIndex((s) => s === null);
-        if (free < 0) free = this.evictForNewcomer();
-        if (free < 0) {
-          link.sendReliable({ t: 'full', reason: 'full' });
-          this.log('відмова пульту: усі чотири місця зайняті');
-          return;
-        }
-        slot = this.createSlot(free, 'phone', m.token || this.newToken());
-        this.log(`P${slot.index + 1}: новий пульт, клас ${slot.classId ?? '—'}`);
       }
       slot.link = link;
       slot.lostAt = null;
@@ -311,6 +319,15 @@ export class LobbyHost {
    * Лобі повне, а прийшов живий гравець: звільняємо місце пульта без зв'язку (того, що зник
    * найдавніше), а якщо таких немає — бота. Живих гравців і клавіатуру не чіпаємо.
    */
+  /** Слот телефона, що найдовше без зв'язку. */
+  private orphan(): Slot | null {
+    return (
+      this.slots
+        .filter((s): s is Slot => s !== null && s.kind === 'phone' && s.link === null)
+        .sort((a, b) => (a.lostAt ?? 0) - (b.lostAt ?? 0))[0] ?? null
+    );
+  }
+
   private evictForNewcomer(): number {
     const dead = this.slots
       .filter((s): s is Slot => s !== null && s.kind === 'phone' && s.link === null)

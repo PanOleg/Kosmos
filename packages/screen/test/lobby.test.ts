@@ -201,15 +201,40 @@ describe('lobby', () => {
       ),
       order,
     );
+    // Поки всі пульти на зв'язку, новий незнайомий пульт під час матчу не впускаємо.
+    expect(join('stranger').last('full')?.reason).toBe('inMatch');
     a.close();
     advance(6000);
     expect(host.botControlled(host.slots[1]!)).toBe(true);
-    // Новий незнайомий пульт під час матчу не впускаємо.
-    expect(join('stranger').last('full')?.reason).toBe('inMatch');
     const back = join('a2', token);
     expect(back.last('welcome')?.slot).toBe(1);
     expect(host.slots[1]!.classId).toBe('engineer');
     expect(host.botControlled(host.slots[1]!)).toBe(false);
+  });
+
+  test('mid-match a controller without a token takes the seat that lost its phone', () => {
+    const { host, join } = setup();
+    join('x');
+    const a = join('a');
+    const token = a.last('welcome')!.token;
+    for (const s of host.slots) if (s) s.ready = true;
+    const order = host.slots.filter((s) => s !== null);
+    host.beginMatch(
+      createGame(
+        undefined,
+        1,
+        order.map((s) => ({ classId: s.classId! })),
+      ),
+      order,
+    );
+    a.close();
+    // Та сама людина відкрила пульт у новій вкладці: токена немає, але місце вільне.
+    const fresh = join('a-new-tab');
+    expect(fresh.last('welcome')?.slot).toBe(1);
+    expect(host.botControlled(host.slots[1]!)).toBe(false);
+    // Старий токен більше не діє — два пульти не б'ються за одне місце.
+    expect(fresh.last('welcome')!.token).not.toBe(token);
+    expect(join('a-old', token).last('full')?.reason).toBe('inMatch');
   });
 
   test('stale unordered input packets are dropped', () => {

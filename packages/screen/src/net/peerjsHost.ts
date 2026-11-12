@@ -42,7 +42,16 @@ export class PeerJsHost implements HostTransport {
       // Втрата сигналінг-сервера не рве вже встановлені з'єднання; лише нові не прийдуть.
       peer.on('disconnected', () => {
         logNet('сервер сигналінгу від’єднався: нові пульти не зайдуть, поки не повернеться');
-        if (!peer.destroyed) setTimeout(() => peer.reconnect(), 1000);
+        setTimeout(() => peer.disconnected && !peer.destroyed && peer.reconnect(), 1000);
+      });
+      // Після обриву мережі сокет сигналінгу буває мертвим ще з пів хвилини, поки PeerJS
+      // це помітить, — і всі дзвінки пультів за цей час губляться. Мережа повернулась —
+      // перевідкриваємо його одразу; ігрові лінії це не зачіпає.
+      window.addEventListener('online', () => {
+        if (peer !== this.peer || peer.destroyed || !opened) return;
+        logNet('мережа повернулась — перевідкриваю сигналінг');
+        // Обробник disconnected вище сам підключить його заново.
+        if (!peer.disconnected) peer.disconnect();
       });
       peer.on('connection', (conn) => this.accept(conn));
     });

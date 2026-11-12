@@ -108,9 +108,28 @@ if (!room) {
 function run(room: string): void {
   show('connecting');
   $('conn-msg').textContent = `Кімната ${room}`;
-  // Токен повернення в слот — у sessionStorage: переживає оновлення сторінки й відновлення
-  // вкладки після сну, але не ділиться між вкладками (інакше друга вкладка вкрала б слот).
+  // Токен повернення в слот. sessionStorage переживає оновлення сторінки; localStorage — ще
+  // й нову вкладку (гравець після обриву часто сканує QR заново). У локальному режимі
+  // розробки вкладки одного браузера — різні гравці, тож там спільного сховища немає.
   const tokenKey = `horizon-token-${room}`;
+  const shared = params.get('net') !== 'local';
+  const loadToken = (): string => {
+    try {
+      return (
+        sessionStorage.getItem(tokenKey) ?? (shared ? localStorage.getItem(tokenKey) : null) ?? ''
+      );
+    } catch {
+      return '';
+    }
+  };
+  const saveToken = (t: string): void => {
+    try {
+      sessionStorage.setItem(tokenKey, t);
+      if (shared) localStorage.setItem(tokenKey, t);
+    } catch {
+      // приватний режим без сховища — повернення в слот зробить екран за вільним місцем
+    }
+  };
   // ?net=local — без мережі, через BroadcastChannel з екраном на тому ж origin.
   const net: ClientTransport =
     params.get('net') === 'local' ? new LocalNet(room) : new ControllerNet(room);
@@ -446,7 +465,7 @@ function run(room: string): void {
         diag.add('пульт', `екран прийняв: гравець ${m.slot + 1}`);
         flushLog();
         slot = m.slot;
-        sessionStorage.setItem(tokenKey, m.token);
+        saveToken(m.token);
         break;
       case 'full':
         diag.add('пульт', `екран відмовив: ${m.reason}`);
@@ -593,7 +612,7 @@ function run(room: string): void {
   net.start(() => ({
     t: 'hello',
     v: PROTOCOL_VERSION,
-    token: sessionStorage.getItem(tokenKey) ?? '',
+    token: loadToken(),
   }));
 
   // Ввід — повний стан пульта з фіксованою частотою, ненадійним каналом.
