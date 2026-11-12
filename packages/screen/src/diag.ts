@@ -95,9 +95,13 @@ export async function routeOf(pc: RTCPeerConnection): Promise<string> {
 /** Стани ICE й з'єднання — у журнал; кандидати — лише підсумком за типами. */
 export function watchPeer(pc: RTCPeerConnection, who: string): void {
   const kinds: Record<string, number> = {};
+  let meter = 0;
   pc.addEventListener('icecandidate', (e) => {
     const m = e.candidate ? / typ (\w+)/.exec(e.candidate.candidate) : null;
-    if (m) kinds[m[1]!] = (kinds[m[1]!] ?? 0) + 1;
+    if (!m) return;
+    // host буває справжньою адресою або іменем *.local (mDNS) — від цього залежить пряме з'єднання.
+    const k = m[1] === 'host' && /\.local /.test(e.candidate!.candidate) ? 'host(mdns)' : m[1]!;
+    kinds[k] = (kinds[k] ?? 0) + 1;
   });
   pc.addEventListener('icegatheringstatechange', () => {
     if (pc.iceGatheringState === 'complete')
@@ -108,7 +112,23 @@ export function watchPeer(pc: RTCPeerConnection, who: string): void {
   pc.addEventListener('iceconnectionstatechange', () => {
     const s = pc.iceConnectionState;
     logNet(`${who}: ICE ${s}`);
-    if (s === 'connected') void routeOf(pc).then((r) => logNet(`${who}: ${r}`));
+    if (s === 'connected') {
+      void routeOf(pc).then((r) => logNet(`${who}: ${r}`));
+      // Чому не напряму: які пари адрес пробувались і чим скінчились (п. 74).
+      window.setTimeout(() => void pairSummary(pc).then((r) => logNet(`${who}: пари ${r}`)), 3000);
+      window.clearInterval(meter);
+      let last = 0;
+      meter = window.setInterval(() => {
+        void trafficOf(pc).then((b) => {
+          if (b === null || pc.iceConnectionState === 'closed') return window.clearInterval(meter);
+          logNet(
+            `${who}: трафік за хвилину ${Math.round((b - last) / 1024)} КБ, усього ${Math.round(b / 1024)} КБ`,
+          );
+          last = b;
+        });
+      }, 60000);
+    }
+    if (s === 'closed' || s === 'failed') window.clearInterval(meter);
   });
   pc.addEventListener('icecandidateerror', (e) => {
     const ev = e as RTCPeerConnectionIceErrorEvent;
@@ -165,4 +185,52 @@ export function startUpload(role: 'screen' | 'controller', room: () => string): 
   // Початок сесії — одразу: видно, хто й звідки зайшов, навіть якщо далі все зависне.
   sent = 0;
   timer = window.setTimeout(flush, 4000);
+}
+
+type PairStat = {
+  type: string;
+  state?: string;
+  localCandidateId?: string;
+  remoteCandidateId?: string;
+  bytesSent?: number;
+  bytesReceived?: number;
+};
+
+/** Підсумок пар ICE: «host↔host failed×2, srflx↔relay succeeded×1». */
+export async function pairSummary(pc: RTCPeerConnection): Promise<string> {
+  try {
+    const stats = await pc.getStats();
+    const count: Record<string, number> = {};
+    const kind = (id?: string) =>
+      (id ? (stats.get(id) as { candidateType?: string } | undefined)?.candidateType : '') ?? '?';
+    stats.forEach((r: PairStat) => {
+      if (r.type !== 'candidate-pair') return;
+      const k = `${kind(r.localCandidateId)}↔${kind(r.remoteCandidateId)} ${r.state ?? '?'}`;
+      count[k] = (count[k] ?? 0) + 1;
+    });
+    const out = Object.entries(count).map(([k, n]) => `${k}×${n}`);
+    return out.length ? out.join(', ') : 'немає даних';
+  } catch (e) {
+    return `невідомо (${describeError(e)})`;
+  }
+}
+
+/** Байтів передано й прийнято цим з'єднанням (усі пари); null — статистика недоступна. */
+export async function trafficOf(pc: RTCPeerConnection): Promise<number | null> {
+  try {
+    const stats = await pc.getStats();
+    let sum = 0;
+    stats.forEach((r: PairStat) => {
+      if (r.type === 'candidate-pair') sum += (r.bytesSent ?? 0) + (r.bytesReceived ?? 0);
+    });
+    return sum;
+  } catch {
+    return null;
+  }
+}
+
+/** Чи йде з'єднання через ретранслятор: true/false, null — ще невідомо. */
+export async function viaRelay(pc: RTCPeerConnection): Promise<boolean | null> {
+  const r = await routeOf(pc);
+  return r.includes('невідомий') ? null : r.includes('relay');
 }

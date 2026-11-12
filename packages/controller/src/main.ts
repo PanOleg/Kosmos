@@ -586,6 +586,9 @@ function run(room: string): void {
   const inp: PlayerInput = { move: { x: 0, y: 0 }, ability: false, dash: false, buy: 0 };
   const packet = new DataView(new ArrayBuffer(INPUT_PACKET_SIZE));
   let seq = 0;
+  let lastSig = NaN;
+  let repeats = 0;
+  let idleTicks = 0;
   window.setInterval(() => {
     if (net.state !== 'open' || phase !== 'match') return;
     inp.move.x = stick.x;
@@ -599,6 +602,20 @@ function run(room: string): void {
     inp.ability = abilityPressed;
     inp.dash = performance.now() < stick.dashUntil;
     inp.buy = performance.now() < buyUntil ? buyItem : 0;
+    // Трафік (п. 74): незмінний ввід (палець стоїть або відпущений) — 10 разів на секунду
+    // замість 30; будь-яка зміна йде одразу й ще двічі поспіль на випадок втрати пакета.
+    const sig =
+      Math.round(inp.move.x * 40) * 4096 +
+      Math.round(inp.move.y * 40) * 32 +
+      (inp.ability ? 1 : 0) +
+      (inp.dash ? 2 : 0) +
+      inp.buy * 4;
+    if (sig !== lastSig) {
+      lastSig = sig;
+      repeats = 2;
+    } else if (repeats > 0) repeats--;
+    else if (++idleTicks < 3) return;
+    idleTicks = 0;
     encodeInput(packet, seq++, inp);
     net.sendPacket(packet.buffer.slice(0) as ArrayBuffer);
   }, 1000 / SEND_HZ);

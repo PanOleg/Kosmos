@@ -149,6 +149,28 @@ describe('lobby', () => {
     expect(join('h').last('full')?.reason).toBe('full');
   });
 
+  test('unchanged status is not resent ten times a second, only once a second', () => {
+    const { host, join, advance } = setup();
+    const a = join('a');
+    const count = () => a.sent.filter((m) => m.t === 'status').length;
+    advance(200);
+    host.update();
+    const first = count();
+    for (let i = 0; i < 8; i++) {
+      advance(100);
+      host.update();
+    }
+    expect(count()).toBe(first);
+    advance(300);
+    host.update();
+    expect(count()).toBe(first + 1);
+    // Зміна йде одразу.
+    a.onReliable({ t: 'class', classId: 'tech' });
+    advance(100);
+    host.update();
+    expect(count()).toBe(first + 2);
+  });
+
   test('fifth player is rejected', () => {
     const { join } = setup();
     for (const id of ['a', 'b', 'c', 'd']) join(id);

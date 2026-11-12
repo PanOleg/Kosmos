@@ -31,6 +31,7 @@ import {
   type LobbySlotInfo,
   type PauseInfo,
   type ScreenPhase,
+  type ScreenMessage,
 } from '@horizon/sim/protocol';
 import type { Link } from './transport';
 
@@ -58,6 +59,8 @@ export interface Slot {
 
 const PING_EVERY = 1000;
 const STATUS_EVERY = 100;
+/** Незмінний статус повторюється не частіше ніж раз на стільки мс. */
+const STATUS_HEARTBEAT = 1000;
 /** Через стільки після розриву гравця в матчі веде бот (DECISIONS.md, п. 15). */
 export const BOT_TAKEOVER_MS = 5000;
 const LOBBY_DROP_MS = 20000;
@@ -81,6 +84,7 @@ export class LobbyHost {
   private game: Game | null = null;
   private lastPing = 0;
   private lastStatus = 0;
+  private readonly statusSent = new WeakMap<Link, { body: string; at: number }>();
   private pingId = 1;
   private readonly pingSent = new Map<number, number>();
   private readonly buf = new DataView(new ArrayBuffer(PING_PACKET_SIZE));
@@ -561,7 +565,8 @@ export class LobbyHost {
       for (const s of this.slots) {
         if (!s?.link) continue;
         const p = g?.state.players[s.index];
-        s.link.sendReliable({
+        const rv = p && g && !p.down ? reviveInfo(g, p) : null;
+        const msg: ScreenMessage = {
           t: 'status',
           phase: this.phase,
           classId: s.classId,
@@ -569,7 +574,8 @@ export class LobbyHost {
           maxHp: p ? p.maxHp : 0,
           parts: p ? Math.floor(p.parts + 1e-6) : 0,
           down: p ? p.down : false,
-          ability: p && g ? abilityReadiness(g, p) : 1,
+          // Крок 0,05: кільце на пульті й так плавне, а повідомлень на порядок менше.
+          ability: p && g ? Math.floor(abilityReadiness(g, p) * 20) / 20 : 1,
           wave: g ? g.state.wave.index : 0,
           shop:
             p && g && shopOpen(g)
@@ -585,13 +591,20 @@ export class LobbyHost {
                   life: g.state.players.length === 1 && !p.lifeBought ? REVIVE.soloLifePrice : null,
                 }
               : null,
-          revive: p && g && !p.down ? reviveInfo(g, p) : null,
+          revive: rv && { ...rv, progress: Math.round(rv.progress * 20) / 20 },
           bleed: p && p.down ? (p.out ? -1 : Math.ceil(p.bleedT / TICKS_PER_SEC)) : 0,
           pause: this.pause && { by: this.pause.by, waiting: [...this.pause.waiting] },
           resumeIn: this.resumeIn(),
           dropped,
           audio: this.audio,
-        });
+        };
+        // Трафік (п. 74): статус іде лише коли щось змінилось, і раз на секунду — для певності.
+        // Раніше — 10 разів на секунду кожному пульту, здебільшого те саме.
+        const body = JSON.stringify(msg);
+        const last = this.statusSent.get(s.link);
+        if (last && last.body === body && t - last.at < STATUS_HEARTBEAT) continue;
+        this.statusSent.set(s.link, { body, at: t });
+        s.link.sendReliable(msg);
       }
     }
   }

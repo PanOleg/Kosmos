@@ -75,6 +75,9 @@ const uk = {
   teamParts: 'деталі',
   teamRevives: 'воскресіння',
   resFoot: (s: number) => `«Ще раз» на будь-якому пульті або Enter · лобі через ${s} с`,
+  relay: 'ретранслятор',
+  relayHint:
+    'З’єднання йде через сервер в інтернеті, а не напряму в домашній мережі: трохи більша затримка',
   mapLabel: 'Карта',
   soundLabel: 'Звук',
   audioName: { music: 'Музика', sfx: 'Звуки', voice: 'Озвучка' } as Record<string, string>,

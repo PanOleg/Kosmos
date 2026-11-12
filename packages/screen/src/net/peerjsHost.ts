@@ -2,7 +2,7 @@ import Peer, { type DataConnection } from 'peerjs';
 import type { ControllerMessage, ScreenMessage } from '@horizon/sim/protocol';
 import { RoomTakenError, type HostTransport, type Link } from './transport';
 import { iceServers } from './ice';
-import { logErr, logNet, watchPeer } from '../diag';
+import { logErr, logNet, viaRelay, watchPeer } from '../diag';
 
 export const PEER_PREFIX = 'horizon-room-';
 /** Узгоджений канал вводу: той самий id на обох кінцях, без нового обміну SDP. */
@@ -82,6 +82,10 @@ export class PeerJsHost implements HostTransport {
     };
     conn.on('open', () => {
       logNet(`${who}: канал відкрито`);
+      window.setTimeout(
+        () => void viaRelay(conn.peerConnection).then((r) => (link.relay = r)),
+        1500,
+      );
       unreliable = conn.peerConnection.createDataChannel('input', {
         negotiated: true,
         id: INPUT_CHANNEL_ID,

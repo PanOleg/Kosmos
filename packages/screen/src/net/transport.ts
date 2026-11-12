@@ -7,6 +7,8 @@ import type { ControllerMessage, ScreenMessage } from '@horizon/sim/protocol';
 export interface Link {
   readonly id: string;
   readonly open: boolean;
+  /** Через ретранслятор (TURN): повільніше й витрачає місячний ліміт; null — невідомо. */
+  relay?: boolean | null;
   sendReliable(msg: ScreenMessage): void;
   /** Ненадійний невпорядкований канал; мовчки губиться, якщо ще не відкритий. */
   sendUnreliable(buf: ArrayBuffer): void;

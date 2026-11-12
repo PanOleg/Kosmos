@@ -41,6 +41,9 @@ const css = `
 .lobby .settings { margin-top: 18px; width: 474px; padding: 12px 14px; border-radius: 12px; background: rgba(10,12,18,.7);
   display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
 .lobby .settings .row { display: flex; align-items: center; gap: 8px; }
+/* Режимів багато: на вузькому екрані переносяться на другий рядок під першим. */
+.lobby .settings .row.wrap { flex-wrap: wrap; row-gap: 6px; }
+.lobby .settings .row.wrap .grp { display: flex; flex-wrap: wrap; gap: 6px 8px; flex: 1; min-width: 0; }
 .lobby .settings .lbl { width: 110px; opacity: .7; }
 .lobby .settings button[data-mod], .lobby .settings button[data-endless] { padding: 5px 6px; font-size: 12px; white-space: nowrap; }
 .lobby .settings button { font: inherit; color: inherit; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18);
@@ -220,8 +223,10 @@ export class LobbyView {
       const conn =
         s.kind === 'phone' && !s.link ? t.slotLost : s.ready ? t.slotReady : t.slotChoosing;
       const ping = s.kind === 'phone' && !Number.isNaN(s.rtt) ? ` · ${Math.round(s.rtt)} мс` : '';
+      // ☁ — з'єднання через ретранслятор, а не напряму в домашній мережі.
+      const relay = s.link?.relay ? ` · <span title="${t.relayHint}">☁ ${t.relay}</span>` : '';
       parts.push(
-        `<div class="slot on" style="border-color:${color}">${s.classId ? `<img class="pt" src="${import.meta.env.BASE_URL}classes/${s.classId}.png" alt="">` : ''}<div class="tx"><div class="n">P${i + 1} ${kind}</div><div class="c" style="color:${color}">${s.classId ? t.className[s.classId] : '—'}</div><div class="s">${conn}${ping}</div></div></div>`,
+        `<div class="slot on" style="border-color:${color}">${s.classId ? `<img class="pt" src="${import.meta.env.BASE_URL}classes/${s.classId}.png" alt="">` : ''}<div class="tx"><div class="n">P${i + 1} ${kind}</div><div class="c" style="color:${color}">${s.classId ? t.className[s.classId] : '—'}</div><div class="s">${conn}${ping}${relay}</div></div></div>`,
       );
     }
     // Перемальовуємо лише зміни: інакше портрети блимали б щоразу (рендер — кожні 200 мс).
@@ -362,7 +367,7 @@ export class LobbyView {
       .join('');
     this.settingsEl.innerHTML = `<div class="row"><span class="lbl">${t.mapLabel}</span>${maps}</div>
 <div class="row"><span class="lbl">${t.soundLabel}</span>${audio}</div>
-<div class="row"><span class="lbl">${t.modsLabel}</span>${mods}</div>
+<div class="row wrap"><span class="lbl">${t.modsLabel}</span><div class="grp">${mods}</div></div>
 <div class="row"><span class="lbl">${t.difficulty}</span>${presets}<span class="preset-note" style="opacity:.6;margin-left:auto">${s.custom ? t.customized : ''}</span></div>
 <div class="row"><span class="lbl">${t.wavesLabel}</span><button data-waves="-1">−</button><span class="val">${s.waves}</span><button data-waves="1">+</button><button data-adv="1" style="margin-left:auto">${t.advanced}</button></div>
 <div class="adv">${sliders}<div class="row"><button data-reset="1">${t.resetCustom}</button></div></div>`;
