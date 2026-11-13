@@ -147,6 +147,21 @@ export class AbilityRenderer {
           this.sparks.burst(30, X, 0.6, Z, 1, 0, 10, Math.PI * 2, 0.4, 0.2, 0x9fd0ff);
         } else if (e.b === 0) {
           this.sparks.burst(18, X, 1, Z, 1, 0, 6, Math.PI * 2, 0.3, 0.16, 0xffa040);
+        } else if (e.b === 1) {
+          // Щит-сфери: хвиля іскор до радіуса дії.
+          this.sparks.burst(
+            36,
+            X,
+            0.8,
+            Z,
+            1,
+            0,
+            e.value * 1.6,
+            Math.PI * 2,
+            0.45,
+            0.2,
+            classColor('engineer'),
+          );
         } else if (e.b === 2) {
           this.sparks.burst(20, X, 0.4, Z, 1, 0, 5, Math.PI * 2, 0.5, 0.18, classColor('medic'));
         }

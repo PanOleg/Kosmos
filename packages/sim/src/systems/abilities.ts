@@ -1,5 +1,4 @@
-import { ABILITIES } from '../config/classes';
-import { resolveCircle } from '../collision/world';
+import { ABILITIES, isArmored } from '../config/classes';
 import type { Barrier } from '../entities/barrier';
 import type { Player } from '../entities/player';
 import { emit } from '../events';
@@ -23,6 +22,7 @@ export function updateAbilities(game: Game): void {
   const s = game.state;
   for (const p of s.players) {
     if (p.abilityCd > 0) p.abilityCd--;
+    if (p.shieldT > 0 && --p.shieldT === 0) p.shield = 0;
     if (p.overheatT > 0) p.overheatT--;
     if (p.abilityT > 0) {
       p.abilityT--;
@@ -50,8 +50,10 @@ function activate(game: Game, p: Player): void {
       ? boost
         ? UPGRADES.abilityBoost.empRadius
         : ABILITIES.emp.radius
-      : p.classId === 'engineer' && boost
-        ? UPGRADES.abilityBoost.barrierLength
+      : p.classId === 'engineer'
+        ? boost
+          ? UPGRADES.abilityBoost.shieldRadius
+          : ABILITIES.shield.radius
         : 0;
   emit(
     game.events,
@@ -74,24 +76,16 @@ function activate(game: Game, p: Player): void {
       p.abilityT = secToTicks(ABILITIES.healField.duration);
       break;
     case 'engineer': {
-      const b = s.barriers.find((x) => !x.alive) ?? oldestBarrier(s.barriers);
-      const cfg = ABILITIES.barrier;
-      // Стіна перед Інженером, поперек погляду: прикриває його й тих, хто позаду.
-      let cx = p.x + p.fx * cfg.distance;
-      let cy = p.y + p.fy * cfg.distance;
-      const r = resolveCircle(game.world, cx, cy, 0.3);
-      cx = r.x;
-      cy = r.y;
-      b.alive = true;
-      b.owner = p.slot;
-      b.x = cx;
-      b.y = cy;
-      b.ux = -p.fy;
-      b.uy = p.fx;
-      b.halfLen = (boost ? UPGRADES.abilityBoost.barrierLength : cfg.length) / 2;
-      b.halfThick = cfg.thickness / 2;
-      b.hp = b.maxHp = boost ? UPGRADES.abilityBoost.barrierHp : cfg.hp;
-      b.life = secToTicks(cfg.duration);
+      // Щит-сфера кожному, хто стоїть поруч, і собі; повторний щит оновлює, а не додається.
+      const cfg = ABILITIES.shield;
+      const radius = boost ? UPGRADES.abilityBoost.shieldRadius : cfg.radius;
+      const hp = boost ? UPGRADES.abilityBoost.shieldHp : cfg.hp;
+      for (const o of s.players) {
+        if (o.down || isArmored(o.classId)) continue;
+        if ((o.x - p.x) ** 2 + (o.y - p.y) ** 2 > radius * radius) continue;
+        o.shield = o.shieldMax = hp;
+        o.shieldT = secToTicks(cfg.duration);
+      }
       break;
     }
     case 'tech': {
@@ -128,12 +122,6 @@ function tickActive(game: Game, p: Player): void {
 function endAbility(game: Game, p: Player): void {
   if (p.classId === 'assault') p.overheatT = secToTicks(ABILITIES.overload.overheat);
   emit(game.events, 'abilityEnd', p.x, p.y, 0, 0, p.slot, ABILITY_CLASS_INDEX[p.classId]);
-}
-
-function oldestBarrier(list: Barrier[]): Barrier {
-  let best = list[0]!;
-  for (const b of list) if (b.life < best.life) best = b;
-  return best;
 }
 
 function updateBarriers(game: Game): void {

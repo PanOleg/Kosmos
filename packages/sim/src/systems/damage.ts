@@ -20,6 +20,15 @@ export function damagePlayer(
     emit(game.events, 'armorBlock', p.x, p.y, fromX, fromY, p.slot);
     return;
   }
+  // Щит-сфера Інженера поглинає шкоду першою.
+  if (p.shield > 0) {
+    const absorbed = Math.min(p.shield, amount);
+    p.shield -= absorbed;
+    amount -= absorbed;
+    if (p.shield <= 0) p.shieldT = 0;
+    emit(game.events, 'armorBlock', p.x, p.y, fromX, fromY, p.slot, 1, absorbed);
+    if (amount <= 0) return;
+  }
   p.hp -= amount;
   p.stats.damageTaken += amount;
   emit(game.events, 'playerHit', p.x, p.y, fromX, fromY, p.slot, 0, amount);
@@ -30,6 +39,8 @@ export function damagePlayer(
 export function knockDown(game: Game, p: Player): void {
   if (p.down || isArmored(p.classId)) return;
   p.hp = 0;
+  p.shield = 0;
+  p.shieldT = 0;
   p.down = true;
   p.target = -1;
   onPlayerDown(p);

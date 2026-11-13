@@ -4,12 +4,11 @@ import {
   step,
   spawnEnemy,
   abilityReadiness,
-  TEAM_ENEMY,
   type ClassId,
   type Game,
   type PlayerInput,
 } from '../src/index';
-import { spawnProjectile } from '../src/systems/combat';
+import { damagePlayer } from '../src/systems/damage';
 
 const idle = (): PlayerInput => ({ move: { x: 0, y: 0 }, ability: false, dash: false, buy: 0 });
 const press = (): PlayerInput => ({ move: { x: 0, y: 0 }, ability: true, dash: false, buy: 0 });
@@ -70,23 +69,32 @@ describe('abilities', () => {
     expect(shotsIn(over, 100)).toBe(0);
   });
 
-  test('engineer barrier stops enemy projectiles and breaks after 300 damage', () => {
-    const g = setup('engineer');
-    const p = g.state.players[0]!;
-    p.fx = 1;
-    p.fy = 0;
-    step(g, [press()]);
-    const b = g.state.barriers.find((x) => x.alive)!;
-    expect(b).toBeDefined();
-    // Ворожа куля летить у гравця крізь бар'єр.
-    spawnProjectile(g, TEAM_ENEMY, 0, p.x + 6, p.y, -1, 0, 16, 14, 50, 0, 0.25);
-    run(g, 60);
-    expect(p.stats.damageTaken).toBe(0);
-    expect(b.hp).toBe(250);
-    for (let i = 0; i < 5; i++)
-      spawnProjectile(g, TEAM_ENEMY, 0, p.x + 6, p.y + i * 0.3 - 0.6, -1, 0, 16, 14, 50, 0, 0.25);
-    run(g, 60);
-    expect(b.alive).toBe(false);
+  test('engineer shields everyone nearby: the sphere absorbs 80 damage, then fades', () => {
+    const g = createGame(undefined, 5, [
+      { classId: 'engineer' },
+      { classId: 'assault' },
+      { classId: 'medic' },
+    ]);
+    g.config = { ...g.config, waves: [] };
+    g.state.wave.phase = 'done';
+    const [e, near, far] = g.state.players;
+    e!.x = e!.px = -18;
+    near!.x = near!.px = -15;
+    far!.x = far!.px = -8;
+    e!.y = near!.y = far!.y = 0;
+    step(g, [press(), idle(), idle()]);
+    expect(e!.shield).toBe(80);
+    expect(near!.shield).toBe(80);
+    expect(far!.shield).toBe(0);
+    damagePlayer(g, near!, 50, 0, 0);
+    expect(near!.hp).toBe(near!.maxHp);
+    expect(near!.shield).toBe(30);
+    // Залишок шкоди понад щит проходить у здоров'я.
+    damagePlayer(g, near!, 50, 0, 0);
+    expect(near!.shield).toBe(0);
+    expect(near!.hp).toBe(near!.maxHp - 20);
+    for (let i = 0; i < 60 * 8 + 2; i++) step(g, [idle(), idle(), idle()]);
+    expect(e!.shield).toBe(0);
   });
 
   test('medic field heals allies in radius', () => {

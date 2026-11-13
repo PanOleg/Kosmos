@@ -219,6 +219,8 @@ export class PlayerView {
   private ringPulse = 0;
   private readonly muzzle: THREE.Mesh;
   private readonly model: ModelInstance | null;
+  /** Щит-сфера Інженера на цьому гравцеві: видно, поки щит тримає шкоду. */
+  private readonly shield: THREE.Mesh;
   /** Силова бульбашка Малюка: видно, що броню не пробити. */
   private bubble: THREE.Mesh | null = null;
   /** Лікувальний дрон Медика: кружляє біля плеча (концепт classes.jpg). */
@@ -336,6 +338,33 @@ export class PlayerView {
     this.muzzle.visible = false;
     this.body.add(this.muzzle);
     this.root.add(this.body);
+    const shieldColor = classColor('engineer');
+    this.shield = new THREE.Mesh(
+      new THREE.SphereGeometry(1.0, 20, 14),
+      new THREE.MeshBasicMaterial({
+        color: shieldColor,
+        transparent: true,
+        opacity: 0.22,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      }),
+    );
+    this.shield.add(
+      new THREE.Mesh(
+        new THREE.IcosahedronGeometry(1.02, 1),
+        new THREE.MeshBasicMaterial({
+          color: shieldColor,
+          transparent: true,
+          opacity: 0.3,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          wireframe: true,
+        }),
+      ),
+    );
+    this.shield.position.y = 0.85;
+    this.shield.visible = false;
+    this.root.add(this.shield);
     // Візуально більший за хітбокс (0.5 м): з дивана на телевізорі інакше губиться.
     this.root.scale.setScalar(VISUAL_SCALE);
 
@@ -434,6 +463,15 @@ export class PlayerView {
     }
     // Вибулий до наступної хвилі зникає з арени.
     this.root.visible = !p.out;
+    this.shield.visible = p.shield > 0 && !p.down;
+    if (this.shield.visible) {
+      // Що менше лишилось щита, то блідіша сфера; останні півтори секунди вона блимає.
+      const left = p.shieldMax > 0 ? p.shield / p.shieldMax : 1;
+      const blink = p.shieldT < 90 ? 0.6 + 0.4 * Math.sin(time * 18) : 1;
+      (this.shield.material as THREE.MeshBasicMaterial).opacity =
+        (0.1 + 0.16 * left + this.flash * 0.4) * blink;
+      this.shield.rotation.y = time * 0.8;
+    }
     if (this.bubble) {
       this.bubble.rotation.y = time * 0.6;
       // Удар у броню (hitFlash) — бульбашка на мить спалахує.

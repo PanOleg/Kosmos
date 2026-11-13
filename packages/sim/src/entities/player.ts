@@ -23,6 +23,10 @@ export interface Player {
   dashDy: number;
   /** Тики невразливості (ривок, підйом). */
   invuln: number;
+  /** Щит-сфера Інженера: скільки шкоди ще поглине, скільки було, тики до зникнення. */
+  shield: number;
+  shieldMax: number;
+  shieldT: number;
   prevDash: boolean;
   prevAbility: boolean;
   /** Цього тику натиснуто здібність (передній фронт кнопки). */
@@ -92,6 +96,9 @@ export function createPlayer(
     dashDx: 0,
     dashDy: 0,
     invuln: 0,
+    shield: 0,
+    shieldMax: 0,
+    shieldT: 0,
     prevDash: false,
     prevAbility: false,
     abilityPressed: false,

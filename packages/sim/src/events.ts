@@ -33,7 +33,7 @@ export type GameEventType =
   | 'shieldUp'
   | 'shieldBreak'
   | 'playerHit'
-  /** Удар у непробивну броню Малюка: a — слот; шкоди немає. */
+  /** Удар у непробивну броню Малюка (b = 0) або в щит-сферу Інженера (b = 1, value — поглинуто): a — слот. */
   | 'armorBlock'
   | 'pickup'
   | 'purchase'

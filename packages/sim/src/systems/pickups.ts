@@ -1,3 +1,4 @@
+import { isArmored } from '../config/classes';
 import { PICKUPS } from '../config/waves';
 import { resolveCircle } from '../collision/world';
 import { emit } from '../events';
@@ -29,6 +30,11 @@ export function dropParts(game: Game, x: number, y: number, count: number): void
   }
 }
 
+/** Малюк деталей не збирає й не отримує частку — хіба що грають самі Малюки. */
+function collects(game: Game, p: { classId: Parameters<typeof isArmored>[0] }): boolean {
+  return !isArmored(p.classId) || game.state.players.every((o) => isArmored(o.classId));
+}
+
 export function updatePickups(game: Game): void {
   const s = game.state;
   const cfg = game.config.player;
@@ -50,7 +56,7 @@ export function updatePickups(game: Game): void {
       p.magnet = -1;
       let bestD = vacuum ? Infinity : grab2;
       for (const pl of s.players) {
-        if (pl.down) continue;
+        if (pl.down || !collects(game, pl)) continue;
         const d = (pl.x - p.x) ** 2 + (pl.y - p.y) ** 2;
         if (d < bestD) {
           bestD = d;
@@ -90,11 +96,12 @@ export function updatePickups(game: Game): void {
 function collect(game: Game, slot: number, value: number, x: number, y: number): void {
   const s = game.state;
   let alive = 0;
-  for (const p of s.players) if (!p.down) alive++;
+  for (const p of s.players) if (!p.down && collects(game, p)) alive++;
   const shared = alive > 1 ? value * PICKUPS.sharedFraction : 0;
   const picker = s.players[slot]!;
   picker.parts += value - shared;
   picker.stats.partsCollected += value;
-  if (shared > 0) for (const p of s.players) if (!p.down) p.parts += shared / alive;
+  if (shared > 0)
+    for (const p of s.players) if (!p.down && collects(game, p)) p.parts += shared / alive;
   emit(game.events, 'pickup', x, y, 0, 0, slot, 0, value);
 }

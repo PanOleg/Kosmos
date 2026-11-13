@@ -467,7 +467,7 @@ export function botInput(
         out.ability = drones >= 2 || near >= 4;
         break;
       case 'engineer':
-        // Бар'єр — від обстрілу й натовпу.
+        // Щит-сфера — від обстрілу й натовпу.
         out.ability = danger || near >= 3;
         break;
       default:

@@ -299,9 +299,23 @@ export class FxDirector {
         break;
       }
       case 'armorBlock':
-        // Броня Малюка: бульбашка спалахує, іскри кольору класу; без тряски й червоного екрана.
+        // Броня Малюка або щит-сфера Інженера: сфера спалахує, іскри її кольору;
+        // без тряски й червоного екрана.
         this.players[e.a]?.hitFlash();
-        this.sparks.burst(8, X, 1, Z, X - toX(e.x2), Z - toZ(e.y2), 5, 1.5, 0.25, 0.12, 0xd9a6ff);
+        this.sparks.burst(
+          8,
+          X,
+          1,
+          Z,
+          X - toX(e.x2),
+          Z - toZ(e.y2),
+          5,
+          1.5,
+          0.25,
+          0.12,
+          e.b === 1 ? 0xffb060 : 0xd9a6ff,
+        );
+        if (e.b === 1) this.sfx.barrierHit();
         break;
       case 'revived':
         this.sfx.revive();

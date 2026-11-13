@@ -13,8 +13,8 @@ export const UPGRADES = {
   /** Посилення здібності на 3-му рівні. */
   abilityBoost: {
     overloadDuration: 7,
-    barrierHp: 450,
-    barrierLength: 6,
+    shieldHp: 130,
+    shieldRadius: 7,
     healPerSecond: 25,
     empRadius: 9,
   },

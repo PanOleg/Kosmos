@@ -37,8 +37,10 @@ export interface ClassDef {
 export const ABILITIES = {
   /** Штурмовик: ×2 скорострільність на 5 с, потім 2 с перегріву без стрільби. */
   overload: { duration: 5, rateMul: 2, overheat: 2 },
-  /** Інженер: стіна 4 м, 300 HP, 10 с; ставиться перед собою, поперек погляду. */
+  /** Розміри стіни-бар'єра (Інженер її більше не ставить; механіка лишилась у симуляції). */
   barrier: { length: 4, thickness: 0.35, hp: 300, duration: 10, distance: 2 },
+  /** Інженер: щит-сфера на кожному, хто в радіусі (і на ньому самому): поглинає hp шкоди, тримається duration с. */
+  shield: { radius: 5, hp: 80, duration: 8 },
   /** Медик: поле радіусом 4 м навколо себе, +15 HP/с союзникам 5 с. */
   healField: { radius: 4, perSecond: 15, duration: 5 },
   /** Технік: ЕМІ радіусом 7 м, глушить ворогів на 3 с. */
@@ -62,7 +64,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     },
   },
   engineer: {
-    hp: 150,
+    hp: 225,
     abilityCooldown: 20,
     weapon: {
       damage: 8,

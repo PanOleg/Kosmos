@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { createGame, fighterCount, spawnEnemy, step, type PlayerInput } from '../src/index';
 import { damagePlayer, knockDown } from '../src/systems/damage';
+import { dropParts } from '../src/systems/pickups';
 import { allLost } from '../src/systems/revive';
 
 const idle = (): PlayerInput => ({ move: { x: 0, y: 0 }, ability: false, dash: false, buy: 0 });
@@ -44,5 +45,23 @@ describe('kid (armored class)', () => {
     // Самі Малюки програти не можуть.
     const solo = createGame(undefined, 1, [{ classId: 'kid' }]);
     expect(allLost(solo)).toBe(false);
+  });
+
+  test('does not collect parts: they fly past the kid to a fighter', () => {
+    const g = createGame(undefined, 1, [{ classId: 'assault' }, { classId: 'kid' }]);
+    g.config = { ...g.config, waves: [] };
+    g.state.wave.phase = 'done';
+    const [a, kid] = g.state.players;
+    a!.x = a!.px = 10;
+    kid!.x = kid!.px = -10;
+    a!.y = kid!.y = 0;
+    dropParts(g, -10, 0, 5);
+    for (let i = 0; i < 120; i++) step(g, [idle(), idle()]);
+    expect(kid!.parts).toBe(0);
+    expect(g.state.pickups.some((p) => p.alive)).toBe(true);
+    a!.x = a!.px = -10.5;
+    for (let i = 0; i < 120; i++) step(g, [idle(), idle()]);
+    expect(a!.parts).toBeGreaterThan(0);
+    expect(kid!.parts).toBe(0);
   });
 });
