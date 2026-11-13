@@ -21,10 +21,15 @@ export class Joystick {
     private readonly onFlick: () => void,
   ) {
     zone.addEventListener('pointerdown', (e) => {
-      if (this.pointer !== null) return;
+      // Новий дотик завжди забирає стік. Старі Safari інколи не надсилають pointerup
+      // (системний жест, втрачене захоплення) — без цього стік лишався «зайнятим» назавжди.
       this.pointer = e.pointerId;
       zone.classList.add('touch');
-      zone.setPointerCapture(e.pointerId);
+      try {
+        zone.setPointerCapture(e.pointerId);
+      } catch {
+        // Старий Safari може відмовити в захопленні — стік працює й без нього.
+      }
       const r = zone.getBoundingClientRect();
       this.cx = e.clientX - r.left;
       this.cy = e.clientY - r.top;
@@ -61,15 +66,30 @@ export class Joystick {
       );
       this.detectFlick(e.timeStamp, n);
     });
-    const end = (e: PointerEvent) => {
-      if (e.pointerId !== this.pointer) return;
+    const reset = () => {
+      if (this.pointer === null) return;
       this.pointer = null;
       zone.classList.remove('touch');
       this.x = this.y = 0;
       base.style.display = knob.style.display = 'none';
     };
+    const end = (e: PointerEvent) => {
+      if (e.pointerId === this.pointer) reset();
+    };
     zone.addEventListener('pointerup', end);
     zone.addEventListener('pointercancel', end);
+    zone.addEventListener('lostpointercapture', end);
+    // Запобіжники на випадок, коли кінець дотику до зони не дійшов: на екрані не лишилось
+    // жодного пальця або сторінка пішла у фон — стік відпущено, персонаж не біжить сам.
+    const noFingers = (e: TouchEvent) => {
+      if (e.touches.length === 0) reset();
+    };
+    document.addEventListener('touchend', noFingers);
+    document.addEventListener('touchcancel', noFingers);
+    window.addEventListener('blur', reset);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') reset();
+    });
   }
 
   private detectFlick(t: number, n: number): void {
