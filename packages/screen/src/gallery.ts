@@ -11,9 +11,16 @@ import { models } from './render/models';
  * Галерея для доведення вигляду: одна модель крупним планом у ракурсі концептів
  * (?m=assault|engineer|medic|tech|scout|gunner) або карта згори (?m=map).
  * Порівнюється з docs/concepts; у грі не використовується.
+ * ?portrait — прозоре тло без підлоги й постобробки: знімок 512×512 стає портретом класу
+ * (public/classes/*.png) для моделей, яких немає в models.blend.
  */
 const m = new URLSearchParams(location.search).get('m') ?? 'assault';
-const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+const portrait = new URLSearchParams(location.search).has('portrait');
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  preserveDrawingBuffer: true,
+  alpha: portrait,
+});
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
@@ -21,7 +28,11 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0d0e12);
+if (portrait) {
+  renderer.setClearColor(0x000000, 0);
+  document.documentElement.style.background = 'transparent';
+  document.body.style.background = 'transparent';
+} else scene.background = new THREE.Color(0x0d0e12);
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.32;
@@ -62,8 +73,8 @@ if (m === 'map') {
     new THREE.MeshStandardMaterial({ color: 0x2a2c30, metalness: 0.5, roughness: 0.35 }),
   );
   floor.receiveShadow = true;
-  scene.add(floor);
-  const classes: ClassId[] = ['assault', 'engineer', 'medic', 'tech'];
+  if (!portrait) scene.add(floor);
+  const classes: ClassId[] = ['assault', 'engineer', 'medic', 'tech', 'kid'];
   let obj: THREE.Object3D;
   if (classes.includes(m as ClassId)) obj = new PlayerView(0, m as ClassId).root;
   else {
@@ -87,5 +98,6 @@ if (m === 'map') {
   cam.lookAt(0, h * 0.48, 0);
   camera = cam;
 }
-new PostFx(renderer, scene, camera, true).render();
+if (portrait) renderer.render(scene, camera);
+else new PostFx(renderer, scene, camera, true).render();
 document.title = 'ready';

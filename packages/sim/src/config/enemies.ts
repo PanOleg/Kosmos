@@ -232,7 +232,7 @@ export const FOREMAN = {
   hp: 900,
   speed: 2.5,
   radius: 1.1,
-  damage: 25,
+  damage: 40,
   parts: 20,
   threat: 18,
   /** Підходить на цю дистанцію. */
@@ -242,15 +242,15 @@ export const FOREMAN = {
   strikeOffset: 2.5,
   strikeRadius: 3,
   strikeWarn: 1.2,
-  strikeEvery: 3.5,
+  strikeEvery: 2.4,
   /** Раз на buildEvery — укриття або турель (по черзі), турелей ≤ maxTurrets за хвилю. */
-  buildEvery: 8,
+  buildEvery: 6,
   maxTurrets: 2,
   /** Раз на summonEvery — summonCount Скаутів. */
-  summonEvery: 12,
+  summonEvery: 9,
   summonCount: 3,
   /** Звір (ліс): стрибок на гравця раз на leapEvery, якщо той далі за leapMin; зграя з воріт. */
-  leapEvery: 7,
+  leapEvery: 5,
   leapMin: 6,
   packCount: 4,
   /** Стіна-укриття, яку він ставить. */
@@ -284,7 +284,7 @@ export const CORE = {
   hp: 1500,
   speed: 0,
   radius: 2.9,
-  damage: 30,
+  damage: 45,
   parts: 60,
   /** Нижче за турелі й більшість ворогів: автоприціл спершу чистить загрози. */
   threat: 8,
@@ -294,18 +294,18 @@ export const CORE = {
   darkRadius: 8,
   wallTurrets: 6,
   wallTurretR: 25,
-  gridEvery: 6,
+  gridEvery: 4.5,
   gridWarn: 1.5,
   gridFire: 0.25,
   /** Відстань між променями й половина ширини променя. */
   gridSpacing: 4.5,
   gridHalfWidth: 0.55,
-  gridDamage: 25,
+  gridDamage: 40,
   /** Звір (ліс): у першій фазі — серія ударів лапами по гравцях замість сітки. */
-  pawEvery: 5,
+  pawEvery: 3.5,
   pawWarn: 1.1,
   pawRadius: 3,
-  pawDamage: 22,
+  pawDamage: 35,
   pawCombo: 2,
   // Фаза 2: шлюзи.
   airlockEvery: 10,
@@ -315,18 +315,18 @@ export const CORE = {
   pull: 3,
   /** Ближче за це до відкритого шлюзу — затягнуло. */
   suckRadius: 1.6,
-  rocketEvery: 3.5,
-  scoutEvery: 9,
+  rocketEvery: 2.5,
+  scoutEvery: 7,
   scoutCount: 3,
   // Фаза 3: робот, атаки по черзі з паузою.
-  attackPause: 2,
+  attackPause: 1.3,
   volley: 3,
   laserAim: 1.5,
   laserSpeed: 45,
-  laserDamage: 35,
+  laserDamage: 50,
   craneRadius: 3.5,
   craneWarn: 1.2,
-  craneDamage: 35,
+  craneDamage: 50,
   /** Не кличе Рій, якщо дрібних дронів уже стільки. */
   swarmCap: 24,
 } satisfies EnemyDef & Record<string, number>;

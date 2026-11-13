@@ -1,3 +1,4 @@
+import { fighterCount, isArmored } from '../config/classes';
 import { REVIVE } from '../config/revive';
 import type { Player } from '../entities/player';
 import { emit } from '../events';
@@ -51,7 +52,7 @@ function standUp(game: Game, p: Player, x = p.x, y = p.y): void {
  */
 export function updateRevive(game: Game): void {
   const s = game.state;
-  const solo = s.players.length === 1;
+  const solo = fighterCount(s.players) === 1;
   const hold = secToTicks(REVIVE.hold);
 
   for (const p of s.players) {
@@ -123,7 +124,8 @@ export function returnOutPlayers(game: Game): void {
 
 /** Програш: усі впали, і в соло не лишилось автопідйому. */
 export function allLost(game: Game): boolean {
-  const ps = game.state.players;
-  if (!ps.every((p) => p.down)) return false;
+  // Малюк не падає, але й матч сам не витягне: рахуються лише ті, хто може впасти.
+  const ps = game.state.players.filter((p) => !isArmored(p.classId));
+  if (ps.length === 0 || !ps.every((p) => p.down)) return false;
   return !(ps.length === 1 && ps[0]!.autoRevives > 0 && !ps[0]!.out);
 }

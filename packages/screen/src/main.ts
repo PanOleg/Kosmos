@@ -53,7 +53,7 @@ import { showResults, type ResultsView } from './ui/results';
 import { dayNumber, loadProgress, recordMatch, saveProgress } from './meta/progress';
 import { LobbyView } from './ui/lobby';
 import { t } from './ui/i18n';
-import { LobbyHost, PAUSE_BY_SCREEN, type Slot } from './net/lobby';
+import { CLASS_IDS, LobbyHost, PAUSE_BY_SCREEN, type Slot } from './net/lobby';
 import { PeerJsHost } from './net/peerjsHost';
 import { LocalHost } from './net/localHost';
 import { RoomTakenError } from './net/transport';
@@ -62,6 +62,7 @@ import { RoomTakenError } from './net/transport';
  * Параметри розробника в URL:
  *   ?quick    — без лобі: клавіатура (WASD) + ?bots=N, одразу матч
  *   ?bots=N   — разом з ?quick: N ботів
+ *   ?class=X  — разом з ?quick: клас гравця з клавіатури (assault|engineer|medic|tech|kid)
  *   ?seed=N   — сід першого матчу
  *   ?debug    — fps/draw calls/затримки, window.game, F1/F2 спавнять ворогів
  */
@@ -592,6 +593,8 @@ if (params.has('quick')) {
   void modelsReady.then(() => {
     const s = lobby.addLocal('keyboard');
     if (s) keyboardLayout.set(s, LAYOUT_WASD);
+    const cls = CLASS_IDS.find((c) => c === params.get('class'));
+    if (s && cls) lobby.pickClass(s, cls);
     for (let i = 0; i < Number(params.get('bots') ?? 0); i++) lobby.addLocal('bot');
     startMatch();
   });

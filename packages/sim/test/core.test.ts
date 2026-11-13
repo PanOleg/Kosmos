@@ -83,7 +83,8 @@ describe('station core', () => {
     a!.hp = b!.hp = a!.maxHp = b!.maxHp = 1000;
     let onBeam = 0;
     let inGap = 0;
-    run(g, 60 * 14, (g) => {
+    // Рівно одна сітка: наступна вмикається через gridEvery після пострілу.
+    run(g, 60 * 10, (g) => {
       const bs = g.state.boss;
       // Поки сітка підсвічена, один стоїть на промені, інший — посередині проміжку.
       if (bs.grid === 1) {

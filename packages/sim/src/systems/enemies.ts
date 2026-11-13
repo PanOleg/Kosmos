@@ -1,3 +1,4 @@
+import { isArmored } from '../config/classes';
 import { slowAt } from '../config/map';
 import { clearHash, insertHash } from '../collision/spatial';
 import { raycast, resolveCircle } from '../collision/world';
@@ -135,15 +136,23 @@ export function steerTo(game: Game, e: Enemy, tx: number, ty: number): void {
 function pickTarget(game: Game, e: Enemy): number {
   let best = -1;
   let bestD = Infinity;
+  // Малюка в непробивній броні беруть за ціль, лише коли більше нікого немає.
+  let spare = -1;
+  let spareD = Infinity;
   for (const p of game.state.players) {
     if (p.down) continue;
     const d = (p.x - e.x) * (p.x - e.x) + (p.y - e.y) * (p.y - e.y);
-    if (d < bestD) {
+    if (isArmored(p.classId)) {
+      if (d < spareD) {
+        spareD = d;
+        spare = p.slot;
+      }
+    } else if (d < bestD) {
       bestD = d;
       best = p.slot;
     }
   }
-  return best;
+  return best >= 0 ? best : spare;
 }
 
 export function updateEnemies(game: Game): void {

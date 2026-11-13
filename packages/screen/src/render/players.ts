@@ -9,7 +9,8 @@ import { toX, toZ } from './coords';
 /**
  * Силуети класів за концептами: темна броня, пластини й візор кольору класу.
  * Штурмовик — масивні наплічники й довга гвинтівка; Інженер — великий рюкзак-генератор;
- * Медик — стрункий, світлі пластини, пістолет; Технік — антена й довга дугова гармата.
+ * Медик — стрункий, світлі пластини, пістолет; Технік — антена й довга дугова гармата;
+ * Малюк — низенький і круглий: панцир-куля, великий шолом, навколо — силова бульбашка.
  * Вороги натомість бліді з червоними очима: гравця видно за формою й кольором одночасно.
  */
 type V3 = [number, number, number];
@@ -31,6 +32,34 @@ function buildClass(classId: ClassId): {
   const k = medic ? 0.86 : classId === 'engineer' ? 1.12 : 1;
   const hull: Part[] = [];
   const glow: Part[] = [];
+
+  if (classId === 'kid') {
+    // Малюк: короткі ніжки, панцир-куля з поясом, великий круглий шолом, маленький бластер.
+    for (const sx of [1, -1]) {
+      hull.push(
+        seg(BOX, A, [0.15 * sx, 0.42, 0], [0.16 * sx, 0.1, 0.02], 0.19, 0.21),
+        part(BOX, c, [0.16 * sx, 0.06, 0.06], [0.22, 0.12, 0.32]),
+        part(SPHERE, c, [0.42 * sx, 0.84, 0], [0.26, 0.26, 0.28]),
+        seg(BOX, A, [0.42 * sx, 0.8, 0], [0.36 * sx, 0.6, 0.2], 0.14),
+      );
+    }
+    hull.push(
+      part(SPHERE, A, [0, 0.68, 0], [0.84, 0.74, 0.74]),
+      part(SPHERE, c, [0, 0.72, 0.04], [0.74, 0.62, 0.72]),
+      part(CYL, L, [0, 0.52, 0], [0.8, 0.07, 0.72]),
+      part(SPHERE, c, [0, 1.2, 0.01], [0.56, 0.52, 0.56]),
+      part(BOX, A, [0, 1.19, 0.2], [0.36, 0.16, 0.14]),
+      part(CYL, L, [0, 1.48, 0], [0.05, 0.14, 0.05]),
+      part(SPHERE, c, [0, 1.58, 0], [0.11, 0.11, 0.11]),
+      part(BOX, A, [0.36, 0.6, 0.32], [0.11, 0.12, 0.3]),
+      part(BOX, L, [0.36, 0.61, 0.5], [0.07, 0.07, 0.1]),
+    );
+    glow.push(
+      part(BOX, 0xffffff, [0, 1.2, 0.275], [0.26, 0.07, 0.02]),
+      part(SPHERE, 0xffffff, [0, 0.74, 0.36], [0.16, 0.16, 0.06]),
+    );
+    return { hull: merge(hull), glow: merge(glow), muzzle: [0.36, 0.61, 0.6] };
+  }
 
   // Ноги: стегно, гомілка зі щитком кольору класу, черевик.
   for (const sx of [1, -1]) {
@@ -190,6 +219,8 @@ export class PlayerView {
   private ringPulse = 0;
   private readonly muzzle: THREE.Mesh;
   private readonly model: ModelInstance | null;
+  /** Силова бульбашка Малюка: видно, що броню не пробити. */
+  private bubble: THREE.Mesh | null = null;
   /** Лікувальний дрон Медика: кружляє біля плеча (концепт classes.jpg). */
   private drone: THREE.Object3D | null = null;
   /** Ноги статичної моделі на шарнірі в стегні: код крокує ними на бігу. */
@@ -264,6 +295,21 @@ export class PlayerView {
       const glow = new THREE.Mesh(model.glow, this.visorMat);
       hull.castShadow = true;
       this.body.add(hull, glow);
+      if (classId === 'kid') {
+        this.bubble = new THREE.Mesh(
+          new THREE.IcosahedronGeometry(0.95, 1),
+          new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity: 0.14,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            wireframe: true,
+          }),
+        );
+        this.bubble.position.y = 0.85;
+        this.body.add(this.bubble);
+      }
       if (classId === 'engineer') this.body.add(hexShield(color));
       if (classId === 'medic') {
         this.drone = medicDrone(color);
@@ -388,6 +434,11 @@ export class PlayerView {
     }
     // Вибулий до наступної хвилі зникає з арени.
     this.root.visible = !p.out;
+    if (this.bubble) {
+      this.bubble.rotation.y = time * 0.6;
+      // Удар у броню (hitFlash) — бульбашка на мить спалахує.
+      (this.bubble.material as THREE.MeshBasicMaterial).opacity = 0.14 + this.flash * 0.5;
+    }
     if (this.drone) {
       const a = time * 1.6;
       this.drone.position.set(

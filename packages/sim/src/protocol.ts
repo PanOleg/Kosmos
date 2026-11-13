@@ -37,6 +37,7 @@ export const CLASS_COLOR: Record<ClassId, number> = {
   engineer: 0xff8a1f,
   medic: 0x3fd45a,
   tech: 0x2f7bff,
+  kid: 0xb45cff,
 };
 
 export type ScreenPhase = 'lobby' | 'match' | 'results';

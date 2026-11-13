@@ -1,7 +1,7 @@
 import { buildCover } from './collision/cover';
 import { createSpatialHash } from './collision/spatial';
 import { buildWorld } from './collision/world';
-import { DEFAULT_CONFIG, type ClassId, type GameConfig } from './config';
+import { DEFAULT_CONFIG, fighterCount, isArmored, type ClassId, type GameConfig } from './config';
 import { createEnemyPool } from './entities/enemy';
 import { createPlayer } from './entities/player';
 import { createPickupPool } from './entities/pickup';
@@ -74,7 +74,8 @@ export function createGame(
     perches: buildPerches(world),
   };
   // Соло-запобіжник: автопідйом раз на матч (DECISIONS.md, п. 12).
-  if (state.players.length === 1) state.players[0]!.autoRevives = REVIVE.soloAuto;
+  if (fighterCount(state.players) === 1)
+    for (const p of state.players) if (!isArmored(p.classId)) p.autoRevives = REVIVE.soloAuto;
   updateNav(game.nav, state);
   if (config.waves.length > 0) startWave(game, 0);
   else state.wave.phase = 'done';

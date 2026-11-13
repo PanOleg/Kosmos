@@ -10,7 +10,7 @@ import { UPGRADES } from '../config/upgrades';
 import { abilityBoosted, abilityCooldownTicks } from './upgrades';
 
 /** Індекс класу в подіях: рендер вибирає ефект за ним. */
-export const ABILITY_CLASS_INDEX = { assault: 0, engineer: 1, medic: 2, tech: 3 } as const;
+export const ABILITY_CLASS_INDEX = { assault: 0, engineer: 1, medic: 2, tech: 3, kid: 4 } as const;
 
 /** 0..1: частка готовності здібності; 1 — можна тиснути. Для кільця на пульті й у HUD. */
 export function abilityReadiness(game: Game, p: Player): number {
@@ -31,6 +31,8 @@ export function updateAbilities(game: Game): void {
     }
     if (p.down || !p.abilityPressed || p.abilityCd > 0 || p.abilityT > 0 || p.overheatT > 0)
       continue;
+    // Малюк здібності не має: кнопка лишається тільки для підйому напарника.
+    if (p.classId === 'kid') continue;
     // Перезарядка рахується від натискання; для тривалих здібностей — включно з дією,
     // як у BALANCE (15 с у Штурмовика охоплюють 5 с перевантаження й 2 с перегріву).
     p.abilityCd = abilityCooldownTicks(game, p);

@@ -6,6 +6,8 @@ import {
   UPGRADES,
   REVIVE,
   downedAllyNear,
+  fighterCount,
+  isArmored,
   reviveCost,
   wholeParts,
   type ClassId,
@@ -36,7 +38,7 @@ import {
 import type { Link } from './transport';
 
 export const MAX_SLOTS = 4;
-export const CLASS_IDS: ClassId[] = ['assault', 'engineer', 'medic', 'tech'];
+export const CLASS_IDS: ClassId[] = ['assault', 'engineer', 'medic', 'tech', 'kid'];
 
 export interface Slot {
   index: number;
@@ -606,7 +608,10 @@ export class LobbyHost {
                   ],
                   medkit: p.medkitBought ? null : UPGRADES.medkit.price,
                   medkitHeal: UPGRADES.medkit.heal,
-                  life: g.state.players.length === 1 && !p.lifeBought ? REVIVE.soloLifePrice : null,
+                  life:
+                    fighterCount(g.state.players) === 1 && !isArmored(p.classId) && !p.lifeBought
+                      ? REVIVE.soloLifePrice
+                      : null,
                 }
               : null,
           revive: rv && { ...rv, progress: Math.round(rv.progress * 20) / 20 },

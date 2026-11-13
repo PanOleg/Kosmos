@@ -289,6 +289,7 @@ const uk = {
     engineer: 'Інженер',
     medic: 'Медик',
     tech: 'Технік',
+    kid: 'Малюк',
   } as Record<string, string>,
   controlsHint: 'WASD — рух · Пробіл — ривок · Shift — здібність · стрільба автоматична',
 };

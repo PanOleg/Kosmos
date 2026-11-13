@@ -15,4 +15,4 @@ export const PLAYER = {
   pickupLockMul: 2,
 };
 
-export type ClassId = 'assault' | 'engineer' | 'medic' | 'tech';
+export type ClassId = 'assault' | 'engineer' | 'medic' | 'tech' | 'kid';

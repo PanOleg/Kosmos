@@ -1,3 +1,4 @@
+import { isArmored } from '../config/classes';
 import { ENEMIES } from '../config/enemies';
 import type { Enemy } from '../entities/enemy';
 import type { Player } from '../entities/player';
@@ -15,6 +16,10 @@ export function damagePlayer(
   fromY: number,
 ): void {
   if (p.down || p.invuln > 0 || amount <= 0) return;
+  if (isArmored(p.classId)) {
+    emit(game.events, 'armorBlock', p.x, p.y, fromX, fromY, p.slot);
+    return;
+  }
   p.hp -= amount;
   p.stats.damageTaken += amount;
   emit(game.events, 'playerHit', p.x, p.y, fromX, fromY, p.slot, 0, amount);
@@ -23,7 +28,7 @@ export function damagePlayer(
 
 /** Гравець падає незалежно від здоров'я й невразливості (затягнуло в шлюз). */
 export function knockDown(game: Game, p: Player): void {
-  if (p.down) return;
+  if (p.down || isArmored(p.classId)) return;
   p.hp = 0;
   p.down = true;
   p.target = -1;

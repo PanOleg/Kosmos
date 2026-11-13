@@ -29,6 +29,8 @@ export interface ClassDef {
   arc?: ArcDef;
   /** Перезарядка здібності, с (BALANCE.md). */
   abilityCooldown: number;
+  /** Броню не пробити: шкода й падіння не діють, вороги на нього не полюють (Малюк). */
+  armored?: boolean;
 }
 
 /** Параметри здібностей з BALANCE.md. */
@@ -99,7 +101,37 @@ export const CLASSES: Record<ClassId, ClassDef> = {
       knockback: 0.2,
     },
   },
+  // Малюк — для найменших: тільки бігати. Не падає, здібності не має, стріляє сам і слабко.
+  kid: {
+    hp: 100,
+    abilityCooldown: 0,
+    armored: true,
+    weapon: {
+      damage: 8,
+      rate: 3,
+      range: 10,
+      pellets: 1,
+      spread: 4 * deg,
+      projectileSpeed: 40,
+      knockback: 0.3,
+    },
+  },
 };
+
+/** Клас із непробивною бронею (Малюк). */
+export function isArmored(classId: ClassId): boolean {
+  return CLASSES[classId].armored === true;
+}
+
+/**
+ * Скільки гравців воюють по-справжньому: за ними рахуються кількість ворогів, здоров'я босів
+ * і правила одинака. Малюк не рахується; якщо грають самі Малюки — рахуються всі.
+ */
+export function fighterCount(players: readonly { classId: ClassId }[]): number {
+  let n = 0;
+  for (const p of players) if (!isArmored(p.classId)) n++;
+  return n > 0 ? n : players.length;
+}
 
 export const AUTOAIM = {
   /** Утримання поточної цілі, щоб приціл не смикався між рівними кандидатами. */

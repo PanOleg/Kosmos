@@ -8,6 +8,7 @@ export const TRACER: Record<ClassId, number> = {
   engineer: 0xff9030,
   medic: 0xfff07a,
   tech: 0x7ab8ff,
+  kid: 0xd9a6ff,
 };
 
 /** Кулі двома InstancedMesh: свої й ворожі — різні кольори й форма, один draw call на команду. */

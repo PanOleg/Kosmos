@@ -34,11 +34,18 @@ export const CLASS_META: Record<
     ability: 'ЕМІ',
     about: 'Дуга б’є по трьох. Здібність: глушить ворогів, дрони падають',
   },
+  kid: {
+    name: 'Малюк',
+    role: 'Для найменших',
+    icon: '●',
+    ability: '',
+    about: 'Броню не пробити: не падає. Просто бігай — стріляє сам',
+  },
 };
 
-const IDS: ClassId[] = ['assault', 'engineer', 'medic', 'tech'];
+const IDS: ClassId[] = ['assault', 'engineer', 'medic', 'tech', 'kid'];
 
-/** Чотири великі картки класів; зайняті іншими — притемнені й неактивні. */
+/** Великі картки класів; зайняті іншими — притемнені й неактивні. */
 export class ClassSelect {
   private readonly cards = new Map<ClassId, HTMLButtonElement>();
 

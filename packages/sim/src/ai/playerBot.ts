@@ -1,3 +1,4 @@
+import { fighterCount, isArmored } from '../config/classes';
 import { CORE_CRANE, CORE_LASER, coreZone, gridDistance } from './core';
 import { CORE, FOREMAN, KAMIKAZE, SNIPER, SPIDER } from '../config/enemies';
 import { FOREMAN_STRIKE } from './foreman';
@@ -429,7 +430,12 @@ export function botInput(
       out.buy = BUY_MEDKIT;
       return;
     }
-    if (s.players.length === 1 && !p.lifeBought && parts >= REVIVE.soloLifePrice) {
+    if (
+      fighterCount(s.players) === 1 &&
+      !isArmored(p.classId) &&
+      !p.lifeBought &&
+      parts >= REVIVE.soloLifePrice
+    ) {
       out.buy = BUY_LIFE;
       return;
     }

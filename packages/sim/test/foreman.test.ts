@@ -40,7 +40,8 @@ describe('foreman & turret', () => {
     let warns = 0;
     let hits = 0;
     let props = 0;
-    for (let i = 0; i < 60 * 26; i++) {
+    // 28 с: третій виклик Скаутів (кожні 9 с) щойно відбувся, їх ще не встигли перебити.
+    for (let i = 0; i < 60 * 28; i++) {
       step(g, [idle()]);
       for (let k = 0; k < g.events.count; k++) {
         const t = g.events.list[k]!.type;

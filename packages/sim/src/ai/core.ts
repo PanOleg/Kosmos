@@ -1,3 +1,4 @@
+import { fighterCount, isArmored } from '../config/classes';
 import { CORE, SWARM, TURRET } from '../config/enemies';
 import { swarmCount } from '../config/difficulty';
 import { PLAYER_COUNT_MUL } from '../config/waves';
@@ -36,7 +37,10 @@ export function initCore(game: Game, index: number): void {
 }
 
 function aliveTargets(game: Game): Player[] {
-  return game.state.players.filter((p) => !p.down);
+  const up = game.state.players.filter((p) => !p.down);
+  // Малюка в непробивній броні бос вибирає, лише коли більше нікого немає.
+  const fighters = up.filter((p) => !isArmored(p.classId));
+  return fighters.length ? fighters : up;
 }
 
 function pick(game: Game): Player | undefined {
@@ -272,7 +276,7 @@ function phase2(game: Game, e: Enemy, index: number): void {
       b.airlock >= 0 ? (b.airlock + 2) % locks.length : randInt(s.rng, 0, locks.length - 1);
     const a = locks[li]!;
     const l = Math.hypot(a.x, a.y) || 1;
-    const mul = PLAYER_COUNT_MUL[Math.min(s.players.length, PLAYER_COUNT_MUL.length - 1)]!;
+    const mul = PLAYER_COUNT_MUL[Math.min(fighterCount(s.players), PLAYER_COUNT_MUL.length - 1)]!;
     const count = Math.max(1, Math.round(CORE.scoutCount * mul * game.config.mods.enemyCount));
     for (let k = 0; k < count; k++)
       spawnEnemy(
@@ -288,7 +292,7 @@ function phase2(game: Game, e: Enemy, index: number): void {
 function pullPlayers(game: Game, ax: number, ay: number): void {
   const r = game.config.player.radius;
   for (const p of game.state.players) {
-    if (p.down) continue;
+    if (p.down || isArmored(p.classId)) continue;
     const dx = ax - p.x;
     const dy = ay - p.y;
     const d = Math.sqrt(dx * dx + dy * dy) || 1;

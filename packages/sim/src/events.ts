@@ -33,6 +33,8 @@ export type GameEventType =
   | 'shieldUp'
   | 'shieldBreak'
   | 'playerHit'
+  /** Удар у непробивну броню Малюка: a — слот; шкоди немає. */
+  | 'armorBlock'
   | 'pickup'
   | 'purchase'
   | 'purchaseFail'

@@ -1,3 +1,4 @@
+import { fighterCount, isArmored } from '../config/classes';
 import {
   BUY_LIFE,
   BUY_MEDKIT,
@@ -53,7 +54,12 @@ export function updateUpgrades(game: Game): void {
     if (item === BUY_LIFE) {
       // Соло: додаткове життя, раз за матч (DECISIONS.md, п. 12).
       const price = REVIVE.soloLifePrice;
-      if (game.state.players.length !== 1 || p.lifeBought || wholeParts(p) < price) {
+      if (
+        fighterCount(game.state.players) !== 1 ||
+        isArmored(p.classId) ||
+        p.lifeBought ||
+        wholeParts(p) < price
+      ) {
         emit(game.events, 'purchaseFail', p.x, p.y, 0, 0, p.slot, item);
         continue;
       }

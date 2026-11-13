@@ -1,3 +1,4 @@
+import { fighterCount } from '../config/classes';
 import { randInt } from '../rng';
 import { PICKUPS, PLAYER_COUNT_MUL } from '../config/waves';
 import { AIR_TYPES, SWARM } from '../config/enemies';
@@ -50,7 +51,7 @@ export function createWaveState(): WaveState {
 }
 
 function groupCount(game: Game, base: number, air = false): number {
-  const n = game.state.players.length;
+  const n = fighterCount(game.state.players);
   const mods = game.config.mods;
   const mul =
     PLAYER_COUNT_MUL[Math.min(n, PLAYER_COUNT_MUL.length - 1)]! *
@@ -202,7 +203,7 @@ function spawnGroup(
         const en = game.state.enemies[e]!;
         en.speed *= w.speedMul;
         if (BOSS_TYPES.has(type)) {
-          const n = game.state.players.length;
+          const n = fighterCount(game.state.players);
           en.hp = en.maxHp = Math.round(
             en.maxHp * PLAYER_COUNT_MUL[Math.min(n, PLAYER_COUNT_MUL.length - 1)]!,
           );

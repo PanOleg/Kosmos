@@ -298,6 +298,11 @@ export class FxDirector {
         this.sparks.burst(10, X, 1, Z, X - toX(e.x2), Z - toZ(e.y2), 7, 1.5, 0.25, 0.15, 0xff3020);
         break;
       }
+      case 'armorBlock':
+        // Броня Малюка: бульбашка спалахує, іскри кольору класу; без тряски й червоного екрана.
+        this.players[e.a]?.hitFlash();
+        this.sparks.burst(8, X, 1, Z, X - toX(e.x2), Z - toZ(e.y2), 5, 1.5, 0.25, 0.12, 0xd9a6ff);
+        break;
       case 'revived':
         this.sfx.revive();
         this.sparks.burst(30, X, 0.5, Z, 1, 0, 6, Math.PI * 2, 0.7, 0.2, 0x6aff8a);
